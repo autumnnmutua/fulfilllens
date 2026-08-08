@@ -1,0 +1,59 @@
+{
+  "generated_at": "2026-08-02T00:15:51.944489+08:00",
+  "environment": {
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python": "3.13.14",
+    "logical_cpu_count": 22,
+    "total_memory_gib": 31.5
+  },
+  "budgets": {
+    "10000": {
+      "each_core_step_seconds": 20,
+      "peak_rss_mib": 1228.8
+    },
+    "50000": {
+      "dataset_import_seconds": 60,
+      "metrics_seconds": 90,
+      "diagnostics_seconds": 120,
+      "simulation_seconds": 120,
+      "html_export_seconds": 90,
+      "peak_rss_mib": 2048
+    }
+  },
+  "results": [
+    {
+      "order_count": 10000,
+      "event_rows": 20000,
+      "csv_bytes": 1640202,
+      "finding_count": 3,
+      "export_bytes": 15709,
+      "timings": {
+        "synthetic_generation_seconds": 0.123,
+        "csv_parse_seconds": 0.067,
+        "dataset_import_seconds": 0.442,
+        "metrics_seconds": 0.817,
+        "diagnostics_seconds": 1.496,
+        "simulation_seconds": 3.153,
+        "html_export_seconds": 2.743
+      },
+      "peak_rss_mib": 363.3
+    },
+    {
+      "order_count": 50000,
+      "event_rows": 100000,
+      "csv_bytes": 8200202,
+      "finding_count": 3,
+      "export_bytes": 15715,
+      "timings": {
+        "synthetic_generation_seconds": 0.557,
+        "csv_parse_seconds": 0.213,
+        "dataset_import_seconds": 1.172,
+        "metrics_seconds": 4.568,
+        "diagnostics_seconds": 8.928,
+        "simulation_seconds": 18.859,
+        "html_export_seconds": 17.971
+      },
+      "peak_rss_mib": 1345.3
+    }
+  ]
+}

@@ -1,0 +1,126 @@
+{
+  "rule_set_version": "diagnostics-v1.0.0",
+  "rules": [
+    {
+      "rule_id": "FL-WH-001",
+      "rule_version": "1.0.0",
+      "title": "仓内作业延迟",
+      "category": "warehouse_delay",
+      "description": "识别仓内节点超过业务阈值或显著高于同仓节点中位基线的订单。",
+      "severity": "medium",
+      "priority": 70,
+      "enabled": true,
+      "parameters": {
+        "order_to_pick_threshold_hours": {"display_name": "接单到拣货阈值", "value": 4, "minimum": 0.25, "maximum": 168, "unit": "hour"},
+        "picking_threshold_hours": {"display_name": "拣货阈值", "value": 2, "minimum": 0.25, "maximum": 168, "unit": "hour"},
+        "pick_to_qc_threshold_hours": {"display_name": "等待复核阈值", "value": 2, "minimum": 0.25, "maximum": 168, "unit": "hour"},
+        "quality_check_threshold_hours": {"display_name": "复核阈值", "value": 1.5, "minimum": 0.25, "maximum": 168, "unit": "hour"},
+        "packing_threshold_hours": {"display_name": "打包阈值", "value": 2, "minimum": 0.25, "maximum": 168, "unit": "hour"},
+        "baseline_multiplier": {"display_name": "同组基线倍数", "value": 1.5, "minimum": 1.01, "maximum": 10, "unit": "ratio"},
+        "minimum_baseline_sample": {"display_name": "最小基线样本", "value": 10, "minimum": 3, "maximum": 10000, "unit": "order"}
+      }
+    },
+    {
+      "rule_id": "FL-PU-001",
+      "rule_version": "1.0.0",
+      "title": "出库后揽收延迟",
+      "category": "pickup_delay",
+      "description": "识别待出库/待揽收到承运商首次揽收超过业务阈值的订单。",
+      "severity": "high",
+      "priority": 85,
+      "enabled": true,
+      "parameters": {
+        "threshold_hours": {"display_name": "揽收等待阈值", "value": 12, "minimum": 0.5, "maximum": 336, "unit": "hour"}
+      }
+    },
+    {
+      "rule_id": "FL-LH-001",
+      "rule_version": "1.0.0",
+      "title": "干线运输长尾",
+      "category": "linehaul_long_tail",
+      "description": "识别承运运输时长超过业务阈值，或在足量样本下超过 P90 的订单。",
+      "severity": "high",
+      "priority": 82,
+      "enabled": true,
+      "parameters": {
+        "threshold_hours": {"display_name": "干线时长阈值", "value": 72, "minimum": 1, "maximum": 1440, "unit": "hour"},
+        "percentile": {"display_name": "长尾分位", "value": 0.9, "minimum": 0.5, "maximum": 0.99, "unit": "ratio"},
+        "minimum_baseline_sample": {"display_name": "最小分位样本", "value": 30, "minimum": 5, "maximum": 10000, "unit": "order"}
+      }
+    },
+    {
+      "rule_id": "FL-LM-001",
+      "rule_version": "1.0.0",
+      "title": "末端网点积压",
+      "category": "last_mile_backlog",
+      "description": "识别到达目的城市后长时间未派送，或派送后长时间未签收的订单。",
+      "severity": "high",
+      "priority": 84,
+      "enabled": true,
+      "parameters": {
+        "station_dwell_threshold_hours": {"display_name": "目的城市等待派送阈值", "value": 24, "minimum": 1, "maximum": 720, "unit": "hour"},
+        "delivery_attempt_threshold_hours": {"display_name": "派送到签收阈值", "value": 12, "minimum": 1, "maximum": 336, "unit": "hour"}
+      }
+    },
+    {
+      "rule_id": "FL-CR-001",
+      "rule_version": "1.0.0",
+      "title": "承运商相对异常",
+      "category": "carrier_relative",
+      "description": "在可比样本足量时，将承运商 OTIF 与 P90 同其他承运商基线比较。",
+      "severity": "medium",
+      "priority": 55,
+      "enabled": true,
+      "parameters": {
+        "minimum_sample": {"display_name": "承运商最小样本", "value": 30, "minimum": 5, "maximum": 10000, "unit": "order"},
+        "minimum_coverage": {"display_name": "最低 OTIF 覆盖率", "value": 0.8, "minimum": 0.1, "maximum": 1, "unit": "ratio"},
+        "otif_gap": {"display_name": "OTIF 差距阈值", "value": 0.1, "minimum": 0.01, "maximum": 1, "unit": "ratio"},
+        "p90_ratio": {"display_name": "P90 恶化倍数", "value": 1.25, "minimum": 1.01, "maximum": 10, "unit": "ratio"}
+      }
+    },
+    {
+      "rule_id": "FL-WC-001",
+      "rule_version": "1.0.0",
+      "title": "仓库拥堵相关性观察",
+      "category": "warehouse_congestion",
+      "description": "识别订单量上升与仓内时长同步恶化的仓库日期，仅报告相关性。",
+      "severity": "medium",
+      "priority": 45,
+      "enabled": true,
+      "parameters": {
+        "minimum_daily_orders": {"display_name": "当日最小订单量", "value": 10, "minimum": 3, "maximum": 10000, "unit": "order"},
+        "minimum_baseline_days": {"display_name": "最少历史天数", "value": 3, "minimum": 2, "maximum": 365, "unit": "day"},
+        "volume_ratio": {"display_name": "订单量上升倍数", "value": 1.25, "minimum": 1.01, "maximum": 10, "unit": "ratio"},
+        "duration_ratio": {"display_name": "仓内时长恶化倍数", "value": 1.2, "minimum": 1.01, "maximum": 10, "unit": "ratio"}
+      }
+    },
+    {
+      "rule_id": "FL-TC-001",
+      "rule_version": "1.0.0",
+      "title": "异常时间集中",
+      "category": "time_concentration",
+      "description": "识别规则异常在特定星期或六小时时段内的集中现象。",
+      "severity": "medium",
+      "priority": 35,
+      "enabled": true,
+      "parameters": {
+        "minimum_anomaly_orders": {"display_name": "最小异常订单量", "value": 10, "minimum": 3, "maximum": 10000, "unit": "order"},
+        "concentration_share": {"display_name": "集中占比阈值", "value": 0.5, "minimum": 0.1, "maximum": 1, "unit": "ratio"},
+        "minimum_distinct_dates": {"display_name": "最少日期数", "value": 3, "minimum": 2, "maximum": 365, "unit": "day"}
+      }
+    },
+    {
+      "rule_id": "FL-DQ-001",
+      "rule_version": "1.0.0",
+      "title": "事件数据异常",
+      "category": "data_quality",
+      "description": "识别事件缺失、倒序、重复、状态跳跃和异常长间隔。",
+      "severity": "high",
+      "priority": 100,
+      "enabled": true,
+      "parameters": {
+        "long_interval_threshold_hours": {"display_name": "异常长间隔阈值", "value": 720, "minimum": 24, "maximum": 8760, "unit": "hour"}
+      }
+    }
+  ]
+}

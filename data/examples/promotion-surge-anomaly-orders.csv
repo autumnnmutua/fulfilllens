@@ -1,0 +1,7 @@
+﻿订单标识,订单状态,仓库,承运商,目的地区,OTIF,履约时长（小时）,异常类型,异常证据,指标版本
+***0206,delivered,WH-SYN-EAST,CAR-SYN-STD,CN-HB-WH,false,41.65111111111111,partial_delivery,完成订单存在部分交付。,metrics-v1.1.0
+***0204,delivered,WH-SYN-EAST,CAR-SYN-FAST,CN-SD-QD,false,37.598333333333336,partial_delivery,完成订单存在部分交付。,metrics-v1.1.0
+***0075,delivered,WH-SYN-EAST,CAR-SYN-ECON,CN-JS-NJ,false,60.8975,partial_delivery,完成订单存在部分交付。,metrics-v1.1.0
+***0063,delivered,WH-SYN-EAST,CAR-SYN-FAST,CN-SD-QD,false,43.592777777777776,partial_delivery,完成订单存在部分交付。,metrics-v1.1.0
+***0058,delivered,WH-SYN-EAST,CAR-SYN-STD,CN-SD-QD,false,43.7375,partial_delivery,完成订单存在部分交付。,metrics-v1.1.0
+***0012,delivered,WH-SYN-EAST,CAR-SYN-STD,CN-JS-NJ,false,44.90611111111111,partial_delivery,完成订单存在部分交付。,metrics-v1.1.0

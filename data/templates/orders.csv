@@ -1,0 +1,1 @@
+order_id,created_at,promised_delivery_time,actual_delivery_time,ordered_quantity,delivered_quantity,quantity_unit,order_status,raw_order_status,warehouse_id,carrier_id,destination_region,sales_channel

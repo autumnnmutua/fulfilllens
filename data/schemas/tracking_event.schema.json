@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fulfilllens.cn/schemas/tracking-event.schema.json",
+  "title": "FulfillLens CN 物流轨迹事件行",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "tracking_event_id",
+    "order_id",
+    "shipment_id",
+    "event_time",
+    "event_code",
+    "raw_status",
+    "carrier_id"
+  ],
+  "properties": {
+    "tracking_event_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "order_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "shipment_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "event_time": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "(Z|[+-][0-9]{2}:[0-9]{2})$"
+    },
+    "event_code": {
+      "$ref": "https://fulfilllens.cn/schemas/status-codes.schema.json#/$defs/trackingEventCode"
+    },
+    "raw_status": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "carrier_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "location_code": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "region_code": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "exception_code": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "sequence_number": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 0
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  }
+}

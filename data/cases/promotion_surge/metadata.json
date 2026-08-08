@@ -1,0 +1,90 @@
+{
+  "business_background": "活动开始后订单在两天内集中涌入，仓库作业能力未同步扩容。",
+  "case_id": "promotion_surge",
+  "content_fingerprint": "aa59f5ac69c0492bf6b488ed072a95ce525a826b42a19ad52721a045b74bfe69",
+  "date_range": {
+    "end": "2026-06-12",
+    "start": "2026-06-01"
+  },
+  "display_name": "案例 B：促销爆单",
+  "expected_findings": [
+    {
+      "description": "仓内多个节点超过业务阈值",
+      "required": true,
+      "rule_id": "FL-WH-001"
+    },
+    {
+      "description": "订单量与仓内 P90 同步恶化的相关性观察",
+      "required": true,
+      "rule_id": "FL-WC-001"
+    }
+  ],
+  "expected_metric_ranges": {
+    "anomaly_order_rate": {
+      "maximum": 0.1,
+      "minimum": 0.01,
+      "unit": "ratio"
+    },
+    "fulfillment_duration_mean_hours": {
+      "maximum": 80.0,
+      "minimum": 45.0,
+      "unit": "hour"
+    },
+    "if_rate": {
+      "maximum": 1.0,
+      "minimum": 0.94,
+      "unit": "ratio"
+    },
+    "ot_rate": {
+      "maximum": 0.85,
+      "minimum": 0.25,
+      "unit": "ratio"
+    },
+    "otif_rate": {
+      "maximum": 0.82,
+      "minimum": 0.2,
+      "unit": "ratio"
+    }
+  },
+  "files": [
+    {
+      "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "name": "case.xlsx",
+      "size_bytes": 199981
+    },
+    {
+      "media_type": "text/csv; charset=utf-8",
+      "name": "orders.csv",
+      "size_bytes": 42497
+    },
+    {
+      "media_type": "text/csv; charset=utf-8",
+      "name": "tracking_events.csv",
+      "size_bytes": 315644
+    },
+    {
+      "media_type": "text/csv; charset=utf-8",
+      "name": "warehouse_events.csv",
+      "size_bytes": 304424
+    }
+  ],
+  "generator_version": "case-generator-v1.0.0",
+  "injected_anomalies": [
+    "活动峰值日订单量显著上升",
+    "峰值订单的接单等待、拣货、复核、打包和出库耗时同步恶化"
+  ],
+  "learning_objectives": [
+    "识别活动波峰与仓内瓶颈节点",
+    "理解订单量与时长共同恶化只是相关性证据",
+    "用仓内改善方案评估方向性影响"
+  ],
+  "order_count": 240,
+  "privacy_statement": "本案例完全由程序生成，不包含真实姓名、手机号、身份证、详细地址、真实快递单号、真实企业名称或任何公司内部数据。",
+  "row_counts": {
+    "orders": 240,
+    "tracking_events": 2160,
+    "warehouse_events": 2160
+  },
+  "seed": 20260802,
+  "timezone": "Asia/Shanghai"
+}

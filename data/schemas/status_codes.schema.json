@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fulfilllens.cn/schemas/status-codes.schema.json",
+  "title": "FulfillLens CN 标准状态代码",
+  "description": "订单、仓库作业和物流轨迹的受控状态枚举。",
+  "$defs": {
+    "orderStatus": {
+      "type": "string",
+      "enum": [
+        "created",
+        "confirmed",
+        "processing",
+        "shipped",
+        "delivered",
+        "cancelled",
+        "returned",
+        "unmapped"
+      ]
+    },
+    "warehouseEventCode": {
+      "type": "string",
+      "enum": [
+        "order_received",
+        "picking_started",
+        "picking_completed",
+        "quality_check_started",
+        "quality_check_failed",
+        "quality_check_completed",
+        "packing_started",
+        "packing_completed",
+        "ready_to_ship",
+        "shipped_from_warehouse",
+        "warehouse_cancelled",
+        "unmapped"
+      ]
+    },
+    "trackingEventCode": {
+      "type": "string",
+      "enum": [
+        "shipment_created",
+        "carrier_picked_up",
+        "origin_departed",
+        "in_transit",
+        "arrived_at_hub",
+        "departed_hub",
+        "arrived_at_destination_city",
+        "out_for_delivery",
+        "delivered",
+        "delivery_failed",
+        "exception",
+        "return_initiated",
+        "returned",
+        "unmapped"
+      ]
+    }
+  }
+}

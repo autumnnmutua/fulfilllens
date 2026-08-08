@@ -1,0 +1,66 @@
+name: 字段或状态映射建议
+description: 提议数据字典别名、字段验证或中文物流状态映射
+title: "[Data Mapping] "
+labels:
+  - data-mapping
+body:
+  - type: markdown
+    attributes:
+      value: |
+        只提交脱敏后的字段名和合成示例。不要粘贴真实订单行、姓名、手机号、地址、身份证、运单号或客户名称。未知状态必须保留原值并标记 unmapped，不能静默丢弃。
+  - type: dropdown
+    id: data_type
+    attributes:
+      label: 数据类型
+      options:
+        - orders（订单表）
+        - warehouse_events（仓库事件表）
+        - tracking_events（物流轨迹表）
+        - status taxonomy（标准状态）
+    validations:
+      required: true
+  - type: input
+    id: source_header
+    attributes:
+      label: 脱敏后的来源字段或状态
+      placeholder: 例如 承诺签收时间 / 已交承运商
+    validations:
+      required: true
+  - type: input
+    id: target
+    attributes:
+      label: 建议目标字段或标准状态
+      placeholder: 例如 promised_delivery_time / picked_up
+    validations:
+      required: true
+  - type: textarea
+    id: semantics
+    attributes:
+      label: 业务含义与来源系统差异
+      description: 解释它在来源系统中的定义、粒度、单位、时区和可能歧义。
+    validations:
+      required: true
+  - type: textarea
+    id: synthetic_sample
+    attributes:
+      label: 最小合成样例
+      description: 提供不含真实信息的表头与 1–3 行示例，或生成脚本。
+      render: csv
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: 期望校验与验收证据
+      description: 正例、边界、反例，期望置信度，以及未知值应如何处理。
+    validations:
+      required: true
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: 隐私确认
+      options:
+        - label: 字段名、样例、日志和截图均已脱敏且完全合成。
+          required: true
+        - label: 我已检查 DATA_DICTIONARY.md 和 STATUS_TAXONOMY.md，当前没有等价定义。
+          required: true

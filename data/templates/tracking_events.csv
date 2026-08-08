@@ -1,0 +1,1 @@
+tracking_event_id,order_id,shipment_id,event_time,event_code,raw_status,carrier_id,location_code,region_code,exception_code,sequence_number

@@ -1,0 +1,101 @@
+{
+  "business_background": "仓内作业保持稳定，但教学承运商 CAR-SYN-SLOW 出现揽收、干线和末端长尾。",
+  "case_id": "carrier_disruption",
+  "content_fingerprint": "c481ffe8ce11e9fcb252a7ae83a0fd699cbb62ff6034c1ce0d49ee34002062ae",
+  "date_range": {
+    "end": "2026-06-18",
+    "start": "2026-06-01"
+  },
+  "display_name": "案例 C：承运商异常",
+  "expected_findings": [
+    {
+      "description": "出库至揽收等待超过业务阈值",
+      "required": true,
+      "rule_id": "FL-PU-001"
+    },
+    {
+      "description": "承运运输时长形成明显长尾",
+      "required": true,
+      "rule_id": "FL-LH-001"
+    },
+    {
+      "description": "目的城市等待或派送到签收超过阈值",
+      "required": true,
+      "rule_id": "FL-LM-001"
+    },
+    {
+      "description": "慢承运商 OTIF/P90 相对同批其他承运商恶化",
+      "required": true,
+      "rule_id": "FL-CR-001"
+    }
+  ],
+  "expected_metric_ranges": {
+    "anomaly_order_rate": {
+      "maximum": 0.35,
+      "minimum": 0.1,
+      "unit": "ratio"
+    },
+    "fulfillment_duration_mean_hours": {
+      "maximum": 115.0,
+      "minimum": 75.0,
+      "unit": "hour"
+    },
+    "if_rate": {
+      "maximum": 1.0,
+      "minimum": 0.95,
+      "unit": "ratio"
+    },
+    "ot_rate": {
+      "maximum": 0.75,
+      "minimum": 0.45,
+      "unit": "ratio"
+    },
+    "otif_rate": {
+      "maximum": 0.72,
+      "minimum": 0.42,
+      "unit": "ratio"
+    }
+  },
+  "files": [
+    {
+      "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "name": "case.xlsx",
+      "size_bytes": 155508
+    },
+    {
+      "media_type": "text/csv; charset=utf-8",
+      "name": "orders.csv",
+      "size_bytes": 32013
+    },
+    {
+      "media_type": "text/csv; charset=utf-8",
+      "name": "tracking_events.csv",
+      "size_bytes": 242547
+    },
+    {
+      "media_type": "text/csv; charset=utf-8",
+      "name": "warehouse_events.csv",
+      "size_bytes": 228344
+    }
+  ],
+  "generator_version": "case-generator-v1.0.0",
+  "injected_anomalies": [
+    "CAR-SYN-SLOW 占比约 40%，揽收等待超过 12 小时",
+    "CAR-SYN-SLOW 干线、目的城市停留和派送时长显著增加",
+    "部分慢承运商订单带有合成运输异常状态"
+  ],
+  "learning_objectives": [
+    "比较承运商 OTIF、P90 与样本量",
+    "从聚合诊断下钻到揽收、干线和末端证据",
+    "讨论承运商结构调整的历史重采样限制"
+  ],
+  "order_count": 180,
+  "privacy_statement": "本案例完全由程序生成，不包含真实姓名、手机号、身份证、详细地址、真实快递单号、真实企业名称或任何公司内部数据。",
+  "row_counts": {
+    "orders": 180,
+    "tracking_events": 1657,
+    "warehouse_events": 1620
+  },
+  "seed": 20260803,
+  "timezone": "Asia/Shanghai"
+}

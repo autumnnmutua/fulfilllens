@@ -1,0 +1,15 @@
+cff-version: 1.2.0
+message: "如果本项目支持了你的教学或研究，请引用 FulfillLens CN 软件及所使用的版本。"
+type: software
+title: "FulfillLens CN"
+abstract: "面向物流教学与中小电商商家的本地优先、可解释履约分析工具。"
+authors:
+  - name: "FulfillLens CN contributors"
+version: "1.0.0-rc.1"
+license: MIT
+keywords:
+  - logistics
+  - fulfillment
+  - OTIF
+  - supply-chain
+  - education

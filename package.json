@@ -1,0 +1,63 @@
+{
+  "name": "fulfilllens-cn",
+  "version": "1.0.0-rc.1",
+  "private": true,
+  "license": "MIT",
+  "description": "FulfillLens CN 本地优先履约分析工具",
+  "packageManager": "npm@11.13.0",
+  "engines": {
+    "node": ">=22.12 <25",
+    "npm": ">=10"
+  },
+  "workspaces": [
+    "apps/web",
+    "apps/cloudflare-worker"
+  ],
+  "scripts": {
+    "dev": "concurrently --kill-others-on-fail --names web,api --prefix-colors blue,green \"npm run dev:web\" \"npm run dev:api\"",
+    "dev:web": "npm run dev --workspace @fulfilllens/web",
+    "dev:api": "python -m uvicorn app.main:app --app-dir apps/api --reload --no-access-log --host 127.0.0.1 --port 8000",
+    "build": "npm run build --workspace @fulfilllens/web",
+    "build:cloudflare": "npm run build --workspace @fulfilllens/web -- --mode cloudflare",
+    "deploy:cloudflare": "npm run build:cloudflare && npx --yes wrangler@4.120.0 deploy",
+    "lint": "npm run lint:web && npm run lint:api && npm run lint:cloudflare",
+    "lint:web": "npm run lint --workspace @fulfilllens/web",
+    "lint:api": "python -m ruff check apps/api tests scripts",
+    "lint:cloudflare": "npm run typecheck --workspace @fulfilllens/cloudflare-worker",
+    "format": "npm run format:web && npm run format:cloudflare && npm run format:api && npm run format:docs",
+    "format:web": "npm run format --workspace @fulfilllens/web",
+    "format:api": "python -m ruff check --select I --fix apps/api tests scripts && python -m ruff format apps/api tests scripts",
+    "format:cloudflare": "prettier --write \"apps/cloudflare-worker/**/*.{ts,json}\" \"wrangler.jsonc\"",
+    "format:docs": "prettier --write \"*.md\" \"docs/**/*.md\" \".github/**/*.md\" \".github/**/*.yml\" \"*.yml\" \"CITATION.cff\"",
+    "format:check": "npm run format:check:web && npm run format:check:cloudflare && npm run format:check:api && npm run format:check:docs",
+    "format:check:web": "npm run format:check --workspace @fulfilllens/web",
+    "format:check:api": "python -m ruff format --check apps/api tests scripts",
+    "format:check:cloudflare": "prettier --check \"apps/cloudflare-worker/**/*.{ts,json}\" \"wrangler.jsonc\"",
+    "format:check:docs": "prettier --check \"*.md\" \"docs/**/*.md\" \".github/**/*.md\" \".github/**/*.yml\" \"*.yml\" \"CITATION.cff\"",
+    "typecheck": "npm run typecheck:web && npm run typecheck:cloudflare && npm run typecheck:api",
+    "typecheck:web": "npm run typecheck --workspace @fulfilllens/web",
+    "typecheck:api": "python -m mypy apps/api/app",
+    "typecheck:cloudflare": "npm run typecheck --workspace @fulfilllens/cloudflare-worker",
+    "test": "npm run test:web && npm run test:cloudflare && npm run test:api",
+    "test:web": "npm run test --workspace @fulfilllens/web",
+    "test:api": "python -m pytest apps/api/tests tests",
+    "test:cloudflare": "npm run test --workspace @fulfilllens/cloudflare-worker",
+    "demo:import": "python scripts/demo_import.py",
+    "demo:metrics": "python scripts/demo_metrics.py",
+    "demo:dashboard": "python scripts/demo_dashboard.py",
+    "demo:diagnostics": "python scripts/demo_diagnostics.py",
+    "demo:simulation": "python scripts/demo_simulation.py",
+    "demo:cases": "python scripts/demo_cases.py",
+    "demo:reports": "python scripts/demo_reports.py",
+    "generate:cases": "python scripts/generate_cases.py",
+    "smoke": "python scripts/smoke.py",
+    "audit": "npm audit --audit-level=high && python -m pip_audit",
+    "docs:check": "python scripts/check_release_docs.py",
+    "licenses:check": "python scripts/check_dependency_licenses.py",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build",
+    "release:check": "npm run check && npm run audit && npm run docs:check && npm run licenses:check"
+  },
+  "devDependencies": {
+    "concurrently": "10.0.4"
+  }
+}

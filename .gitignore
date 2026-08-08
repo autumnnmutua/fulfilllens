@@ -1,0 +1,62 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Node.js
+node_modules/
+.npm/
+.pnpm-store/
+.yarn/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local application state and imported data
+uploads/
+tmp/
+temp/
+logs/
+*.log
+*.sqlite
+*.sqlite3
+*.db
+data/local/
+data/generated/
+data/exports/
+
+# Editors and operating systems
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Docker and tooling overrides
+docker-compose.override.yml
+.wrangler/
+.dev.vars
+.dev.vars.*
+
+# Miscellaneous artifacts
+*.bak
+*.tmp
+*.zip
+*.tar
+*.tar.gz

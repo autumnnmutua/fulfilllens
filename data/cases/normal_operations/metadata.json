@@ -1,0 +1,90 @@
+{
+  "business_background": "区域电商仓在非活动期保持稳定日单量，仓内与运输节点波动较小。",
+  "case_id": "normal_operations",
+  "content_fingerprint": "ef992d757eff326a2b74c3d5af08cee8d7b63ae6389b21e8ceaaba1e05dacfaa",
+  "date_range": {
+    "end": "2026-06-18",
+    "start": "2026-06-01"
+  },
+  "display_name": "案例 A：正常运营",
+  "expected_findings": [
+    {
+      "description": "少量随机订单出现出库后揽收等待",
+      "required": true,
+      "rule_id": "FL-PU-001"
+    },
+    {
+      "description": "足量样本下最慢约 10% 形成统计长尾",
+      "required": true,
+      "rule_id": "FL-LH-001"
+    }
+  ],
+  "expected_metric_ranges": {
+    "anomaly_order_rate": {
+      "maximum": 0.1,
+      "minimum": 0.01,
+      "unit": "ratio"
+    },
+    "fulfillment_duration_mean_hours": {
+      "maximum": 65.0,
+      "minimum": 35.0,
+      "unit": "hour"
+    },
+    "if_rate": {
+      "maximum": 1.0,
+      "minimum": 0.95,
+      "unit": "ratio"
+    },
+    "ot_rate": {
+      "maximum": 1.0,
+      "minimum": 0.9,
+      "unit": "ratio"
+    },
+    "otif_rate": {
+      "maximum": 1.0,
+      "minimum": 0.87,
+      "unit": "ratio"
+    }
+  },
+  "files": [
+    {
+      "media_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "name": "case.xlsx",
+      "size_bytes": 153122
+    },
+    {
+      "media_type": "text/csv; charset=utf-8",
+      "name": "orders.csv",
+      "size_bytes": 32006
+    },
+    {
+      "media_type": "text/csv; charset=utf-8",
+      "name": "tracking_events.csv",
+      "size_bytes": 236915
+    },
+    {
+      "media_type": "text/csv; charset=utf-8",
+      "name": "warehouse_events.csv",
+      "size_bytes": 228344
+    }
+  ],
+  "generator_version": "case-generator-v1.0.0",
+  "injected_anomalies": [
+    "约 4% 订单注入可解释的随机揽收或运输延迟",
+    "约 2% 订单部分交付"
+  ],
+  "learning_objectives": [
+    "理解订单、仓库事件与物流轨迹的关联关系",
+    "复算 OT、IF、OTIF、P50 和 P90",
+    "区分正常波动、长尾和数据覆盖率"
+  ],
+  "order_count": 180,
+  "privacy_statement": "本案例完全由程序生成，不包含真实姓名、手机号、身份证、详细地址、真实快递单号、真实企业名称或任何公司内部数据。",
+  "row_counts": {
+    "orders": 180,
+    "tracking_events": 1620,
+    "warehouse_events": 1620
+  },
+  "seed": 20260801,
+  "timezone": "Asia/Shanghai"
+}

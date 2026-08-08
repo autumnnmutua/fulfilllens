@@ -1,0 +1,283 @@
+{
+  "orders": [
+    {
+      "order_id": "ORD-GOLD-001",
+      "created_at": "2026-07-01T08:00:00+08:00",
+      "promised_delivery_time": "2026-07-03T18:00:00+08:00",
+      "actual_delivery_time": "2026-07-03T12:00:00+08:00",
+      "ordered_quantity": 2,
+      "delivered_quantity": 2,
+      "quantity_unit": "piece",
+      "order_status": "delivered",
+      "raw_order_status": "已签收",
+      "warehouse_id": "WH-A",
+      "carrier_id": "CAR-A",
+      "destination_region": "CN-SD",
+      "sales_channel": "marketplace"
+    },
+    {
+      "order_id": "ORD-GOLD-002",
+      "created_at": "2026-07-01T09:00:00+08:00",
+      "promised_delivery_time": "2026-07-03T18:00:00+08:00",
+      "actual_delivery_time": "2026-07-04T10:00:00+08:00",
+      "ordered_quantity": 1,
+      "delivered_quantity": 1,
+      "quantity_unit": "piece",
+      "order_status": "delivered",
+      "raw_order_status": "已签收",
+      "warehouse_id": "WH-A",
+      "carrier_id": "CAR-B",
+      "destination_region": "CN-SH",
+      "sales_channel": "direct"
+    },
+    {
+      "order_id": "ORD-GOLD-003",
+      "created_at": "2026-07-01T10:00:00+08:00",
+      "promised_delivery_time": "2026-07-03T18:00:00+08:00",
+      "actual_delivery_time": "2026-07-03T15:00:00+08:00",
+      "ordered_quantity": 3,
+      "delivered_quantity": 2,
+      "quantity_unit": "piece",
+      "order_status": "delivered",
+      "raw_order_status": "部分签收",
+      "warehouse_id": "WH-B",
+      "carrier_id": "CAR-A",
+      "destination_region": "CN-SD",
+      "sales_channel": "marketplace"
+    },
+    {
+      "order_id": "ORD-GOLD-004",
+      "created_at": "2026-07-01T11:00:00+08:00",
+      "promised_delivery_time": "2026-07-03T18:00:00+08:00",
+      "actual_delivery_time": null,
+      "ordered_quantity": 1,
+      "delivered_quantity": 0,
+      "quantity_unit": "piece",
+      "order_status": "cancelled",
+      "raw_order_status": "已取消",
+      "warehouse_id": "WH-B",
+      "carrier_id": null,
+      "destination_region": "CN-BJ",
+      "sales_channel": "direct"
+    },
+    {
+      "order_id": "ORD-GOLD-005",
+      "created_at": "2026-07-02T08:00:00+08:00",
+      "promised_delivery_time": "2026-07-04T18:00:00+08:00",
+      "actual_delivery_time": "2026-07-04T12:00:00+08:00",
+      "ordered_quantity": 1,
+      "delivered_quantity": 1,
+      "quantity_unit": "piece",
+      "order_status": "returned",
+      "raw_order_status": "已退回",
+      "warehouse_id": "WH-A",
+      "carrier_id": "CAR-A",
+      "destination_region": "CN-SD",
+      "sales_channel": "marketplace"
+    },
+    {
+      "order_id": "ORD-GOLD-006",
+      "created_at": "2026-07-02T09:00:00+08:00",
+      "promised_delivery_time": "2026-07-05T18:00:00+08:00",
+      "actual_delivery_time": null,
+      "ordered_quantity": 2,
+      "delivered_quantity": 0,
+      "quantity_unit": "piece",
+      "order_status": "shipped",
+      "raw_order_status": "已发货",
+      "warehouse_id": "WH-A",
+      "carrier_id": "CAR-B",
+      "destination_region": "CN-SH",
+      "sales_channel": "direct"
+    },
+    {
+      "order_id": "ORD-GOLD-007",
+      "created_at": "2026-07-03T08:00:00+08:00",
+      "promised_delivery_time": null,
+      "actual_delivery_time": "2026-07-05T08:00:00+08:00",
+      "ordered_quantity": 2,
+      "delivered_quantity": 2,
+      "quantity_unit": "piece",
+      "order_status": "delivered",
+      "raw_order_status": "已签收",
+      "warehouse_id": null,
+      "carrier_id": null,
+      "destination_region": null,
+      "sales_channel": null
+    },
+    {
+      "order_id": "ORD-GOLD-008",
+      "created_at": "2026-07-03T08:00:00+08:00",
+      "promised_delivery_time": "2026-07-04T18:00:00+08:00",
+      "actual_delivery_time": "2026-07-04T18:00:00+08:00",
+      "ordered_quantity": 1,
+      "delivered_quantity": 1,
+      "quantity_unit": "piece",
+      "order_status": "delivered",
+      "raw_order_status": "已签收",
+      "warehouse_id": null,
+      "carrier_id": "CAR-A",
+      "destination_region": "CN-SD",
+      "sales_channel": "marketplace"
+    }
+  ],
+  "warehouse_events": [
+    {
+      "event_id": "WHE-GOLD-001",
+      "order_id": "ORD-GOLD-001",
+      "event_time": "2026-07-01T09:00:00+08:00",
+      "event_code": "order_received",
+      "raw_status": "仓库接单",
+      "warehouse_id": "WH-A"
+    },
+    {
+      "event_id": "WHE-GOLD-002",
+      "order_id": "ORD-GOLD-001",
+      "event_time": "2026-07-01T10:00:00+08:00",
+      "event_code": "picking_started",
+      "raw_status": "开始拣货",
+      "warehouse_id": "WH-A"
+    },
+    {
+      "event_id": "WHE-GOLD-003",
+      "order_id": "ORD-GOLD-001",
+      "event_time": "2026-07-01T11:30:00+08:00",
+      "event_code": "picking_completed",
+      "raw_status": "拣货完成",
+      "warehouse_id": "WH-A"
+    },
+    {
+      "event_id": "WHE-GOLD-004",
+      "order_id": "ORD-GOLD-001",
+      "event_time": "2026-07-01T12:00:00+08:00",
+      "event_code": "quality_check_started",
+      "raw_status": "开始复核",
+      "warehouse_id": "WH-A"
+    },
+    {
+      "event_id": "WHE-GOLD-005",
+      "order_id": "ORD-GOLD-001",
+      "event_time": "2026-07-01T12:30:00+08:00",
+      "event_code": "quality_check_completed",
+      "raw_status": "复核完成",
+      "warehouse_id": "WH-A"
+    },
+    {
+      "event_id": "WHE-GOLD-006",
+      "order_id": "ORD-GOLD-001",
+      "event_time": "2026-07-01T13:00:00+08:00",
+      "event_code": "packing_started",
+      "raw_status": "开始打包",
+      "warehouse_id": "WH-A"
+    },
+    {
+      "event_id": "WHE-GOLD-007",
+      "order_id": "ORD-GOLD-001",
+      "event_time": "2026-07-01T14:00:00+08:00",
+      "event_code": "packing_completed",
+      "raw_status": "打包完成",
+      "warehouse_id": "WH-A"
+    },
+    {
+      "event_id": "WHE-GOLD-008",
+      "order_id": "ORD-GOLD-001",
+      "event_time": "2026-07-01T15:00:00+08:00",
+      "event_code": "ready_to_ship",
+      "raw_status": "待揽收",
+      "warehouse_id": "WH-A"
+    }
+  ],
+  "tracking_events": [
+    {
+      "tracking_event_id": "TRE-GOLD-001",
+      "order_id": "ORD-GOLD-001",
+      "shipment_id": "SHP-GOLD-001",
+      "event_time": "2026-07-01T16:00:00+08:00",
+      "event_code": "carrier_picked_up",
+      "raw_status": "已揽收",
+      "carrier_id": "CAR-A",
+      "location_code": "ORIGIN"
+    },
+    {
+      "tracking_event_id": "TRE-GOLD-002",
+      "order_id": "ORD-GOLD-001",
+      "shipment_id": "SHP-GOLD-001",
+      "event_time": "2026-07-02T10:00:00+08:00",
+      "event_code": "arrived_at_hub",
+      "raw_status": "到达中转场",
+      "carrier_id": "CAR-A",
+      "location_code": "HUB-A"
+    },
+    {
+      "tracking_event_id": "TRE-GOLD-003",
+      "order_id": "ORD-GOLD-001",
+      "shipment_id": "SHP-GOLD-001",
+      "event_time": "2026-07-02T12:00:00+08:00",
+      "event_code": "departed_hub",
+      "raw_status": "离开中转场",
+      "carrier_id": "CAR-A",
+      "location_code": "HUB-A"
+    },
+    {
+      "tracking_event_id": "TRE-GOLD-004",
+      "order_id": "ORD-GOLD-001",
+      "shipment_id": "SHP-GOLD-001",
+      "event_time": "2026-07-03T12:00:00+08:00",
+      "event_code": "delivered",
+      "raw_status": "已签收",
+      "carrier_id": "CAR-A",
+      "location_code": "DESTINATION"
+    },
+    {
+      "tracking_event_id": "TRE-GOLD-006",
+      "order_id": "ORD-GOLD-002",
+      "shipment_id": "SHP-GOLD-002",
+      "event_time": "2026-07-02T12:00:00+08:00",
+      "event_code": "exception",
+      "raw_status": "运输异常",
+      "carrier_id": "CAR-B",
+      "location_code": "HUB-B"
+    },
+    {
+      "tracking_event_id": "TRE-GOLD-005",
+      "order_id": "ORD-GOLD-002",
+      "shipment_id": "SHP-GOLD-002",
+      "event_time": "2026-07-01T12:00:00+08:00",
+      "event_code": "carrier_picked_up",
+      "raw_status": "已揽收",
+      "carrier_id": "CAR-B",
+      "location_code": "ORIGIN"
+    },
+    {
+      "tracking_event_id": "TRE-GOLD-007",
+      "order_id": "ORD-GOLD-002",
+      "shipment_id": "SHP-GOLD-002",
+      "event_time": "2026-07-04T10:00:00+08:00",
+      "event_code": "delivered",
+      "raw_status": "已签收",
+      "carrier_id": "CAR-B",
+      "location_code": "DESTINATION"
+    }
+  ],
+  "expected": {
+    "order_count": 8,
+    "valid_order_count": 8,
+    "ot_rate": 0.8,
+    "ot_numerator": 4,
+    "ot_denominator": 5,
+    "ot_coverage": 0.8333333333333334,
+    "if_rate": 0.8333333333333334,
+    "otif_rate": 0.6,
+    "duration_mean": 52.0,
+    "duration_median": 52.0,
+    "duration_p90": 63.0,
+    "cancellation_rate": 0.125,
+    "return_rate": 0.125,
+    "anomaly_rate": 0.42857142857142855,
+    "data_coverage_rate": 0.8333333333333334,
+    "picking_hours": 1.5,
+    "hub_dwell_hours": 2.0,
+    "ready_to_pickup_hours": 1.0,
+    "carrier_transit_hours": 57.0
+  }
+}
