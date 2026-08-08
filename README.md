@@ -257,17 +257,18 @@ FastAPI + Pydantic ── 领域服务与透明规则
 
 阶段 0–11 已完成可在当前环境执行的内容；阶段 12 将进行最终全量验收。当前证据：
 
-- 前端 22 项测试、后端与契约 218 项测试；
+- 前端 22 项、Cloudflare Worker 5 项、后端与契约 218 项测试；
 - 1 万/5 万订单性能基准；
 - 8 个路由 × 360/768/1440 Chromium + axe 检查；
-- npm/Python 漏洞审计和敏感信息扫描。
+- npm/Python 漏洞审计和敏感信息扫描；
+- [GitHub Actions 首次运行](https://github.com/autumnnmutua/fulfilllens-cn/actions/runs/31246519865)的质量与 Docker smoke job 全部成功；
+- 公开远程仓库与 Private Vulnerability Reporting 已启用。
 
 仍需发布前确认：
 
-- Docker 实机构建、健康检查和持久卷清理；
+- 本机 Windows 重启后复验 Docker Desktop 引擎（CI 容器路径已通过）；
 - Firefox/Safari；
 - PDF 中文字体、分页和长表；
-- 远程仓库私密安全报告入口；
 - 干净克隆后的阶段 12 完整验收。
 
 报告和基准是特定代码、数据和机器条件下的证据，不是对所有硬件或业务数据的保证。

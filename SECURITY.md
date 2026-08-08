@@ -10,7 +10,7 @@
 
 ## 私密报告漏洞
 
-远程仓库创建后，请启用 GitHub Private Vulnerability Reporting，并通过 **Security → Report a vulnerability** 提交。不要创建公开 Issue，也不要附真实订单、个人信息、有效 Token 或未经脱敏的日志。
+GitHub Private Vulnerability Reporting 已在公开远程仓库启用。请通过 **Security → Report a vulnerability** 提交；不要创建公开 Issue，也不要附真实订单、个人信息、有效 Token 或未经脱敏的日志。
 
 报告建议包含：
 
@@ -20,7 +20,7 @@
 - 已做的脱敏处理；
 - 如有建议修复，请说明兼容性风险。
 
-如果私密报告入口尚未启用，请通过仓库所有者 GitHub 资料中公开的私密联系方式联系。正式公开仓库前，维护者必须启用或公布一个有效的私密渠道。
+如果 GitHub 暂时无法显示私密报告入口，请先通过仓库所有者 GitHub 资料中公开的私密联系方式联系，不要转为公开披露。
 
 ## 响应目标
 

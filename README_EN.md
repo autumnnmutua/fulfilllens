@@ -257,17 +257,18 @@ See [Architecture](docs/ARCHITECTURE.md) and [ADRs](docs/adr/README.md). The Clo
 
 Stages 0–11 are complete for checks available in the current environment. Stage 12 performs final clean-environment acceptance. Current evidence includes:
 
-- 22 frontend tests and 218 backend/contract tests;
+- 22 frontend, 5 Cloudflare Worker, and 218 backend/contract tests;
 - 10,000/50,000-order performance benchmarks;
 - eight routes at 360/768/1440 with Chromium and axe;
-- npm/Python vulnerability audits and repository secret scans.
+- npm/Python vulnerability audits and repository secret scans;
+- the [first GitHub Actions run](https://github.com/autumnnmutua/fulfilllens-cn/actions/runs/31246519865) passed both the quality and Docker smoke jobs;
+- the public remote repository and Private Vulnerability Reporting are enabled.
 
 Release items still to confirm:
 
-- real Docker build, health, and persistent-volume cleanup;
+- local Docker Desktop engine verification after the pending Windows restart (the CI container path has passed);
 - Firefox and Safari;
 - PDF Chinese fonts, pagination, and long tables;
-- a private security-reporting channel on the remote repository;
 - full Stage 12 verification from a clean clone.
 
 Reports and benchmarks are evidence for a specific revision, dataset, and machine—not guarantees for every hardware or business dataset.

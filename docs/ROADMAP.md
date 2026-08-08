@@ -101,7 +101,7 @@
 ## 阶段 11：开源文档与 GitHub 发布准备
 
 - 依赖：阶段 10 的本机质量门禁通过；Docker 与跨浏览器保留为明确的阶段 12 发布验收项。
-- 当前状态：已完成中英文 README、MIT 与依赖许可审查、贡献/安全/行为准则、FAQ/故障排查、Issue/PR 模板、`1.0.0-rc.1` 发布说明、截图清单、文档/隐私/许可证检查和 GitHub Actions Docker smoke job；Cloudflare 受限在线预览已部署，GitHub 远程、首次推送、标签和 Release 仍待完成。
+- 当前状态：已完成中英文 README、MIT 与依赖许可审查、贡献/安全/行为准则、FAQ/故障排查、Issue/PR 模板、`1.0.0-rc.1` 发布说明、截图清单、文档/隐私/许可证检查；GitHub 公开远程、首次推送、Private Vulnerability Reporting、质量/Docker smoke 首次实跑和 Cloudflare 受限在线预览均已完成，标签和 Release 仍待阶段 12 决定。
 - 阶段成果：中英文 README、许可证、贡献/安全/行为准则、Issue/PR 模板、变更日志、发布候选说明和发布前 CI。
 - 验收重点：陌生用户可按真实命令在 10 分钟内载入示例；依赖许可证兼容；仓库无敏感信息和本地产物。
 - 建议提交：`docs: prepare open-source release assets`
