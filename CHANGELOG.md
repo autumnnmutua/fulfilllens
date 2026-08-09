@@ -10,7 +10,7 @@
 - 评估 Firefox/Safari 兼容性和可复现 PDF 中文渲染；
 - 评估 Cloudflare 上的完整后端迁移方案，同时保持本地优先和可解释数据边界。
 
-## [1.0.0-rc.2] - 2026-08-08
+## [1.0.0-rc.2] - 2026-08-09
 
 ### Fixed
 
@@ -24,6 +24,7 @@
 
 ### Changed
 
+- GitHub Actions 官方 `checkout`、`setup-node`、`setup-python` 升级到 v7，消除 Node.js 20 运行时弃用警告；
 - Docker smoke 增加真实 Chrome、360/768/1440 三视口和 axe/WCAG 审计；
 - Cloudflare 从静态受限预览扩展为只处理公开合成案例的同源分析演示，仍拒绝真实文件和持久业务数据；
 - 完成 Windows 重启后的本机 Docker、三案例、金标准、5 万订单性能和数据清理验收；
