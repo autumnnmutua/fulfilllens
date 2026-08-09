@@ -36,6 +36,10 @@ FIELD_ALIASES: dict[str, tuple[str, ...]] = {
     str(field): tuple(str(alias) for alias in aliases)
     for field, aliases in _FIELD_CATALOG["aliases"].items()
 }
+AUXILIARY_ALIASES: dict[str, tuple[str, ...]] = {
+    str(field): tuple(str(alias) for alias in aliases)
+    for field, aliases in _FIELD_CATALOG.get("auxiliary_aliases", {}).items()
+}
 
 
 @dataclass(frozen=True)
@@ -46,6 +50,7 @@ class Contract:
     primary_field: str
     raw_status_field: str
     normalized_status_field: str
+    auxiliary_aliases: dict[str, tuple[str, ...]]
 
 
 def load_schema(data_type: DataType) -> dict[str, Any]:
@@ -83,6 +88,7 @@ def get_contract(data_type: DataType) -> Contract:
     raw_status_field, normalized_status_field = STATUS_FIELDS[data_type]
     return Contract(
         data_type=data_type,
+        auxiliary_aliases=AUXILIARY_ALIASES,
         schema=schema,
         fields=fields,
         primary_field=PRIMARY_FIELDS[data_type],

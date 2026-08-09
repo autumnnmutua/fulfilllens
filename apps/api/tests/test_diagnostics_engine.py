@@ -143,6 +143,25 @@ def test_warehouse_delay_positive_boundary_negative_and_guard(
     assert any(item.result.rule_id == "FL-WH-001" for item in result.records) is expected
 
 
+def test_warehouse_delay_findings_keep_deterministic_process_order() -> None:
+    created = datetime.fromisoformat("2026-07-01T08:00:00+08:00")
+    events = [
+        warehouse_event("W-1", "O-1", created, "order_received"),
+        warehouse_event("W-2", "O-1", created + timedelta(hours=5), "picking_started"),
+        warehouse_event("W-3", "O-1", created + timedelta(hours=8), "picking_completed"),
+        warehouse_event("W-4", "O-1", created + timedelta(hours=11), "quality_check_started"),
+        warehouse_event("W-5", "O-1", created + timedelta(hours=13), "quality_check_completed"),
+        warehouse_event("W-6", "O-1", created + timedelta(hours=14), "packing_started"),
+        warehouse_event("W-7", "O-1", created + timedelta(hours=17), "packing_completed"),
+    ]
+
+    result = run([order("O-1", created=created)], events, [], rules={"FL-WH-001"})
+
+    assert [
+        item.result.dimension_value for item in result.records if item.result.rule_id == "FL-WH-001"
+    ] == ["order_to_pick", "picking", "pick_to_qc", "quality_check", "packing"]
+
+
 @pytest.mark.parametrize(
     ("case", "duration", "complete", "expected"),
     [

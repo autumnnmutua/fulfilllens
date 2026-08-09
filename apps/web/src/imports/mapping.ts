@@ -19,6 +19,20 @@ interface ScoredField {
   method: FieldSuggestion["method"];
 }
 
+const MEDIUM_CONFIDENCE = 0.55;
+const CRITICAL_CANDIDATE_CONFIDENCE = 0.35;
+
+function normalizeFieldVariants(value: string): string[] {
+  const normalized = value.normalize("NFKC").trim();
+  const withoutParenthetical = normalized
+    .replace(/[（(][^()（）]*[）)]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return [
+    ...new Set([normalized, withoutParenthetical].map(normalizeFieldName)),
+  ].filter(Boolean);
+}
+
 export function normalizeFieldName(value: string): string {
   return value
     .normalize("NFKC")
@@ -58,33 +72,81 @@ function similarity(left: string, right: string): number {
 function scoreColumn(
   sourceColumn: string,
   contract: ImportContract,
+  rows: PreviewRow[] = [],
 ): ScoredField[] {
-  const normalizedSource = normalizeFieldName(sourceColumn);
+  const sourceVariants = normalizeFieldVariants(sourceColumn);
+  const nonEmptyValues = rows
+    .map((row) => scalarText(row.values[sourceColumn]).trim())
+    .filter(Boolean);
+  const uniqueRatio =
+    nonEmptyValues.length === 0
+      ? 0
+      : new Set(nonEmptyValues).size / nonEmptyValues.length;
+  const numericRatio =
+    nonEmptyValues.length === 0
+      ? 0
+      : nonEmptyValues.filter((value) =>
+          Number.isFinite(Number(value.replaceAll(",", ""))),
+        ).length / nonEmptyValues.length;
+  const dateRatio =
+    nonEmptyValues.length === 0
+      ? 0
+      : nonEmptyValues.filter((value) =>
+          /^(?:\d{4}[./年-]\d{1,2}|\d{1,2}[/-]\d{1,2}[/-]\d{4}|[A-Za-z]{3}\s+[A-Za-z]{3}\s+\d{1,2}\s+\d{4})/.test(
+            value,
+          ),
+        ).length / nonEmptyValues.length;
   return contract.fields
     .map((definition): ScoredField => {
       if (sourceColumn === definition.field) {
         return { confidence: 1, field: definition.field, method: "Exact" };
       }
       const normalizedField = normalizeFieldName(definition.field);
-      if (normalizedSource === normalizedField) {
+      if (sourceVariants.includes(normalizedField)) {
         return {
           confidence: 0.98,
           field: definition.field,
           method: "Normalized",
         };
       }
-      const aliases = [definition.label, ...definition.aliases].map(
-        normalizeFieldName,
+      const aliases = [definition.label, ...definition.aliases].flatMap(
+        normalizeFieldVariants,
       );
-      if (aliases.includes(normalizedSource)) {
+      if (aliases.some((alias) => sourceVariants.includes(alias))) {
         return { confidence: 0.95, field: definition.field, method: "Alias" };
       }
       const bestSimilarity = Math.max(
-        similarity(normalizedSource, normalizedField),
-        ...aliases.map((alias) => similarity(normalizedSource, alias)),
+        ...sourceVariants.flatMap((source) => [
+          similarity(source, normalizedField),
+          ...aliases.map((alias) => similarity(source, alias)),
+        ]),
       );
+      let profileAdjustment = 0;
+      if (dateRatio >= 0.8 && definition.value_type === "string") {
+        if (
+          definition.field.endsWith("_time") ||
+          definition.field === "created_at"
+        ) {
+          profileAdjustment += 0.04;
+        }
+      }
+      if (numericRatio >= 0.9 && definition.value_type.includes("number")) {
+        profileAdjustment += 0.03;
+      }
+      if (
+        definition.field === "tracking_event_id" &&
+        nonEmptyValues.length > 1 &&
+        uniqueRatio < 1
+      ) {
+        profileAdjustment -= 0.25;
+      }
       return {
-        confidence: Number((bestSimilarity * 0.88).toFixed(4)),
+        confidence: Number(
+          Math.max(
+            0,
+            Math.min(0.94, bestSimilarity * 0.88 + profileAdjustment),
+          ).toFixed(4),
+        ),
         field: definition.field,
         method: "Similarity",
       };
@@ -99,9 +161,10 @@ function scoreColumn(
 export function suggestMappings(
   sourceColumns: string[],
   contract: ImportContract,
+  rows: PreviewRow[] = [],
 ): FieldSuggestion[] {
   const suggestions = sourceColumns.map((sourceColumn) => {
-    const scores = scoreColumn(sourceColumn, contract);
+    const scores = scoreColumn(sourceColumn, contract, rows);
     const top = scores[0] ?? {
       confidence: 0,
       field: "",
@@ -151,11 +214,70 @@ export function suggestMappings(
   return suggestions;
 }
 
-export function detectDataTypes(sourceColumns: string[]): DataTypeCandidate[] {
+function criticalFields(contract: ImportContract): Set<string> {
+  return new Set([
+    ...contract.fields
+      .filter((field) => field.required)
+      .map((field) => field.field),
+    "order_id",
+    "shipment_id",
+    "tracking_event_id",
+    "event_id",
+    "event_time",
+    "raw_status",
+    "event_code",
+    "carrier_id",
+    "location_code",
+    "region_code",
+    "exception_code",
+    "sequence_number",
+  ]);
+}
+
+const CRITICAL_HEADER_PATTERN =
+  /(订单|运单|物流|轨迹|事件|时间|时刻|日期|状态|扫描|承运|快递|节点|网点|场站|位置|区域|城市|异常|序号|流水|批次|签收|老码|代码|编号|标识|参考|order|shipment|tracking|event|time|date|status|scan|carrier|courier|location|region|exception|sequence|batch|reference|\bid\b|\bno\b)/i;
+
+/**
+ * Returns only unresolved columns that have no plausible analytical or
+ * auxiliary meaning. This deliberately errs on the side of asking the user.
+ */
+export function findSafelyIgnorableColumns(
+  suggestions: FieldSuggestion[],
+  mapping: Record<string, string | null>,
+  ignoredSourceColumns: string[],
+  contract: ImportContract,
+): string[] {
+  const ignored = new Set(ignoredSourceColumns);
+  const critical = criticalFields(contract);
+  return suggestions
+    .filter((suggestion) => {
+      const source = suggestion.source_column;
+      if (ignored.has(source) || mapping[source] != null) return false;
+      if (CRITICAL_HEADER_PATTERN.test(source.normalize("NFKC"))) return false;
+      if (
+        suggestion.candidates.some(
+          (candidate) => candidate.confidence >= MEDIUM_CONFIDENCE,
+        )
+      ) {
+        return false;
+      }
+      return !suggestion.candidates.some(
+        (candidate) =>
+          critical.has(candidate.field) &&
+          candidate.confidence >= CRITICAL_CANDIDATE_CONFIDENCE,
+      );
+    })
+    .map((suggestion) => suggestion.source_column);
+}
+
+export function detectDataTypes(
+  sourceColumns: string[],
+  rows: PreviewRow[] = [],
+): DataTypeCandidate[] {
   return supportedDataTypes
     .map((dataType) => {
       const contract = getImportContract(dataType);
-      const suggestions = suggestMappings(sourceColumns, contract);
+      const suggestions = suggestMappings(sourceColumns, contract, rows);
       const matched = new Set(
         suggestions
           .map((suggestion) => suggestion.suggested_field)
@@ -166,6 +288,9 @@ export function detectDataTypes(sourceColumns: string[]): DataTypeCandidate[] {
           .filter((field) => field.required)
           .map((field) => field.field),
       );
+      if (contract.dataType === "tracking_events") {
+        required.delete("tracking_event_id");
+      }
       const statusMatched =
         matched.has(contract.rawStatusField) ||
         matched.has(contract.normalizedStatusField);
@@ -282,6 +407,9 @@ export function validateMapping(
       .filter((field) => field.required)
       .map((field) => field.field),
   );
+  if (contract.dataType === "tracking_events") {
+    required.delete("tracking_event_id");
+  }
   if (
     mapped.has(contract.rawStatusField) ||
     mapped.has(contract.normalizedStatusField)

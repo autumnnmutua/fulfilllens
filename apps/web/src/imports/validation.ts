@@ -2,6 +2,7 @@ import { getImportContract, type ImportContract } from "./contracts";
 import { validateMapping } from "./mapping";
 import type { BrowserParsedTable } from "./parser";
 import { scalarText } from "./scalar";
+import statusKeywordRulesJson from "../../../../data/schemas/status_keyword_rules.json";
 import type {
   DataType,
   QualityIssue,
@@ -95,6 +96,17 @@ interface StatusValue {
   raw: string;
 }
 
+interface StatusKeywordRule {
+  confidence: number;
+  keywords: string[];
+  target: string;
+}
+
+const statusKeywordRules = statusKeywordRulesJson as Record<
+  string,
+  StatusKeywordRule[]
+>;
+
 export interface ValidationArtifacts {
   normalizedRows: Record<string, unknown>[];
   report: QualityReport;
@@ -182,18 +194,99 @@ function parseNaiveDate(value: string): DateParts | null {
     .replace(/月/g, "-")
     .replace(/日/g, " ")
     .replace(/\s+/g, " ");
-  const match = normalized.match(
+  const yearFirst = normalized.match(
     /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?)?$/,
   );
-  if (!match) return null;
+  if (yearFirst) {
+    return {
+      day: Number(yearFirst[3]),
+      hour: Number(yearFirst[4] ?? 0),
+      minute: Number(yearFirst[5] ?? 0),
+      month: Number(yearFirst[2]),
+      second: Number(yearFirst[6] ?? 0),
+      year: Number(yearFirst[1]),
+    };
+  }
+  const monthFirst = value
+    .normalize("NFKC")
+    .trim()
+    .match(
+      /^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([AP])M$/i,
+    );
+  if (monthFirst) {
+    const hour12 = Number(monthFirst[4]);
+    const afternoon = monthFirst[7]?.toUpperCase() === "P";
+    return {
+      day: Number(monthFirst[2]),
+      hour: (hour12 % 12) + (afternoon ? 12 : 0),
+      minute: Number(monthFirst[5]),
+      month: Number(monthFirst[1]),
+      second: Number(monthFirst[6] ?? 0),
+      year: Number(monthFirst[3]),
+    };
+  }
+  const dayFirst = value
+    .normalize("NFKC")
+    .trim()
+    .match(/^(\d{1,2})-(\d{1,2})-(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (!dayFirst) return null;
   return {
-    day: Number(match[3]),
-    hour: Number(match[4] ?? 0),
-    minute: Number(match[5] ?? 0),
-    month: Number(match[2]),
-    second: Number(match[6] ?? 0),
-    year: Number(match[1]),
+    day: Number(dayFirst[1]),
+    hour: Number(dayFirst[4]),
+    minute: Number(dayFirst[5]),
+    month: Number(dayFirst[2]),
+    second: Number(dayFirst[6] ?? 0),
+    year: Number(dayFirst[3]),
   };
+}
+
+const englishMonths = new Map(
+  [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ].map((month, index) => [month.toLowerCase(), index + 1]),
+);
+
+function parseExplicitEnglishDate(value: string): string | null {
+  const match = value
+    .normalize("NFKC")
+    .trim()
+    .match(
+      /^(?:[A-Za-z]{3}\s+)?([A-Za-z]{3})\s+(\d{1,2})\s+(\d{4})\s+(\d{2}):(\d{2}):(\d{2})\s+GMT([+-])(\d{2})(\d{2})(?:\s+\([^)]*\))?$/,
+    );
+  if (!match) return null;
+  const month = englishMonths.get((match[1] ?? "").toLowerCase());
+  if (!month) return null;
+  const parts: DateParts = {
+    day: Number(match[2]),
+    hour: Number(match[4]),
+    minute: Number(match[5]),
+    month,
+    second: Number(match[6]),
+    year: Number(match[3]),
+  };
+  const probe = new Date(partsUtc(parts));
+  if (
+    probe.getUTCFullYear() !== parts.year ||
+    probe.getUTCMonth() + 1 !== parts.month ||
+    probe.getUTCDate() !== parts.day ||
+    probe.getUTCHours() !== parts.hour ||
+    probe.getUTCMinutes() !== parts.minute ||
+    probe.getUTCSeconds() !== parts.second
+  ) {
+    return null;
+  }
+  return `${parts.year}-${pad(parts.month)}-${pad(parts.day)}T${pad(parts.hour)}:${pad(parts.minute)}:${pad(parts.second)}${match[7]}${match[8]}:${match[9]}`;
 }
 
 function zoneParts(date: Date, timeZone: string): DateParts {
@@ -290,16 +383,30 @@ function attachTimezone(parts: DateParts, timeZone: string | null): string {
   return `${parts.year}-${pad(parts.month)}-${pad(parts.day)}T${pad(parts.hour)}:${pad(parts.minute)}:${pad(parts.second)}${sign}${pad(Math.floor(absolute / 60))}:${pad(absolute % 60)}`;
 }
 
-function parseDate(value: unknown, timeZone: string | null): string {
+export function parseImportDate(
+  value: unknown,
+  timeZone: string | null,
+): string {
   const text = scalarText(value).normalize("NFKC").trim();
-  if (/(Z|[+-]\d{2}:\d{2})$/i.test(text)) {
-    const timestamp = Date.parse(text);
+  const explicitEnglish = parseExplicitEnglishDate(text);
+  if (explicitEnglish) return explicitEnglish;
+  if (/(Z|[+-]\d{2}:?\d{2})$/i.test(text)) {
+    const normalizedOffset = text.replace(/([+-]\d{2})(\d{2})$/, "$1:$2");
+    const timestamp = Date.parse(normalizedOffset);
     if (!Number.isFinite(timestamp)) {
       throw new ValueError(
         "INVALID_TIME",
         "无法解析时间。",
         "使用有效的带时区 ISO 8601 时间。",
       );
+    }
+    const isoParts = normalizedOffset.match(
+      /^(\d{4}-\d{2}-\d{2})[ T](\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/i,
+    );
+    if (isoParts) {
+      const offset =
+        isoParts[5]?.toUpperCase() === "Z" ? "+00:00" : isoParts[5];
+      return `${isoParts[1]}T${isoParts[2]}:${isoParts[3]}:${isoParts[4] ?? "00"}${offset}`;
     }
     return new Date(timestamp).toISOString();
   }
@@ -334,6 +441,7 @@ function normalizeStatus(
   rawValue: unknown,
   projectMappings: Record<string, string>,
   contract: ImportContract,
+  auxiliaryEvidence: Record<string, unknown> = {},
 ): StatusValue {
   const raw = String(rawValue);
   const lookup = normalizeLookup(raw);
@@ -367,12 +475,100 @@ function normalizeStatus(
       raw,
     };
   }
+  const evidence = [
+    { source: "raw_status", value: raw },
+    ...Object.entries(auxiliaryEvidence).map(([source, value]) => ({
+      source,
+      value: scalarText(value),
+    })),
+  ];
+  for (const item of evidence) {
+    const evidenceLookup = normalizeLookup(item.value);
+    if (!evidenceLookup) continue;
+    const rule = (statusKeywordRules[dataType] ?? []).find((candidate) =>
+      candidate.keywords.some((keyword) =>
+        evidenceLookup.includes(normalizeLookup(keyword)),
+      ),
+    );
+    if (rule && contract.statusCodes.has(rule.target)) {
+      return {
+        mappingConfidence: rule.confidence,
+        mappingSource:
+          item.source === "raw_status"
+            ? "builtin_keyword_raw"
+            : `auxiliary_keyword:${item.source}`,
+        normalized: rule.target,
+        raw,
+      };
+    }
+  }
   return {
     mappingConfidence: 0,
     mappingSource: "unmapped",
     normalized: "unmapped",
     raw,
   };
+}
+
+const noExceptionValues = new Set(["", "0", "n", "正常", "无", "-", "常规"]);
+const knownExceptionCodes = new Set([
+  "WEATHER_DELAY",
+  "CALL_FAIL",
+  "ADDR_UNCLEAR",
+  "CANCELLED",
+  "RETURNING",
+  "RETURN_DONE",
+]);
+
+function normalizeExceptionCode(value: unknown): {
+  code: string | null;
+  warning: boolean;
+} {
+  const raw = scalarText(value).normalize("NFKC").trim();
+  const lookup = raw.toLocaleLowerCase("zh-CN");
+  if (noExceptionValues.has(lookup)) return { code: null, warning: false };
+  if (lookup === "1") return { code: "GENERIC_EXCEPTION", warning: true };
+  const code = raw
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  if (!code) return { code: "GENERIC_EXCEPTION", warning: true };
+  return { code, warning: !knownExceptionCodes.has(code) };
+}
+
+function normalizeAuxiliaryHeader(value: string): string {
+  return value
+    .normalize("NFKC")
+    .toLocaleLowerCase("zh-CN")
+    .replace(/[（(][^()（）]*[）)]/g, "")
+    .replace(/[^\p{L}\p{N}]/gu, "");
+}
+
+function generatedTrackingEventId(
+  record: Record<string, unknown>,
+  rowNumber: number,
+): string | null {
+  const required = [
+    record.order_id,
+    record.shipment_id,
+    record.event_time,
+    record.raw_status,
+    record.carrier_id,
+  ].map((value) => scalarText(value).trim());
+  if (required.some((value) => !value)) return null;
+  const canonical = [
+    ...required,
+    scalarText(record.sequence_number).trim(),
+    String(rowNumber),
+  ].join("\u001f");
+  let hash = 0x811c9dc5;
+  for (const byte of new TextEncoder().encode(canonical)) {
+    hash = Math.imul(hash ^ byte, 0x01000193) >>> 0;
+  }
+  return `TRE-GEN-${String(rowNumber).padStart(6, "0")}-${hash
+    .toString(16)
+    .padStart(8, "0")
+    .toUpperCase()}`;
 }
 
 function mask(value: unknown): string | null {
@@ -456,6 +652,28 @@ export function validateBrowserImport(
       )
       .map(([source, target]) => [target, source]),
   );
+  const auxiliarySources = Object.fromEntries(
+    Object.entries(contract.auxiliaryAliases).flatMap(([purpose, aliases]) => {
+      const normalizedAliases = new Set(aliases.map(normalizeAuxiliaryHeader));
+      const source = table.headers.find((header) =>
+        normalizedAliases.has(normalizeAuxiliaryHeader(header)),
+      );
+      return source ? [[purpose, source]] : [];
+    }),
+  );
+  const deriveTrackingEventId =
+    dataType === "tracking_events" && !targetToSource.has("tracking_event_id");
+  if (deriveTrackingEventId) {
+    addIssue({
+      code: "GENERATED_TRACKING_EVENT_ID",
+      message:
+        "源文件没有可信的轨迹事件唯一标识，系统将按语义字段与源行号生成稳定 ID。",
+      raw_value: null,
+      severity: "info",
+      suggestion: "如源系统提供真实且唯一的事件 ID，可返回映射步骤人工选择。",
+      target_field: "tracking_event_id",
+    });
+  }
   const nullCounts: Record<string, number> = {};
   const candidates: Array<{
     record: Record<string, unknown>;
@@ -473,6 +691,9 @@ export function validateBrowserImport(
         nullCounts[definition.field] = (nullCounts[definition.field] ?? 0) + 1;
         if (
           definition.required &&
+          !(
+            deriveTrackingEventId && definition.field === "tracking_event_id"
+          ) &&
           definition.field !== contract.rawStatusField &&
           definition.field !== contract.normalizedStatusField
         ) {
@@ -506,12 +727,29 @@ export function validateBrowserImport(
       }
       try {
         if (dateFields.has(definition.field))
-          record[definition.field] = parseDate(value, defaultTimezone);
+          record[definition.field] = parseImportDate(value, defaultTimezone);
         else if (numberFields.has(definition.field))
           record[definition.field] = parseNumber(value, false);
         else if (integerFields.has(definition.field))
           record[definition.field] = parseNumber(value, true);
-        else
+        else if (definition.field === "exception_code") {
+          const normalized = normalizeExceptionCode(value);
+          record[definition.field] = normalized.code;
+          if (normalized.warning) {
+            addIssue({
+              code: "GENERIC_OR_UNKNOWN_EXCEPTION",
+              message:
+                "异常标记缺少可验证的具体语义，已透明保留为通用或规范化代码。",
+              raw_value: scalarText(value),
+              row_number: sourceRow.row_number,
+              severity: "warning",
+              sheet: table.sheetName,
+              source_column: source ?? null,
+              suggestion: "核对源系统异常字典；系统不会编造具体异常原因。",
+              target_field: definition.field,
+            });
+          }
+        } else
           record[definition.field] = scalarText(value).normalize("NFKC").trim();
       } catch (error) {
         const valueError = error as ValueError;
@@ -546,7 +784,18 @@ export function validateBrowserImport(
         target_field: contract.rawStatusField,
       });
     } else {
-      status = normalizeStatus(dataType, rawValue, projectMappings, contract);
+      status = normalizeStatus(
+        dataType,
+        rawValue,
+        projectMappings,
+        contract,
+        Object.fromEntries(
+          Object.entries(auxiliarySources).map(([purpose, source]) => [
+            purpose,
+            sourceRow.values[source],
+          ]),
+        ),
+      );
       record[contract.rawStatusField] = status.raw;
       record[contract.normalizedStatusField] = status.normalized;
       if (status.normalized === "unmapped") {
@@ -562,6 +811,11 @@ export function validateBrowserImport(
           target_field: contract.normalizedStatusField,
         });
       }
+    }
+
+    if (deriveTrackingEventId) {
+      const generated = generatedTrackingEventId(record, sourceRow.row_number);
+      if (generated) record.tracking_event_id = generated;
     }
 
     Object.entries(contract.schema.properties).forEach(

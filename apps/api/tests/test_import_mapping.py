@@ -119,3 +119,62 @@ def test_tracking_business_aliases_are_detected() -> None:
     assert mapped["waybillNo"] == "shipment_id"
     assert mapped["物流事件编号"] == "tracking_event_id"
     assert mapped["carrierCode"] == "carrier_id"
+
+
+def test_nonstandard_tracking_headers_are_generalized_without_false_event_id() -> None:
+    columns = [
+        "业务交易键",
+        "跟单参考",
+        "发生时刻(原串)",
+        "扫描结果",
+        "承运单位",
+        "异常标注",
+        "export_line",
+        "场站/网点",
+        "批次流水",
+    ]
+    rows = [{column: "same-batch" for column in columns} for _ in range(2)]
+    suggestions = suggest_mappings(
+        columns,
+        get_contract(DataType.TRACKING_EVENTS),
+        rows,
+    )
+    mapped = {item.source_column: item.suggested_field for item in suggestions}
+
+    assert mapped["业务交易键"] == "order_id"
+    assert mapped["跟单参考"] == "shipment_id"
+    assert mapped["发生时刻(原串)"] == "event_time"
+    assert mapped["扫描结果"] == "raw_status"
+    assert mapped["承运单位"] == "carrier_id"
+    assert mapped["异常标注"] == "exception_code"
+    assert mapped["export_line"] == "sequence_number"
+    assert mapped["场站/网点"] == "location_code"
+    assert mapped["批次流水"] != "tracking_event_id"
+
+
+def test_tracking_event_id_can_be_derived_but_other_required_fields_cannot() -> None:
+    sources = ["订单", "运单", "时间", "状态", "承运商"]
+    mapping = {
+        "订单": "order_id",
+        "运单": "shipment_id",
+        "时间": "event_time",
+        "状态": "raw_status",
+        "承运商": "carrier_id",
+    }
+    assert (
+        validate_mapping(
+            mapping,
+            sources,
+            get_contract(DataType.TRACKING_EVENTS),
+        )
+        == []
+    )
+
+    mapping["订单"] = None
+    errors = validate_mapping(
+        mapping,
+        sources,
+        get_contract(DataType.TRACKING_EVENTS),
+        ["订单"],
+    )
+    assert any("order_id" in error for error in errors)

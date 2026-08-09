@@ -166,6 +166,18 @@ async function resolveMapping(page, options = {}) {
   while ((await page.getByRole("button", { name: "确认建议" }).count()) > 0) {
     await page.getByRole("button", { name: "确认建议" }).first().click();
   }
+  if (options.bulkIgnore) {
+    const bulkButton = page.getByRole("button", {
+      name: /一键忽略可忽略项（[1-9]\d*）/,
+    });
+    await bulkButton.click();
+    await page.getByText(/已忽略 \d+ 个非分析字段/).waitFor();
+    await page.getByRole("button", { name: "撤销本次忽略" }).click();
+    await page.getByText("Unresolved", { exact: true }).first().waitFor();
+    await page
+      .getByRole("button", { name: /一键忽略可忽略项（[1-9]\d*）/ })
+      .click();
+  }
   if (options.ignoreSource) {
     const row = await ignoreSource(page, options.ignoreSource);
     await row.getByRole("button", { name: "取消忽略并重新映射" }).click();
@@ -202,7 +214,7 @@ async function confirmImport(page, options = {}) {
 async function runImport(page, filePath, sheetName) {
   await openMapping(page, filePath, sheetName);
   await confirmImport(page, {
-    ignoreSource: sheetName ? undefined : "无关说明",
+    bulkIgnore: !sheetName,
   });
 }
 

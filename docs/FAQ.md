@@ -70,7 +70,7 @@ P90 时效越高通常表示长尾订单更慢，但需要结合样本量、时�
 
 ## 18. Docker 是必需的吗？
 
-不是。本地开发可用 Node、Python 和 venv。Docker Compose 是可复现运行路径。当前开发机已安装 Docker Desktop 4.85.0 和 Compose v5.3.1，并已启用 WSL/虚拟机平台；Windows 重启前引擎不能启动，因此本机 Compose smoke 仍记为未执行。GitHub Actions 的独立 Docker job 已实际完成构建、启动、健康检查和卷清理。
+不是。本地开发可用 Node、Python 和 venv。Docker Compose 是可复现运行路径。当前开发机已使用 Docker 29.6.2 和 Compose 5.3.1 完成隔离构建、启动、API/Web 健康检查、真实 Chrome 审计、日志检查和专用卷清理；GitHub Actions 也保留独立 Docker smoke job。
 
 ## 19. 可以直接部署到 Cloudflare 吗？
 

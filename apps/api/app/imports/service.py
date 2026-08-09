@@ -173,8 +173,15 @@ class ImportService:
             table.headers,
             [row.values for row in table.rows],
         )
-        suggestions = suggest_mappings(table.headers, get_contract(task.data_type))
-        data_type_candidates = detect_data_types(table.headers)
+        suggestions = suggest_mappings(
+            table.headers,
+            get_contract(task.data_type),
+            [row.values for row in table.rows],
+        )
+        data_type_candidates = detect_data_types(
+            table.headers,
+            [row.values for row in table.rows],
+        )
         detected = data_type_candidates[0]
         warnings = list(table.warnings)
         if detected.data_type != task.data_type:

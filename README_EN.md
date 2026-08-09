@@ -6,7 +6,7 @@ FulfillLens is a local-first, open-source fulfillment analytics tool for logisti
 
 The project is designed to make every percentage, anomaly, and scenario traceable to fields, formulas, thresholds, samples, and order-level evidence instead of generating a merely plausible story.
 
-> Version status: `1.0.0-rc.5` unifies the public brand as FulfillLens and improves field-mapping readability and control. Low-confidence suggestions require confirmation; irrelevant source columns can be explicitly ignored and remain distinct from unresolved columns. Ignoring a source column never bypasses required standard fields. The Cloudflare edition still parses and validates custom CSV/XLSX files locally in the browser and does not upload raw files to the Worker. See [Project status](#project-status-and-known-limitations).
+> Version status: `1.0.0-rc.5` unifies the public brand as FulfillLens and further hardens real-world file compatibility. Suggestions combine normalized headers, a shared business alias catalog, and limited value profiling. A conservative, undoable bulk action ignores only clearly non-analytical columns; required and plausible critical candidates remain protected. The Cloudflare edition still parses and validates custom CSV/XLSX files locally in the browser and does not upload raw files to the Worker. See [Project status](#project-status-and-known-limitations).
 
 ## Why FulfillLens
 
@@ -19,9 +19,19 @@ The project is designed to make every percentage, anomaly, and scenario traceabl
 
 ## Screenshots and demo
 
-The repository does not pretend that missing screenshots already exist. The release checklist covers the import wizard, dashboard, anomaly trace, scenario comparison, and teaching cases; see [Screenshot and GIF checklist](docs/SCREENSHOTS.md).
+The following images are captured reproducibly from the real production build with deterministic synthetic data. See the [Screenshot and GIF checklist](docs/SCREENSHOTS.md) for capture and privacy controls.
 
-You can experience the complete flow without screenshots. Start the project, open <http://127.0.0.1:5173/cases>, and load Normal Operations, Promotion Surge, or Carrier Disruption.
+| Custom import and mapping                                                                                             | Analytics dashboard                                                                                 |
+| --------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| ![Custom import mapping with conservative bulk ignore, mapping states, and confidence](docs/media/import-mapping.png) | ![Analytics dashboard with OT, IF, OTIF, coverage, and guidance](docs/media/dashboard-overview.png) |
+
+| Diagnostic evidence                                                                         | What-if comparison                                                                                    |
+| ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| ![Rule evidence and event timeline for an affected order](docs/media/diagnostics-trace.png) | ![Baseline and scenario metrics, coverage, and model assumptions](docs/media/scenario-comparison.png) |
+
+![Three deterministic, fully synthetic teaching cases](docs/media/teaching-cases.png)
+
+Start the project, open <http://127.0.0.1:5173/cases>, and load Stable Operations, Promotion Surge, or Carrier Disruption.
 
 ## Core capabilities
 

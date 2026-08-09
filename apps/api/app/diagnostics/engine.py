@@ -57,13 +57,13 @@ SEVERITY_RANK: dict[Severity, int] = {
     "high": 3,
     "critical": 4,
 }
-WAREHOUSE_NODE_CODES = {
+WAREHOUSE_NODE_CODES = (
     "order_to_pick",
     "picking",
     "pick_to_qc",
     "quality_check",
     "packing",
-}
+)
 ALLOWED_TRACKING_TRANSITIONS = {
     ("shipment_created", "carrier_picked_up"),
     ("carrier_picked_up", "origin_departed"),

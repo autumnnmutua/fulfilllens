@@ -23,6 +23,7 @@ import {
   Steps,
   Table,
   Tag,
+  Tooltip,
   Typography,
   Upload,
 } from "antd";
@@ -34,6 +35,8 @@ import { useNotifications } from "../components/notification-context";
 import { PageHeader } from "../components/PageHeader";
 import { isCloudflareDeploy } from "../config/runtime";
 import { MAX_IMPORT_BYTES, validateFileBasics } from "../imports/parser";
+import { getImportContract } from "../imports/contracts";
+import { findSafelyIgnorableColumns } from "../imports/mapping";
 import type {
   ConfirmResponse,
   CompatibilitySample,
@@ -184,6 +187,7 @@ export function ImportPage() {
     [],
   );
   const [manualSourceColumns, setManualSourceColumns] = useState<string[]>([]);
+  const [lastBulkIgnored, setLastBulkIgnored] = useState<string[]>([]);
   const [timezone, setTimezone] = useState("Asia/Shanghai");
   const [projectStatusMappings, setProjectStatusMappings] = useState<
     Record<string, string>
@@ -248,24 +252,45 @@ export function ImportPage() {
     [manualSourceColumns],
   );
   const mappingSummary = useMemo(() => {
-    const result = { automatic: 0, ignored: 0, manual: 0, pending: 0 };
+    const result = {
+      ignored: 0,
+      mapped: 0,
+      pendingConfirmation: 0,
+      unresolved: 0,
+    };
     (parsed?.suggestions ?? []).forEach((suggestion) => {
       const source = suggestion.source_column;
       const target = mapping[source] ?? null;
       if (ignoredSourceSet.has(source)) {
         result.ignored += 1;
       } else if (target === null) {
-        result.pending += 1;
-      } else if (manualSourceSet.has(source)) {
-        result.manual += 1;
-      } else if (suggestion.requires_confirmation) {
-        result.pending += 1;
+        result.unresolved += 1;
+      } else if (
+        suggestion.requires_confirmation &&
+        !manualSourceSet.has(source)
+      ) {
+        result.pendingConfirmation += 1;
       } else {
-        result.automatic += 1;
+        result.mapped += 1;
       }
     });
     return result;
   }, [ignoredSourceSet, manualSourceSet, mapping, parsed]);
+
+  const safelyIgnorableColumns = useMemo(
+    () =>
+      parsed === null
+        ? []
+        : findSafelyIgnorableColumns(
+            parsed.suggestions,
+            mapping,
+            ignoredSourceColumns,
+            getImportContract(dataType),
+          ),
+    [dataType, ignoredSourceColumns, mapping, parsed],
+  );
+  const blockingMappingCount =
+    mappingSummary.pendingConfirmation + mappingSummary.unresolved;
 
   function applyParsed(response: ParseResponse) {
     setTask(response.task);
@@ -280,6 +305,7 @@ export function ImportPage() {
     );
     setIgnoredSourceColumns([]);
     setManualSourceColumns([]);
+    setLastBulkIgnored([]);
     setPersistentError(null);
     setValidation(null);
     setConfirmed(null);
@@ -305,6 +331,7 @@ export function ImportPage() {
   }
 
   function selectMappingTarget(source: string, target?: string) {
+    setLastBulkIgnored([]);
     setMapping((previous) => ({ ...previous, [source]: target ?? null }));
     setIgnoredSourceColumns((previous) =>
       previous.filter((column) => column !== source),
@@ -318,6 +345,7 @@ export function ImportPage() {
   }
 
   function ignoreSourceColumn(source: string) {
+    setLastBulkIgnored([]);
     setMapping((previous) => ({ ...previous, [source]: null }));
     setIgnoredSourceColumns((previous) => [...new Set([...previous, source])]);
     setManualSourceColumns((previous) =>
@@ -327,6 +355,7 @@ export function ImportPage() {
   }
 
   function confirmSuggestedMapping(source: string) {
+    setLastBulkIgnored([]);
     setManualSourceColumns((previous) => [...new Set([...previous, source])]);
     setIgnoredSourceColumns((previous) =>
       previous.filter((column) => column !== source),
@@ -335,11 +364,51 @@ export function ImportPage() {
   }
 
   function restoreSourceColumn(source: string) {
+    setLastBulkIgnored([]);
     setIgnoredSourceColumns((previous) =>
       previous.filter((column) => column !== source),
     );
     setMapping((previous) => ({ ...previous, [source]: null }));
     invalidateValidation("已取消忽略，请为该源字段选择目标字段或重新忽略。");
+  }
+
+  function ignoreSafelyInBulk() {
+    if (safelyIgnorableColumns.length === 0) return;
+    const columns = [...safelyIgnorableColumns];
+    setMapping((previous) => ({
+      ...previous,
+      ...Object.fromEntries(columns.map((column) => [column, null])),
+    }));
+    setIgnoredSourceColumns((previous) => [
+      ...new Set([...previous, ...columns]),
+    ]);
+    setManualSourceColumns((previous) =>
+      previous.filter((column) => !columns.includes(column)),
+    );
+    setLastBulkIgnored(columns);
+    invalidateValidation("已批量忽略非分析字段，需要重新运行质量校验。");
+    notifications.showSuccess(
+      `已忽略 ${columns.length} 个非分析字段`,
+      "必填字段、关键语义候选和辅助解析字段均未被忽略。",
+    );
+  }
+
+  function undoBulkIgnore() {
+    if (lastBulkIgnored.length === 0) return;
+    const restored = [...lastBulkIgnored];
+    setIgnoredSourceColumns((previous) =>
+      previous.filter((column) => !restored.includes(column)),
+    );
+    setMapping((previous) => ({
+      ...previous,
+      ...Object.fromEntries(restored.map((column) => [column, null])),
+    }));
+    setLastBulkIgnored([]);
+    invalidateValidation("已撤销本次批量忽略，请继续处理恢复的字段。");
+    notifications.showSuccess(
+      "已撤销本次忽略",
+      `已恢复 ${restored.length} 个源字段为未处理状态。`,
+    );
   }
 
   function selectFile(selected: File | null) {
@@ -544,6 +613,7 @@ export function ImportPage() {
     setMapping({});
     setIgnoredSourceColumns([]);
     setManualSourceColumns([]);
+    setLastBulkIgnored([]);
     setProjectStatusMappings({});
     setValidationStale(false);
     setPersistentError(null);
@@ -1162,10 +1232,10 @@ export function ImportPage() {
               />
               <Row gutter={[12, 12]} aria-label="字段映射进度">
                 {[
-                  ["已自动映射", mappingSummary.automatic],
-                  ["已人工映射", mappingSummary.manual],
+                  ["已映射", mappingSummary.mapped],
+                  ["待确认", mappingSummary.pendingConfirmation],
+                  ["未处理", mappingSummary.unresolved],
                   ["已忽略", mappingSummary.ignored],
-                  ["待处理", mappingSummary.pending],
                 ].map(([title, value]) => (
                   <Col xs={12} md={6} key={String(title)}>
                     <Card size="small">
@@ -1174,11 +1244,24 @@ export function ImportPage() {
                   </Col>
                 ))}
               </Row>
-              {mappingSummary.pending > 0 ? (
+              <Flex gap="small" wrap>
+                <Tooltip title="仅忽略不影响当前数据类型和后续分析的未处理字段">
+                  <Button
+                    disabled={safelyIgnorableColumns.length === 0}
+                    onClick={ignoreSafelyInBulk}
+                  >
+                    一键忽略可忽略项（{safelyIgnorableColumns.length}）
+                  </Button>
+                </Tooltip>
+                {lastBulkIgnored.length > 0 ? (
+                  <Button onClick={undoBulkIgnore}>撤销本次忽略</Button>
+                ) : null}
+              </Flex>
+              {blockingMappingCount > 0 ? (
                 <Alert
                   showIcon
                   type="warning"
-                  message={`还有 ${mappingSummary.pending} 个字段待处理`}
+                  message={`还有 ${blockingMappingCount} 个字段待处理`}
                   description="请为字段选择目标、重新选择以确认低置信度建议，或明确忽略后再运行质量校验。"
                 />
               ) : null}
@@ -1279,7 +1362,7 @@ export function ImportPage() {
                 <Button
                   type="primary"
                   loading={busy}
-                  disabled={mappingSummary.pending > 0}
+                  disabled={blockingMappingCount > 0}
                   onClick={() => void handleValidate()}
                 >
                   运行质量校验

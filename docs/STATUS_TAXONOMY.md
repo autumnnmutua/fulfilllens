@@ -154,11 +154,15 @@ shipment_created
 2. 已保存且版本兼容的映射配置；
 3. 内置精确同义词映射；
 4. 标准英文代码完全匹配；
-5. `unmapped`。
+5. 按顺序检查 `status_keyword_rules.json` 中经过审查的原状态关键词；
+6. 检查数据字典登记的旧系统状态码等辅助证据，并降低/说明置信度；
+7. `unmapped`。
 
-包含否定、失败、取消、退回等词时不得仅按部分字符串匹配。
+包含否定、失败、取消、退回等词时不得仅按正向关键词匹配；共享规则把退回、失败、异常放在普通运输/派送规则之前，并由正例、反例和边界测试保护。
 
-每条标准化结果同时保存 `raw_status`、`normalized_status`、`mapping_source` 和 `mapping_confidence`。浏览器本地引擎使用 `project_user`、`builtin_exact`、`standard_code` 或 `unmapped`；FastAPI 返回语义等价的来源字段。来源名称差异不得改变优先级或允许状态集合。无法可靠命中的值必须保留原文并进入 `unmapped`，不能为提高通过率强制归类。
+每条标准化结果同时保存 `raw_status`、`normalized_status`、`mapping_source` 和 `mapping_confidence`。浏览器本地引擎和 FastAPI 使用 `project_user`、`builtin_exact`、`standard_code`、`builtin_keyword_raw`、`auxiliary_keyword:*` 或 `unmapped`。来源名称不得改变优先级或允许状态集合。无法可靠命中的值必须保留原文并进入 `unmapped`，不能为提高通过率强制归类。
+
+例如 `妥投(POD)`/`POD_OK`、`Parcel collected`/`PICKUP_OK`、`运输中 | Linehaul`、`Departed sorting center`、`RETURNING`/`RETURN_DONE` 可在证据一致时映射；`客户取消` 因轨迹枚举没有 cancelled 节点，只能透明映射为异常事件并把 `CANCELLED` 保留在异常代码，不得伪造成签收或退回完成。
 
 ### 6.3 中文同义词示例
 

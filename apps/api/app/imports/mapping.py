@@ -9,11 +9,27 @@ from app.imports.contracts import FIELD_ALIASES, FIELD_LABELS, Contract, get_con
 from app.schemas.imports import DataType, DataTypeCandidate, FieldCandidate, FieldSuggestion
 
 NON_WORD = re.compile(r"[\W_]+", re.UNICODE)
+PARENTHETICAL = re.compile(r"[（(][^()（）]*[）)]")
 
 
 def normalize_field_name(value: str) -> str:
     normalized = unicodedata.normalize("NFKC", value).casefold().strip()
     return NON_WORD.sub("", normalized)
+
+
+def normalize_field_variants(value: str) -> tuple[str, ...]:
+    normalized = unicodedata.normalize("NFKC", value).strip()
+    without_parenthetical = PARENTHETICAL.sub(" ", normalized)
+    return tuple(
+        dict.fromkeys(
+            candidate
+            for candidate in (
+                normalize_field_name(normalized),
+                normalize_field_name(without_parenthetical),
+            )
+            if candidate
+        )
+    )
 
 
 @dataclass(frozen=True)
@@ -23,8 +39,18 @@ class ScoredField:
     method: str
 
 
-def score_source_column(source_column: str, contract: Contract) -> list[ScoredField]:
-    source_normalized = normalize_field_name(source_column)
+def score_source_column(
+    source_column: str,
+    contract: Contract,
+    rows: list[dict[str, object]] | None = None,
+) -> list[ScoredField]:
+    source_variants = normalize_field_variants(source_column)
+    non_empty_values = [
+        str(row.get(source_column)).strip()
+        for row in (rows or [])
+        if row.get(source_column) is not None and str(row.get(source_column)).strip()
+    ]
+    unique_ratio = len(set(non_empty_values)) / len(non_empty_values) if non_empty_values else 0.0
     scores: list[ScoredField] = []
 
     for definition in contract.fields:
@@ -34,28 +60,34 @@ def score_source_column(source_column: str, contract: Contract) -> list[ScoredFi
             continue
 
         field_normalized = normalize_field_name(field)
-        if source_normalized == field_normalized:
+        if field_normalized in source_variants:
             scores.append(ScoredField(field=field, confidence=0.98, method="规范化字段名"))
             continue
 
         aliases = (FIELD_LABELS[field], *FIELD_ALIASES.get(field, ()))
-        normalized_aliases = [normalize_field_name(alias) for alias in aliases]
-        if source_normalized in normalized_aliases:
+        normalized_aliases = [
+            variant for alias in aliases for variant in normalize_field_variants(alias)
+        ]
+        if any(variant in normalized_aliases for variant in source_variants):
             scores.append(ScoredField(field=field, confidence=0.95, method="业务别名精确匹配"))
             continue
 
         similarity = max(
             (
-                SequenceMatcher(None, source_normalized, candidate).ratio()
+                SequenceMatcher(None, source_variant, candidate).ratio()
+                for source_variant in source_variants
                 for candidate in (field_normalized, *normalized_aliases)
-                if candidate
+                if source_variant and candidate
             ),
             default=0.0,
         )
+        adjustment = 0.0
+        if field == "tracking_event_id" and len(non_empty_values) > 1 and unique_ratio < 1:
+            adjustment -= 0.25
         scores.append(
             ScoredField(
                 field=field,
-                confidence=round(similarity * 0.88, 4),
+                confidence=round(max(0.0, min(0.94, similarity * 0.88 + adjustment)), 4),
                 method="字段名相似度",
             )
         )
@@ -63,12 +95,16 @@ def score_source_column(source_column: str, contract: Contract) -> list[ScoredFi
     return sorted(scores, key=lambda item: (-item.confidence, item.field))
 
 
-def suggest_mappings(source_columns: list[str], contract: Contract) -> list[FieldSuggestion]:
+def suggest_mappings(
+    source_columns: list[str],
+    contract: Contract,
+    rows: list[dict[str, object]] | None = None,
+) -> list[FieldSuggestion]:
     suggestions: list[FieldSuggestion] = []
     tentative: list[tuple[int, ScoredField, float]] = []
 
     for index, source_column in enumerate(source_columns):
-        scores = score_source_column(source_column, contract)
+        scores = score_source_column(source_column, contract, rows)
         top = scores[0]
         second_confidence = scores[1].confidence if len(scores) > 1 else 0.0
         candidates = [
@@ -113,17 +149,22 @@ DATA_TYPE_LABELS: dict[DataType, str] = {
 }
 
 
-def detect_data_types(source_columns: list[str]) -> list[DataTypeCandidate]:
+def detect_data_types(
+    source_columns: list[str],
+    rows: list[dict[str, object]] | None = None,
+) -> list[DataTypeCandidate]:
     candidates: list[DataTypeCandidate] = []
     for data_type in DataType:
         contract = get_contract(data_type)
-        suggestions = suggest_mappings(source_columns, contract)
+        suggestions = suggest_mappings(source_columns, contract, rows)
         matched = {
             suggestion.suggested_field
             for suggestion in suggestions
             if suggestion.suggested_field is not None
         }
         required = {field.field for field in contract.fields if field.required}
+        if data_type == DataType.TRACKING_EVENTS:
+            required.discard("tracking_event_id")
         raw_status = contract.raw_status_field
         normalized_status = contract.normalized_status_field
         status_matched = raw_status in matched or normalized_status in matched
@@ -190,6 +231,8 @@ def validate_mapping(
 
     mapped_targets = set(target_fields)
     required = {field.field for field in contract.fields if field.required}
+    if contract.data_type == DataType.TRACKING_EVENTS:
+        required.discard("tracking_event_id")
     raw_status, normalized_status = (
         contract.raw_status_field,
         contract.normalized_status_field,

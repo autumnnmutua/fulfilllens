@@ -8,6 +8,7 @@ import type { DataType, FieldDefinition } from "../types/imports";
 
 interface FieldCatalog {
   aliases: Record<string, string[]>;
+  auxiliary_aliases: Record<string, string[]>;
   labels: Record<string, string>;
 }
 
@@ -24,6 +25,7 @@ export interface ImportContract {
   rawStatusField: string;
   schema: JsonSchema;
   statusCodes: Set<string>;
+  auxiliaryAliases: Record<string, string[]>;
 }
 
 const fieldCatalog: FieldCatalog = fieldCatalogJson;
@@ -86,6 +88,7 @@ export function getImportContract(dataType: DataType): ImportContract {
   const status = statusFields[dataType];
   return {
     dataType,
+    auxiliaryAliases: fieldCatalog.auxiliary_aliases,
     fields: Object.entries(schema.properties).map(([field, definition]) => ({
       aliases: fieldCatalog.aliases[field] ?? [],
       field,

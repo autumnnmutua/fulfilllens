@@ -6,7 +6,7 @@ import unicodedata
 from collections import Counter, defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -15,6 +15,7 @@ from jsonschema import Draft202012Validator, FormatChecker
 from referencing import Registry, Resource
 
 from app.imports.contracts import SCHEMA_DIR, Contract
+from app.imports.mapping import normalize_field_variants
 from app.imports.parser import ParsedTable, ParseIssue
 from app.imports.security import mask_sensitive_value
 from app.imports.statuses import (
@@ -55,8 +56,34 @@ COMMON_NAIVE_FORMATS = (
     "%Y年%m月%d日 %H:%M:%S",
     "%Y年%m月%d日 %H:%M",
     "%Y年%m月%d日",
+    "%m/%d/%Y %I:%M %p",
+    "%m/%d/%Y %I:%M:%S %p",
+    "%d-%m-%Y %H:%M",
+    "%d-%m-%Y %H:%M:%S",
 )
 THOUSANDS_PATTERN = re.compile(r"^[+-]?\d{1,3}(,\d{3})+(?:\.\d+)?$")
+EXPLICIT_ENGLISH_PATTERN = re.compile(
+    r"^(?:[A-Za-z]{3}\s+)?(?P<month>[A-Za-z]{3})\s+(?P<day>\d{1,2})\s+"
+    r"(?P<year>\d{4})\s+(?P<hour>\d{2}):(?P<minute>\d{2}):(?P<second>\d{2})\s+"
+    r"GMT(?P<sign>[+-])(?P<offset_hour>\d{2})(?P<offset_minute>\d{2})"
+    r"(?:\s+\([^)]*\))?$"
+)
+ENGLISH_MONTHS = {
+    month: index
+    for index, month in enumerate(
+        ("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"),
+        start=1,
+    )
+}
+NO_EXCEPTION_VALUES = {"", "0", "n", "正常", "无", "-", "常规"}
+KNOWN_EXCEPTION_CODES = {
+    "WEATHER_DELAY",
+    "CALL_FAIL",
+    "ADDR_UNCLEAR",
+    "CANCELLED",
+    "RETURNING",
+    "RETURN_DONE",
+}
 
 
 class ValueParseError(ValueError):
@@ -250,8 +277,28 @@ def attach_timezone(value: datetime, timezone_name: str | None) -> datetime:
 def parse_datetime_value(value: object, timezone_name: str | None) -> str:
     text = unicodedata.normalize("NFKC", str(value)).strip()
     parsed: datetime | None = None
+    explicit = EXPLICIT_ENGLISH_PATTERN.fullmatch(text)
+    if explicit:
+        offset_minutes = int(explicit["offset_hour"]) * 60 + int(explicit["offset_minute"])
+        if explicit["sign"] == "-":
+            offset_minutes = -offset_minutes
+        month = ENGLISH_MONTHS.get(explicit["month"].casefold())
+        if month is not None:
+            try:
+                parsed = datetime(
+                    int(explicit["year"]),
+                    month,
+                    int(explicit["day"]),
+                    int(explicit["hour"]),
+                    int(explicit["minute"]),
+                    int(explicit["second"]),
+                    tzinfo=timezone(timedelta(minutes=offset_minutes)),
+                )
+            except ValueError:
+                parsed = None
     try:
-        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        if parsed is None:
+            parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
     except ValueError:
         for date_format in COMMON_NAIVE_FORMATS:
             try:
@@ -270,6 +317,38 @@ def parse_datetime_value(value: object, timezone_name: str | None) -> str:
 
 def parse_text(value: object) -> str:
     return unicodedata.normalize("NFKC", str(value)).strip()
+
+
+def normalize_exception_code(value: object) -> tuple[str | None, bool]:
+    raw = parse_text(value)
+    if raw.casefold() in NO_EXCEPTION_VALUES:
+        return None, False
+    if raw == "1":
+        return "GENERIC_EXCEPTION", True
+    code = re.sub(r"[^A-Z0-9]+", "_", raw.upper()).strip("_")
+    if not code:
+        return "GENERIC_EXCEPTION", True
+    return code, code not in KNOWN_EXCEPTION_CODES
+
+
+def generated_tracking_event_id(record: dict[str, Any], row_number: int) -> str | None:
+    required = [
+        parse_text(record.get("order_id", "")),
+        parse_text(record.get("shipment_id", "")),
+        parse_text(record.get("event_time", "")),
+        parse_text(record.get("raw_status", "")),
+        parse_text(record.get("carrier_id", "")),
+    ]
+    if any(not value for value in required):
+        return None
+    canonical = "\x1f".join(
+        [*required, parse_text(record.get("sequence_number", "")), str(row_number)]
+    )
+    hash_value = 0x811C9DC5
+    for byte in canonical.encode("utf-8"):
+        hash_value ^= byte
+        hash_value = (hash_value * 0x01000193) & 0xFFFFFFFF
+    return f"TRE-GEN-{row_number:06d}-{hash_value:08X}"
 
 
 def parse_field_value(field: str, value: object, timezone_name: str | None) -> Any:
@@ -330,6 +409,33 @@ def validate_import(
         for source, target in mapping.items()
         if target is not None and source not in ignored_sources
     }
+    auxiliary_sources: dict[str, str] = {}
+    for purpose, aliases in contract.auxiliary_aliases.items():
+        normalized_aliases = {
+            variant for alias in aliases for variant in normalize_field_variants(alias)
+        }
+        source = next(
+            (
+                header
+                for header in table.headers
+                if set(normalize_field_variants(header)) & normalized_aliases
+            ),
+            None,
+        )
+        if source is not None:
+            auxiliary_sources[purpose] = source
+    derive_tracking_event_id = (
+        contract.data_type.value == "tracking_events"
+        and "tracking_event_id" not in target_to_source
+    )
+    if derive_tracking_event_id:
+        collector.add(
+            severity=IssueSeverity.INFO,
+            code="GENERATED_TRACKING_EVENT_ID",
+            message="源文件没有可信的轨迹事件唯一标识，系统将按语义字段与源行号生成稳定 ID。",
+            suggestion="如源系统提供真实且唯一的事件 ID，可返回映射步骤人工选择。",
+            target_field="tracking_event_id",
+        )
     validator = build_validator(contract)
     null_counts: Counter[str] = Counter()
     candidate_rows: list[tuple[int, dict[str, Any], StatusNormalization | None]] = []
@@ -343,10 +449,15 @@ def validate_import(
             value = parsed_row.values.get(source) if source is not None else None
             if is_empty(value):
                 null_counts[field] += 1
-                if definition.required and field not in {
-                    contract.raw_status_field,
-                    contract.normalized_status_field,
-                }:
+                if (
+                    definition.required
+                    and not (derive_tracking_event_id and field == "tracking_event_id")
+                    and field
+                    not in {
+                        contract.raw_status_field,
+                        contract.normalized_status_field,
+                    }
+                ):
                     collector.add(
                         severity=IssueSeverity.ERROR,
                         code="REQUIRED_VALUE_MISSING",
@@ -371,7 +482,25 @@ def validate_import(
                     raw_value=value,
                 )
             try:
-                record[field] = parse_field_value(field, value, default_timezone)
+                if field == "exception_code":
+                    normalized_exception, warning = normalize_exception_code(value)
+                    record[field] = normalized_exception
+                    if warning:
+                        collector.add(
+                            severity=IssueSeverity.WARNING,
+                            code="GENERIC_OR_UNKNOWN_EXCEPTION",
+                            message=(
+                                "异常标记缺少可验证的具体语义，已透明保留为通用或规范化代码。"
+                            ),
+                            suggestion="核对源系统异常字典；系统不会编造具体异常原因。",
+                            sheet=table.sheet_name,
+                            row_number=parsed_row.row_number,
+                            source_column=source,
+                            target_field=field,
+                            raw_value=value,
+                        )
+                else:
+                    record[field] = parse_field_value(field, value, default_timezone)
             except ValueParseError as error:
                 collector.add(
                     severity=IssueSeverity.ERROR,
@@ -394,6 +523,10 @@ def validate_import(
                 contract.data_type,
                 raw_value,
                 project_status_mappings,
+                {
+                    purpose: parsed_row.values.get(source)
+                    for purpose, source in auxiliary_sources.items()
+                },
             )
             record[raw_field] = status_normalization.raw_status
             record[normalized_field] = status_normalization.normalized_status
@@ -420,6 +553,11 @@ def validate_import(
                 source_column=raw_source,
                 target_field=raw_field,
             )
+
+        if derive_tracking_event_id:
+            generated_id = generated_tracking_event_id(record, parsed_row.row_number)
+            if generated_id is not None:
+                record["tracking_event_id"] = generated_id
 
         for field, check in NEGATIVE_CHECKS.items():
             value = record.get(field)

@@ -4,7 +4,7 @@ from app.core.config import Settings
 from app.imports.contracts import get_contract
 from app.imports.parser import parse_csv
 from app.imports.privacy import detect_sensitive_risks
-from app.imports.validation import validate_import
+from app.imports.validation import parse_datetime_value, validate_import
 from app.schemas.imports import DataType
 
 
@@ -99,3 +99,78 @@ def test_exact_duplicate_is_deduplicated_with_warning(tmp_path: Path) -> None:
     assert artifacts.report.can_confirm is True
     assert artifacts.report.exact_duplicate_rows == 1
     assert artifacts.report.valid_rows == 1
+
+
+def test_real_world_datetime_formats_are_deterministic() -> None:
+    expected = {
+        "2026.07.02 06:35": "2026-07-02T06:35:00+08:00",
+        "2026/7/3 14:17": "2026-07-03T14:17:00+08:00",
+        "2026年07月06日 08:05": "2026-07-06T08:05:00+08:00",
+        "Tue Jul 07 2026 18:20:00 GMT+0800 (中国标准时间)": ("2026-07-07T18:20:00+08:00"),
+        "7/2/2026 11:46 AM": "2026-07-02T11:46:00+08:00",
+        "2026-07-03T07:52+08:00": "2026-07-03T07:52:00+08:00",
+        "7-7-2026 11:40": "2026-07-07T11:40:00+08:00",
+        "04-07-2026 22:15": "2026-07-04T22:15:00+08:00",
+        "02-07-2026 13:42": "2026-07-02T13:42:00+08:00",
+    }
+    for source, normalized in expected.items():
+        assert parse_datetime_value(source, "Asia/Shanghai") == normalized
+
+
+def test_tracking_id_status_and_exception_normalization(tmp_path: Path) -> None:
+    path = tmp_path / "arbitrary-tracking.csv"
+    path.write_text(
+        "业务交易键,跟单参考,发生时刻(原串),扫描结果,承运单位,异常标注,export_line,场站/网点,系统老码,客户备注\n"
+        "ORD-01,SHP-01,2026.07.02 06:35,运输中 | Linehaul,CAR-01,0,1,HUB-A,HUB_ARR,忽略我\n"
+        "ORD-01,SHP-01,Tue Jul 07 2026 18:20:00 GMT+0800 "
+        "(中国标准时间),妥投(POD),CAR-01,1,2,HUB-B,POD_OK,忽略我\n",
+        encoding="utf-8",
+    )
+    table = parse_csv(
+        path,
+        encoding="utf-8",
+        settings=Settings(environment="test", import_root=tmp_path / "imports"),
+    )
+    mapping = {
+        "业务交易键": "order_id",
+        "跟单参考": "shipment_id",
+        "发生时刻(原串)": "event_time",
+        "扫描结果": "raw_status",
+        "承运单位": "carrier_id",
+        "异常标注": "exception_code",
+        "export_line": "sequence_number",
+        "场站/网点": "location_code",
+        "系统老码": None,
+        "客户备注": None,
+    }
+    first = validate_import(
+        table=table,
+        contract=get_contract(DataType.TRACKING_EVENTS),
+        mapping=mapping,
+        ignored_source_columns=["系统老码", "客户备注"],
+        default_timezone="Asia/Shanghai",
+        project_status_mappings={},
+        sensitive_risks=[],
+        max_cell_chars=4096,
+    )
+    second = validate_import(
+        table=table,
+        contract=get_contract(DataType.TRACKING_EVENTS),
+        mapping=mapping,
+        ignored_source_columns=["系统老码", "客户备注"],
+        default_timezone="Asia/Shanghai",
+        project_status_mappings={},
+        sensitive_risks=[],
+        max_cell_chars=4096,
+    )
+
+    assert first.report.can_confirm is True
+    assert len(first.normalized_rows) == 2
+    assert first.normalized_rows[0]["event_code"] == "in_transit"
+    assert first.normalized_rows[1]["event_code"] == "delivered"
+    assert first.normalized_rows[0]["exception_code"] is None
+    assert first.normalized_rows[1]["exception_code"] == "GENERIC_EXCEPTION"
+    assert first.normalized_rows[0]["tracking_event_id"].startswith("TRE-GEN-000002-")
+    assert first.normalized_rows == second.normalized_rows
+    assert "客户备注" not in first.normalized_rows[0]
+    assert any(issue.code == "GENERIC_OR_UNKNOWN_EXCEPTION" for issue in first.report.issues)

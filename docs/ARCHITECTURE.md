@@ -57,7 +57,7 @@ flowchart LR
 
 职责：
 
-- 文件选择、工作表/编码选择、数据预览，以及可区分 mapped/ignored/unresolved 的字段映射；
+- 文件选择、工作表/编码选择、数据预览，以及可区分 mapped/ignored/unresolved 的字段映射；安全批量忽略只作用于保守判定的非分析列并支持撤销；
 - 在 Cloudflare 构建中执行文件安全检查、CSV/XLSX 解析、标准化、Schema/质量校验，并把确认结果保存在浏览器 IndexedDB；
 - 数据质量、指标、图表、异常、订单时间线、模拟和报告交互；
 - 展示口径、覆盖率、版本、错误和警告；
@@ -75,7 +75,7 @@ flowchart LR
 职责：
 
 - 文件上传和本地任务生命周期；
-- 字段/状态映射、显式忽略、Schema 和语义校验；
+- 字段/状态映射、显式忽略、稳定事件 ID 派生、Schema 和语义校验；
 - 数据集、指标、诊断、模拟和报告 API；
 - 统一错误格式、版本信息和健康检查；
 - 调用领域模块并管理本地存储边界。
@@ -86,6 +86,8 @@ flowchart LR
 - 把文件原值写入普通日志；
 - 在未授权情况下调用外部服务；
 - 将 SQLite/DuckDB 表结构直接暴露给前端。
+
+Web 与 FastAPI 共用 `data/schemas/import_field_catalog.json` 的标准字段别名和辅助证据名称，以及 `data/schemas/status_keyword_rules.json` 的可审查状态关键词规则。两端可分别实现运行时细节，但同一输入的字段语义、时间歧义策略、状态代码和异常空值必须由契约测试保持一致。
 
 ### 3.3 领域与分析模块
 

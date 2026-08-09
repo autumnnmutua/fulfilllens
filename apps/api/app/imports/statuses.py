@@ -106,6 +106,9 @@ NORMALIZED_SYNONYMS: dict[DataType, dict[str, str]] = {
     data_type: {normalize_lookup_text(raw): normalized for raw, normalized in mappings.items()}
     for data_type, mappings in BUILTIN_SYNONYMS.items()
 }
+STATUS_KEYWORD_RULES: dict[str, list[dict[str, object]]] = json.loads(
+    (SCHEMA_DIR / "status_keyword_rules.json").read_text(encoding="utf-8")
+)
 
 
 @dataclass(frozen=True)
@@ -120,6 +123,7 @@ def normalize_status(
     data_type: DataType,
     raw_status: object,
     project_mappings: dict[str, str] | None = None,
+    auxiliary_evidence: dict[str, object] | None = None,
 ) -> StatusNormalization:
     raw_text = str(raw_status)
     lookup = normalize_lookup_text(raw_text)
@@ -147,6 +151,33 @@ def normalize_status(
             mapping_source="standard_code",
             mapping_confidence=1.0,
         )
+    evidence = [("raw_status", raw_text), *((auxiliary_evidence or {}).items())]
+    for source, value in evidence:
+        evidence_lookup = normalize_lookup_text(value)
+        if not evidence_lookup:
+            continue
+        for rule in STATUS_KEYWORD_RULES.get(data_type.value, []):
+            keywords = rule.get("keywords", [])
+            target = str(rule.get("target", ""))
+            if target not in STATUS_CODES[data_type] or not isinstance(keywords, list):
+                continue
+            if any(normalize_lookup_text(keyword) in evidence_lookup for keyword in keywords):
+                configured_confidence = rule.get("confidence", 0.85)
+                confidence = (
+                    float(configured_confidence)
+                    if isinstance(configured_confidence, (int, float))
+                    else 0.85
+                )
+                return StatusNormalization(
+                    raw_status=raw_text,
+                    normalized_status=target,
+                    mapping_source=(
+                        "builtin_keyword_raw"
+                        if source == "raw_status"
+                        else f"auxiliary_keyword:{source}"
+                    ),
+                    mapping_confidence=confidence,
+                )
     return StatusNormalization(
         raw_status=raw_text,
         normalized_status="unmapped",

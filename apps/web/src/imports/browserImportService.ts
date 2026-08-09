@@ -204,8 +204,8 @@ export const browserImportService = {
       record.task = { ...record.task, selected_sheet: selectedSheet };
     }
     const contract = getImportContract(record.task.data_type);
-    const suggestions = suggestMappings(table.headers, contract);
-    const candidates = detectDataTypes(table.headers);
+    const suggestions = suggestMappings(table.headers, contract, table.rows);
+    const candidates = detectDataTypes(table.headers, table.rows);
     const sensitiveRisks = detectSensitiveRisks(table.headers, table.rows);
     const top = candidates[0];
     record.task = withStatus(

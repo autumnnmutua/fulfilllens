@@ -79,7 +79,11 @@ async function stopServer() {
 (async () => {
   try {
     let ready = false;
-    for (let attempt = 0; attempt < 40; attempt += 1) {
+    // A cold Windows/npm cache can spend more than 20 seconds resolving
+    // Wrangler and starting workerd after a reboot. Keep this bounded but
+    // large enough that an environment cold start is not mistaken for an app
+    // failure.
+    for (let attempt = 0; attempt < 120; attempt += 1) {
       if (server.exitCode !== null) break;
       try {
         const response = await fetch(`${baseUrl}/health`);
@@ -98,16 +102,15 @@ async function stopServer() {
       );
     }
 
-    const result = spawnSync(
-      process.execPath,
-      [path.join(__dirname, "browser_import_e2e.cjs")],
-      {
-        cwd: repoRoot,
-        env: { ...process.env, FL_WEB_URL: baseUrl },
-        stdio: "inherit",
-        windowsHide: true,
-      },
-    );
+    const browserScript = process.env.FL_BROWSER_SCRIPT
+      ? path.resolve(repoRoot, process.env.FL_BROWSER_SCRIPT)
+      : path.join(__dirname, "browser_import_e2e.cjs");
+    const result = spawnSync(process.execPath, [browserScript], {
+      cwd: repoRoot,
+      env: { ...process.env, FL_WEB_URL: baseUrl },
+      stdio: "inherit",
+      windowsHide: true,
+    });
     if (result.error) throw result.error;
     if (result.status !== 0) process.exitCode = result.status || 1;
   } finally {

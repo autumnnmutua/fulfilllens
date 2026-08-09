@@ -961,98 +961,103 @@ export function ScenariosPage() {
 
           {result ? (
             <>
-              <Alert
-                className="prominent-alert"
-                type="warning"
-                showIcon
-                title={`${result.scenario_name}：情景估算结果`}
-                description={result.estimate_label}
-              />
-              <Card className="section-card" title="基线与方案指标变化">
-                <Table
-                  rowKey="code"
-                  pagination={false}
-                  scroll={{ x: 900 }}
-                  dataSource={result.comparisons}
-                  columns={[
-                    { title: "指标", dataIndex: "display_name", width: 190 },
-                    {
-                      title: "基线",
-                      width: 130,
-                      render: (_value, item) =>
-                        metricText(item.baseline_value, item.unit),
-                    },
-                    {
-                      title: "方案",
-                      width: 130,
-                      render: (_value, item) =>
-                        metricText(item.scenario_value, item.unit),
-                    },
-                    {
-                      title: "绝对变化",
-                      width: 150,
-                      render: (_value, item) => deltaText(item),
-                    },
-                    {
-                      title: "相对变化",
-                      width: 120,
-                      render: (_value, item) =>
-                        item.relative_change === null
-                          ? "不可计算"
-                          : `${item.relative_change >= 0 ? "+" : ""}${(item.relative_change * 100).toFixed(1)}%`,
-                    },
-                    {
-                      title: "分子/分母与覆盖",
-                      render: (_value, item) =>
-                        `基线 ${item.baseline_numerator ?? "—"}/${item.baseline_denominator ?? "—"}；方案 ${item.scenario_numerator ?? "—"}/${item.scenario_denominator ?? "—"}；覆盖 ${item.scenario_coverage === null ? "—" : `${(item.scenario_coverage * 100).toFixed(1)}%`}`,
-                    },
-                  ]}
+              <section
+                className="scenario-result-summary"
+                aria-label="情景估算结果与基线对比"
+              >
+                <Alert
+                  className="prominent-alert"
+                  type="warning"
+                  showIcon
+                  title={`${result.scenario_name}：情景估算结果`}
+                  description={result.estimate_label}
                 />
-              </Card>
-
-              <Card className="section-card" title="复现信息与模型假设">
-                <Descriptions column={{ xs: 1, sm: 2, lg: 3 }} size="small">
-                  <Descriptions.Item label="受影响订单">
-                    {result.affected_order_count}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="调整明细">
-                    {result.total_adjustments}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="随机种子">
-                    {result.random_seed ?? "未使用随机过程"}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="方案指纹">
-                    <Typography.Text code>
-                      {result.scenario_fingerprint.slice(0, 12)}…
-                    </Typography.Text>
-                  </Descriptions.Item>
-                  <Descriptions.Item label="重算版本">
-                    {result.metrics_definition_version}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="调整节点">
-                    {result.adjusted_nodes.length
-                      ? result.adjusted_nodes.map((node) => (
-                          <Tag key={node}>{node}</Tag>
-                        ))
-                      : "无"}
-                  </Descriptions.Item>
-                </Descriptions>
-                <List
-                  size="small"
-                  header="模型假设"
-                  dataSource={result.assumptions}
-                  renderItem={(item) => <List.Item>{item}</List.Item>}
-                />
-                {result.warnings.map((warning) => (
-                  <Alert
-                    className="scenario-inline-warning"
-                    key={warning}
-                    type="warning"
-                    showIcon
-                    title={warning}
+                <Card className="section-card" title="基线与方案指标变化">
+                  <Table
+                    rowKey="code"
+                    pagination={false}
+                    scroll={{ x: 900 }}
+                    dataSource={result.comparisons}
+                    columns={[
+                      { title: "指标", dataIndex: "display_name", width: 190 },
+                      {
+                        title: "基线",
+                        width: 130,
+                        render: (_value, item) =>
+                          metricText(item.baseline_value, item.unit),
+                      },
+                      {
+                        title: "方案",
+                        width: 130,
+                        render: (_value, item) =>
+                          metricText(item.scenario_value, item.unit),
+                      },
+                      {
+                        title: "绝对变化",
+                        width: 150,
+                        render: (_value, item) => deltaText(item),
+                      },
+                      {
+                        title: "相对变化",
+                        width: 120,
+                        render: (_value, item) =>
+                          item.relative_change === null
+                            ? "不可计算"
+                            : `${item.relative_change >= 0 ? "+" : ""}${(item.relative_change * 100).toFixed(1)}%`,
+                      },
+                      {
+                        title: "分子/分母与覆盖",
+                        render: (_value, item) =>
+                          `基线 ${item.baseline_numerator ?? "—"}/${item.baseline_denominator ?? "—"}；方案 ${item.scenario_numerator ?? "—"}/${item.scenario_denominator ?? "—"}；覆盖 ${item.scenario_coverage === null ? "—" : `${(item.scenario_coverage * 100).toFixed(1)}%`}`,
+                      },
+                    ]}
                   />
-                ))}
-              </Card>
+                </Card>
+
+                <Card className="section-card" title="复现信息与模型假设">
+                  <Descriptions column={{ xs: 1, sm: 2, lg: 3 }} size="small">
+                    <Descriptions.Item label="受影响订单">
+                      {result.affected_order_count}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="调整明细">
+                      {result.total_adjustments}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="随机种子">
+                      {result.random_seed ?? "未使用随机过程"}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="方案指纹">
+                      <Typography.Text code>
+                        {result.scenario_fingerprint.slice(0, 12)}…
+                      </Typography.Text>
+                    </Descriptions.Item>
+                    <Descriptions.Item label="重算版本">
+                      {result.metrics_definition_version}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="调整节点">
+                      {result.adjusted_nodes.length
+                        ? result.adjusted_nodes.map((node) => (
+                            <Tag key={node}>{node}</Tag>
+                          ))
+                        : "无"}
+                    </Descriptions.Item>
+                  </Descriptions>
+                  <List
+                    size="small"
+                    header="模型假设"
+                    dataSource={result.assumptions}
+                    renderItem={(item) => <List.Item>{item}</List.Item>}
+                  />
+                  {result.warnings.map((warning) => (
+                    <Alert
+                      className="scenario-inline-warning"
+                      key={warning}
+                      type="warning"
+                      showIcon
+                      title={warning}
+                    />
+                  ))}
+                </Card>
+              </section>
 
               <Card className="section-card" title="调整订单与节点明细">
                 {result.adjustments.length ? (

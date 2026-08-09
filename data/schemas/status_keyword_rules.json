@@ -1,0 +1,69 @@
+{
+  "tracking_events": [
+    {
+      "target": "returned",
+      "keywords": ["return_done", "退回完成", "退件完成", "已退回"],
+      "confidence": 0.96
+    },
+    {
+      "target": "return_initiated",
+      "keywords": ["return_open", "returning", "退件处理开始", "退回中"],
+      "confidence": 0.94
+    },
+    {
+      "target": "delivered",
+      "keywords": ["pod_ok", "妥投", "签收", "delivered"],
+      "confidence": 0.96
+    },
+    {
+      "target": "delivery_failed",
+      "keywords": ["call_fail", "电话未接", "派送失败", "未妥投"],
+      "confidence": 0.92
+    },
+    {
+      "target": "exception",
+      "keywords": ["weather_delay", "addr_unclear", "cancelled", "异常", "延迟", "取消"],
+      "confidence": 0.9
+    },
+    {
+      "target": "out_for_delivery",
+      "keywords": ["out_for_delivery", "重新派送", "派送中", "正在派件", "delivering"],
+      "confidence": 0.94
+    },
+    {
+      "target": "carrier_picked_up",
+      "keywords": ["pickup_ok", "pickup done", "parcel collected", "shipment picked up", "快件已揽收", "已揽件", "已揽收"],
+      "confidence": 0.96
+    },
+    {
+      "target": "arrived_at_destination_city",
+      "keywords": ["待派件", "destination city", "destination station"],
+      "confidence": 0.88
+    },
+    {
+      "target": "arrived_at_hub",
+      "keywords": ["hub_arr", "arrived @ destination hub", "arrived at hub", "中转扫描", "到达中转", "到达分拨"],
+      "confidence": 0.92
+    },
+    {
+      "target": "departed_hub",
+      "keywords": ["departed sorting center", "离开分拨", "发往下一站"],
+      "confidence": 0.92
+    },
+    {
+      "target": "origin_departed",
+      "keywords": ["outbound", "已出库", "始发地已发出"],
+      "confidence": 0.92
+    },
+    {
+      "target": "in_transit",
+      "keywords": ["linehaul in progress", "linehaul", "运输中", "在途"],
+      "confidence": 0.94
+    },
+    {
+      "target": "shipment_created",
+      "keywords": ["pre-advice created", "pack ready", "运单已创建"],
+      "confidence": 0.9
+    }
+  ]
+}

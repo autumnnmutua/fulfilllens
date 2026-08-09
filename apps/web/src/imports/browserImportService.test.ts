@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { readBrowserDataset } from "./browserDatasetStore";
 import { browserImportService } from "./browserImportService";
 import { getImportContract } from "./contracts";
-import { suggestMappings } from "./mapping";
+import { findSafelyIgnorableColumns, suggestMappings } from "./mapping";
 import {
   BrowserImportError,
   MAX_IMPORT_BYTES,
@@ -16,6 +16,7 @@ import {
   parseWorkbookSheet,
   validateFileBasics,
 } from "./parser";
+import { parseImportDate } from "./validation";
 
 function fixture(relativePath: string, name: string, type: string): File {
   const bytes = readFileSync(resolve(process.cwd(), "..", "..", relativePath));
@@ -327,6 +328,119 @@ describe("浏览器本地 CSV/XLSX 导入", () => {
     expect(suggestions[0]?.method).toBe("Exact");
     expect(suggestions[1]?.method).toBe("Alias");
     expect(suggestions[3]?.method).toBe("Alias");
+  });
+
+  it("泛化识别括号补充字段并安全筛选可批量忽略列", () => {
+    const contract = getImportContract("tracking_events");
+    const columns = [
+      "业务交易键",
+      "跟单参考",
+      "发生时刻(原串)",
+      "扫描结果",
+      "承运单位",
+      "异常标注",
+      "export_line",
+      "场站/网点",
+      "批次流水",
+      "系统老码",
+      "签收回传",
+      "客户备注",
+      "额外字段-营销",
+    ];
+    const rows = [
+      {
+        row_number: 2,
+        values: Object.fromEntries(columns.map((column) => [column, "A"])),
+      },
+      {
+        row_number: 3,
+        values: Object.fromEntries(columns.map((column) => [column, "A"])),
+      },
+    ];
+    const suggestions = suggestMappings(columns, contract, rows);
+    const bySource = Object.fromEntries(
+      suggestions.map((suggestion) => [suggestion.source_column, suggestion]),
+    );
+    expect(bySource["业务交易键"]?.suggested_field).toBe("order_id");
+    expect(bySource["跟单参考"]?.suggested_field).toBe("shipment_id");
+    expect(bySource["发生时刻(原串)"]?.suggested_field).toBe("event_time");
+    expect(bySource["扫描结果"]?.suggested_field).toBe("raw_status");
+    expect(bySource["承运单位"]?.suggested_field).toBe("carrier_id");
+    expect(bySource["异常标注"]?.suggested_field).toBe("exception_code");
+    expect(bySource.export_line?.suggested_field).toBe("sequence_number");
+    expect(bySource["场站/网点"]?.suggested_field).toBe("location_code");
+    expect(bySource["批次流水"]?.suggested_field).not.toBe("tracking_event_id");
+
+    const mapping = mappingFrom(suggestions);
+    const safe = findSafelyIgnorableColumns(suggestions, mapping, [], contract);
+    expect(safe).toEqual(expect.arrayContaining(["客户备注", "额外字段-营销"]));
+    expect(safe).not.toEqual(
+      expect.arrayContaining(["批次流水", "系统老码", "签收回传"]),
+    );
+  });
+
+  it.each([
+    ["2026.07.02 06:35", "2026-07-02T06:35:00+08:00"],
+    ["2026/7/3 14:17", "2026-07-03T14:17:00+08:00"],
+    ["2026年07月06日 08:05", "2026-07-06T08:05:00+08:00"],
+    [
+      "Tue Jul 07 2026 18:20:00 GMT+0800 (中国标准时间)",
+      "2026-07-07T18:20:00+08:00",
+    ],
+    ["7/2/2026 11:46 AM", "2026-07-02T11:46:00+08:00"],
+    ["2026-07-03T07:52+08:00", "2026-07-03T07:52:00+08:00"],
+    ["7-7-2026 11:40", "2026-07-07T11:40:00+08:00"],
+    ["04-07-2026 22:15", "2026-07-04T22:15:00+08:00"],
+    ["02-07-2026 13:42", "2026-07-02T13:42:00+08:00"],
+  ])("确定性解析时间 %s", (source, expected) => {
+    expect(parseImportDate(source, "Asia/Shanghai")).toBe(expected);
+  });
+
+  it("缺少真实事件 ID 时生成稳定唯一 ID，并综合原状态和辅助码", async () => {
+    const content =
+      "业务交易键,跟单参考,发生时刻(原串),扫描结果,承运单位,异常标注,export_line,场站/网点,系统老码,客户备注\n" +
+      "ORD-01,SHP-01,2026.07.02 06:35,运输中 | Linehaul,CAR-01,0,1,HUB-A,HUB_ARR,忽略我\n" +
+      "ORD-01,SHP-01,Tue Jul 07 2026 18:20:00 GMT+0800 (中国标准时间),妥投(POD),CAR-01,WEATHER_DELAY,2,HUB-B,POD_OK,忽略我\n";
+    const uploaded = await browserImportService.upload(
+      "tracking_events",
+      csvFile(content, "arbitrary-export.csv"),
+    );
+    const parsed = await browserImportService.parse(uploaded.task.task_id, {});
+    expect(parsed.detected_data_type).toBe("tracking_events");
+    const mapping = mappingFrom(parsed.suggestions);
+    const ignored = ignoredFrom(parsed.suggestions);
+    const first = await browserImportService.validate(uploaded.task.task_id, {
+      default_timezone: "Asia/Shanghai",
+      ignored_source_columns: ignored,
+      mapping,
+      project_status_mappings: {},
+    });
+    const second = await browserImportService.validate(uploaded.task.task_id, {
+      default_timezone: "Asia/Shanghai",
+      ignored_source_columns: ignored,
+      mapping,
+      project_status_mappings: {},
+    });
+    expect(first.report.can_confirm).toBe(true);
+    expect(first.normalized_preview).toHaveLength(2);
+    expect(first.normalized_preview[0]?.tracking_event_id).toMatch(
+      /^TRE-GEN-000002-[0-9A-F]{8}$/,
+    );
+    expect(first.normalized_preview[0]?.event_code).toBe("in_transit");
+    expect(first.normalized_preview[1]?.event_code).toBe("delivered");
+    expect(first.normalized_preview[0]?.tracking_event_id).not.toBe(
+      first.normalized_preview[1]?.tracking_event_id,
+    );
+    expect(second.normalized_preview).toEqual(first.normalized_preview);
+    expect(first.normalized_preview[0]).not.toHaveProperty("客户备注");
+    expect(first.normalized_preview[0]?.exception_code).toBeNull();
+    expect(first.normalized_preview[1]?.exception_code).toBe("WEATHER_DELAY");
+  });
+
+  it("拒绝无 AM/PM 的模糊斜杠月日顺序", () => {
+    expect(() => parseImportDate("7/2/2026 11:46", "Asia/Shanghai")).toThrow(
+      /无法解析时间/,
+    );
   });
 
   it("解析多工作表时不忽略其他工作表，只有用户选择后读取数据", async () => {
