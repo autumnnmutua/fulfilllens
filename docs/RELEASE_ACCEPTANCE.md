@@ -1,221 +1,155 @@
-# 阶段 12：最终全量审查与 v1.0 验收
+# FulfillLens v1.0.0 最终验收记录
 
-验收日期：2026-08-10（Asia/Shanghai）
+## Release Identity
 
-验收版本：`1.0.0-rc.5`
-
-验收平台：Windows 11、Node.js 24.16.0、npm 11.13.0、Python 3.13.14、Docker Desktop 29.6.2、Docker Compose 5.3.1、Google Chrome
-发布结论：**BLOCKED**
-
-## 0. v1.0.0 正式版 Gate
-
-### Release Identity
-
-- version：`1.0.0-rc.5`（未晋级）
+- version：`1.0.0`
+- accepted implementation commit：`d495327a5aa53622f95fcaddc15017379c471b35`
 - branch：`main`
-- functional gate commit：`0006a79ff16963dd998c93f114ab5438a0465e36`
 - date：2026-08-10（Asia/Shanghai）
+- production：<https://fulfilllens.esthertreu3724.workers.dev>
+- tag target：最终发布证据提交；精确 SHA 以远程 annotated tag `v1.0.0^{commit}` 和发布报告为准
 
-### 当前阻断
+验收提交包含正式代码、测试、版本、七张生产截图和发布说明；本记录作为随后唯一的发布证据提交。由于 Git 提交不能在自身内容中预先写入自身 SHA，最终 tag SHA 不伪造为占位值。
 
-用户指定的 `物流轨迹*非标准字段*随机测试样本.csv` 未出现在仓库、工作区父目录、下载、桌面或临时目录。它是正式版要求的 54 行 × 21 列、10 个 order/shipment/carrier 金标准输入，不能用项目现有 12 行合成夹具或手写数据冒充。因此本轮保留并验证已完成修复，但在真实读取、统计、转换、下游分析和浏览器 E2E 完成前，不创建 `v1.0.0` tag 或 GitHub Release。
+## Functional Acceptance
 
-### Non-standard CSV Acceptance
+| 能力                 | 验收结果         | 证据摘要                                                                                              |
+| -------------------- | ---------------- | ----------------------------------------------------------------------------------------------------- |
+| CSV/XLSX 导入        | PASS             | UTF-8/BOM、GBK/GB18030、多 Sheet、Excel 日期、文本数字、前导零、文件类型/大小与 XLSX 安全限制均有回归 |
+| 自动映射与人工复核   | PASS             | Exact/Alias/Normalized/Similarity/Manual、高置信度批量推荐、低置信度人工确认                          |
+| 一键安全忽略         | PASS             | 仅忽略无关键线索且无中等候选的非分析列；支持撤销；ignored 不再进入错误数量                            |
+| Required protection  | PASS             | `order_id` 等必填字段不能被忽略绕过；缺失时显示问题、原因、影响和建议操作                             |
+| Generated / inferred | PASS             | 缺失轨迹事件 ID 时稳定派生；`raw_status` 确定性生成 `event_code`；未知状态保持 `unmapped`             |
+| 质量校验             | PASS             | 映射变化废弃旧报告；忽略列问题消失；真实阻断保留；确认状态只有一个可信来源                            |
+| 指标                 | PASS             | OT/IF/OTIF、P50/P90、节点、异常和覆盖率对账；tracking-only 不伪造 OT/IF/OTIF                          |
+| 诊断                 | PASS             | 透明规则、阈值、事实/判断/可能原因分层、订单证据和样本警告                                            |
+| 行动建议             | PASS             | Professional Action Plan 与 Executive Brief 共享 fact ID、数字、优先级和证据；AI 不可用时模板可用     |
+| What-if              | PASS（边界公开） | 本地/Docker 与公开合成案例可用；浏览器自主数据暂不支持，页面和文档均未夸大                            |
+| 报告                 | PASS             | Markdown、自包含 HTML、安全 CSV；建议章节跟随同一事实；PDF 明确保留为未支持                           |
+| 案例与清理           | PASS             | 三套固定种子合成案例；API/IndexedDB 清理入口；不含真实 PII                                            |
 
-| 检查项         |                   预期 | 实际                                             | 结论    |
-| -------------- | ---------------------: | ------------------------------------------------ | ------- |
-| 数据行         |                     54 | 未执行：指定文件缺失                             | BLOCKED |
-| 源字段         |                     21 | 未执行：指定文件缺失                             | BLOCKED |
-| shipment       |                     10 | 未执行：指定文件缺失                             | BLOCKED |
-| order          |                     10 | 未执行：指定文件缺失                             | BLOCKED |
-| carrier        |                     10 | 未执行：指定文件缺失                             | BLOCKED |
-| 时间解析       | 全部可解释或有透明警告 | 主要要求格式已用独立回归样例通过；指定文件未执行 | BLOCKED |
-| 静默丢行       |                      0 | 指定文件未执行                                   | BLOCKED |
-| 必填字段误忽略 |                      0 | 通用单元/E2E 已通过；指定文件未执行              | BLOCKED |
+## Non-standard CSV Acceptance
 
-现有公开合成兼容样例继续通过：非标准订单 CSV 8/8、XLSX 订单 6/6、仓库事件 36/36、物流轨迹 36/36；`tests/fixtures/nonstandard_tracking_user.csv` 的 12 条轨迹完成浏览器本地七步导入、批量安全忽略、必填保护和原始文件零上传。它们证明通用能力，但不替代上述正式金标准。
+持续回归使用仓库公开的完全合成 fixture `tests/fixtures/nonstandard_tracking_user.csv`，测试会在上传时改名，证明没有文件名白名单。它覆盖中文非标准表头、列顺序变化、多种时间、状态别名、附加列、推荐映射、安全忽略、Schema、确认导入以及浏览器本地分析。
 
-### Cloudflare Evidence
+用户曾指定的 54×21 非标准物流 CSV 是一次性人工兼容性附件。本轮工作区未提供该附件，因此未伪造 54 行、21 列、10 order/shipment/carrier 的逐行复验值；其缺失不影响生产、Cloudflare、CI 或发布。**该文件不是正式版依赖。**
+
+| 检查项               | 通用正式回归结果                                          |
+| -------------------- | --------------------------------------------------------- |
+| 源文件名依赖         | 0；测试上传时使用不同文件名                               |
+| 静默丢行             | 0；解析行数与标准化输入逐行对账                           |
+| 必填字段误忽略       | 0；唯一必填候选受保护                                     |
+| ignored / unresolved | 语义与计数分离；前者不进入标准行，后者继续提示            |
+| tracking event ID    | 无可信源列时稳定、唯一、可复现生成                        |
+| 时间                 | 支持主要现实格式；歧义日期拒绝或提示，不依赖服务器 locale |
+| 状态                 | 保留 `raw_status`；确定性映射或 `unmapped`，不丢事件      |
+| 下游指标             | 只有轨迹表时 OT/IF/OTIF 为不可计算，并说明需补订单字段    |
+
+## Recommendation Acceptance
+
+数据流为：
+
+```text
+Deterministic metrics + deterministic diagnostics
+                   ↓
+        versioned recommendation facts
+                   ↓
+Professional Action Plan + Executive Brief
+```
+
+- 优先级由影响订单、偏差、异常频率、覆盖范围和数据可信度产生，不随机；
+- 每项事实包含 `fact_id`、证据、影响范围、建议动作、KPI、目标方向、风险和验证方法；
+- 两个视图引用同一 facts，不重新计算 KPI；
+- 指标不可计算时只给数据覆盖建议，不输出伪业务结论；
+- 不能证明的原因使用谨慎表述；AI 不参与 KPI、规则、异常或优先级计算；
+- Cloudflare 浏览器路径不上传原始 CSV 或标准化行，Workers AI 不可用时确定性模板正常显示。
+
+## Test Evidence
+
+| 实际命令/检查                                                                | Exit code | 结果                                                                     |
+| ---------------------------------------------------------------------------- | --------: | ------------------------------------------------------------------------ |
+| `npm run format`                                                             |         0 | 前端、Worker、Python 和 Markdown 已格式化                                |
+| `npm run check`                                                              |         0 | format check、lint、typecheck、298 项测试及生产 build 通过               |
+| `npm run test`                                                               |         0 | Web 20 files / 50 tests；Worker 14；Python/API/contracts 234             |
+| `npm run audit`                                                              |         0 | npm 高危门槛与 pip-audit：0 已知漏洞                                     |
+| `npm run licenses:check`                                                     |         0 | 330 个 npm 包、77 个 Python 分发包，无阻断或未知直接许可证               |
+| `npm run test:browser-import`（生产）                                        |         0 | 15 场景通过；CSV/XLSX/忽略/必填/建议/报告/刷新；原始上传请求 0           |
+| `npm run test:browser`（生产）                                               |         0 | 8 路由 × 5 视口 = 40/40；axe、键盘焦点、语义、溢出均通过                 |
+| `docker compose -p fulfilllens-v100-final config --quiet`                    |         0 | Compose 配置有效                                                         |
+| `docker compose -p fulfilllens-v100-final up --build --detach`               |         0 | API healthy、API 1.0.0、Web `/analytics` 200、日志无错误；卷和网络已清理 |
+| `npm run release:check`                                                      |         0 | 最终格式、lint、类型、测试、构建、漏洞、文档和许可证发布链通过           |
+| `npm run smoke`                                                              |         0 | API/Web/代理、版本、兼容样例与全部核心 SPA 路由通过                      |
+| `npm run demo:import/metrics/dashboard/diagnostics/simulation/cases/reports` |         0 | 七条真实合成数据演示全部通过；报告示例包含双视图建议                     |
+
+## Performance
+
+阶段 10 的固定合成基线仍适用于相同机器与代码路径，不是硬件 SLA：
+
+|                     规模 | CSV 解析 | 三表写入 |   指标 |   诊断 |    模拟 |    HTML |    峰值 RSS |
+| -----------------------: | -------: | -------: | -----: | -----: | ------: | ------: | ----------: |
+|  10,000 单 / 20,000 事件 |   0.067s |   0.442s | 0.817s | 1.496s |  3.153s |  2.743s |   363.3 MiB |
+| 50,000 单 / 100,000 事件 |   0.213s |   1.172s | 4.568s | 8.928s | 18.859s | 17.971s | 1,345.3 MiB |
+
+5 万单预算为写入 60s、指标 90s、诊断/模拟各 120s、HTML 90s、峰值 2,048 MiB，已记录基线全部通过。
+
+## Cloudflare Evidence
 
 - Worker：`fulfilllens`
-- production URL：<https://fulfilllens.esthertreu3724.workers.dev>
-- deployment/version ID：`6af3ae31-5c45-4e37-aa30-046374157c66`
-- deployment time：2026-08-10 00:49:02（Asia/Shanghai）
-- GitHub CI：<https://github.com/autumnnmutua/fulfilllens/actions/runs/31324511379>，quality 与 Docker smoke 均成功
-- HTTP：8 个 SPA 路由、`/health`、`/api/version`、案例、样例和 Workers AI 状态均为 200
-- Workers AI：原生绑定探针 `reachable=true`、`sentinel_matched=true`；只发送固定合成短句
-- Chrome：40/40 路由/视口审计通过；生产 CSV/XLSX 12 场景 E2E 通过，`raw_upload_requests=0`
+- URL：<https://fulfilllens.esthertreu3724.workers.dev>
+- accepted deployment version ID：`cd59d85e-a395-4567-91f4-c2e73b4d02ca`
+- deployment date：2026-08-10（Asia/Shanghai）
+- `/health`：`ok`，version `1.0.0`
+- `/api/version`：`app_version=1.0.0`，`environment=cloudflare-online-demo`
+- Workers AI：原生 `AI` binding configured；固定合成探针 reachable 且 sentinel matched；不读取用户文件
+- production browser：15/15 导入场景及 40/40 路由/视口组合通过
 
-## 1. 发布阻断标准与结论依据
+## Security & Privacy
 
-存在下列任一情形即不可发布：自动化测试失败；高严重度安全问题；导入、指标、诊断、模拟或报告核心路径不可用；页面/API/导出不能对账；模拟覆盖原始数据或缺少情景估算声明；容器无法构建/启动；线上展示虚假分析能力；版本和文档冲突。
+- tracked files 未发现 Cloudflare/GitHub Token、私钥或 `.env`；`data/local`、构建、Playwright 和缓存产物保持忽略；
+- 自主文件原始内容仅在浏览器内存处理，确认标准行只进入当前浏览器 IndexedDB，网络断言原始上传请求为 0；
+- CSV 导出 UTF-8 BOM 并转义公式前缀，HTML/Markdown 动态内容转义；
+- 文件类型、MIME、签名、大小、XLSX 解压、路径、宏、公式、外部链接和长文本有安全限制；
+- 示例、fixture 和截图均为完全合成数据，不含真实姓名、手机号、地址、身份证、企业订单或凭据；
+- AI 只允许可选表达辅助，不计算 KPI 或诊断，也不默认接收用户数据。
 
-本轮发现的生产白屏、Docker 案例缺失和失败载入遗留数据均曾构成阻断，现已修复并加入回归证据。当前代码质量门禁可继续作为 RC 证据，但指定正式版非标准 CSV 缺失，因此 `v1.0.0` 结论必须保持 `BLOCKED`；Firefox/Safari、PDF、Cloudflare 完整后端迁移和前端大块优化仍属于已公开的产品边界。
-
-## 2. 功能矩阵
-
-| 能力            | 用户结果                                               | 自动/人工证据                                    | 结论               |
-| --------------- | ------------------------------------------------------ | ------------------------------------------------ | ------------------ |
-| CSV/XLSX 导入   | 七步向导、数据类型识别、业务别名、转换、质量报告、确认 | 解析/映射/安全/兼容样例/API；`demo_import.py`    | 通过               |
-| 状态标准化      | 保留原始值、映射来源/置信度，未知值为 `unmapped`       | 状态与导入测试                                   | 通过               |
-| 指标            | OT、IF、OTIF、P50/P90、节点、取消/退回/异常/覆盖率     | 金标准、20+ 核心计算测试、独立复算               | 通过               |
-| 分析总览        | 筛选、趋势、分布、节点、维度、明细和 CSV               | Dashboard API/前端/E2E；`demo_dashboard.py`      | 通过               |
-| 异常诊断        | 八类规则、事实/判断/可能原因/核查、证据与去重          | 规则正反/边界测试；`demo_diagnostics.py`         | 通过               |
-| What-if         | 订单/节点层变换、基线、方案、敏感性、可复现            | 不变量/边界/API 测试；`demo_simulation.py`       | 通过               |
-| 教学案例        | 正常、促销、承运商异常；固定种子、CSV/XLSX/metadata    | 三案例完整流水线；容器一键载入                   | 通过               |
-| 报告导出        | 预览、Markdown、自包含 HTML、安全 CSV                  | 报告结构/安全/中文/大数据测试；`demo_reports.py` | 通过               |
-| 数据清理        | 设置页二次确认并清理数据集与关联上下文                 | API/E2E；容器实测载入后清理至 0                  | 通过               |
-| Cloudflare 在线 | 自主文件浏览器本地七步导入；公开合成分析与原生 AI 探针 | Chrome E2E、Worker 14 项、Type-7/不变量          | 通过（边界已标明） |
-
-## 3. 三套案例实测
-
-三套输入均由固定种子生成，不含真实姓名、手机号、详细地址、身份证、运单号或企业数据。
-
-| 案例       | 订单 |     OT |     IF |   OTIF | 平均/P50/P90（小时）   | 异常率 | 必须触发规则                                       | 结果 |
-| ---------- | ---: | -----: | -----: | -----: | ---------------------- | -----: | -------------------------------------------------- | ---- |
-| 正常运营   |  180 | 97.78% | 96.11% | 93.89% | 45.65 / 44.47 / 50.97  |  3.89% | `FL-PU-001`、`FL-LH-001`                           | 通过 |
-| 促销爆单   |  240 | 80.83% | 97.50% | 78.75% | 50.73 / 50.25 / 62.43  |  2.50% | `FL-WH-001`、`FL-WC-001`                           | 通过 |
-| 承运商异常 |  180 | 61.11% | 98.33% | 61.11% | 96.42 / 47.91 / 184.69 | 22.22% | `FL-PU-001`、`FL-LH-001`、`FL-LM-001`、`FL-CR-001` | 通过 |
-
-完整流水线为真实 CSV 上传 → 自动/人工映射 → 质量校验 → DuckDB 注册 → 指标 → 诊断 → 模拟。三套案例的质量错误、未知状态和时间冲突均为 0；预期核心规则均实际触发。
-
-## 4. 金标准人工复算与对账
-
-独立复算只使用 Python 标准库读取夹具，没有导入项目指标模块。
-
-| 项目                | 人工计算                | API/夹具          | 结论 |
-| ------------------- | ----------------------- | ----------------- | ---- |
-| OT                  | 4 / 5 = 80.00%          | 80.00%            | 一致 |
-| IF                  | 5 / 6 = 83.33%          | 83.33%            | 一致 |
-| OTIF                | 3 / 5 = 60.00%          | 60.00%            | 一致 |
-| 时长序列            | 34、48、52、52、53、73  | 同左              | 一致 |
-| 平均/P50/P90 Type 7 | 52 / 52 / 63 小时       | 52 / 52 / 63 小时 | 一致 |
-| 拣货/待揽收/枢纽    | 1.5 / 1.0 / 2.0 小时    | 同左              | 一致 |
-| 承运运输均值        | (44 + 70) / 2 = 57 小时 | 57 小时           | 一致 |
-| 异常率              | 3 / 7 = 42.86%          | 42.86%            | 一致 |
-
-Dashboard 维度订单数与总体对账；订单级不可计算状态没有进入成功或失败分母；报告、API 和金标准契约使用相同指标版本 `metrics-v1.1.0`。
-
-## 5. 诊断与模拟审查
-
-- 诊断规则集为 `diagnostics-v1.0.0`，规则输出保留阈值、样本、覆盖率、证据订单和置信度警告；
-- 同订单同类规则聚合后与订单清单唯一数量一致；小样本、低覆盖和缺关键事件会产生警告；
-- 报告分开呈现事实、规则判断、谨慎表述的可能原因和建议核查，不把相关性写成因果；
-- 模拟版本为 `simulation-v1.0.0`，所有变换发生在订单/事件副本后重新调用指标引擎；
-- 基线输入指纹在模拟前后不变；相同参数和随机种子可复现；非法负时长、比例和权重由参数校验拒绝；
-- 页面、API 和报告显著展示“基于历史数据和简化假设的情景估算，不代表真实预测或保证”。
-- Cloudflare 在线演示同样先变换合成订单/节点副本再复算指标；P50/P90 使用 Type-7，并拒绝非法时长和承运商权重。
-
-## 6. 安全、隐私与容器
-
-- 跟踪文件未发现 Cloudflare/GitHub Token、私钥、`.env`、数据库、上传目录、个人绝对路径或大于 5 MiB 的文件；
-- 手机号样式命中仅来自恶意输入脱敏测试的合成占位；示例报告中的长数字为统计小数；
-- 上传测试覆盖扩展名、MIME、大小、路径、压缩炸弹、宏/公式、异常长文本和敏感值脱敏；
-- Cloudflare 自主文件只在浏览器内存解析，确认/取消后释放；Chrome 网络断言原始上传请求为 0，规范化数据只写当前浏览器 IndexedDB；
-- CSV 单元格以 `= + - @` 开头时安全转义；敏感字段默认不进入报告；错误响应不返回堆栈；
-- 恶意 CORS 源没有 `Access-Control-Allow-Origin`，本机明确允许源正常；网页 CSP 禁止对象、外部连接和框架嵌入；
-- API 容器用户为 `fulfilllens`，Web 为 UID 101；两者只读根文件系统、删除全部 capabilities，并启用 `no-new-privileges`；
-- 容器内载入合成案例后实际清理所有数据集，清单恢复为 0；
-- Workers AI 只发送固定合成短句，凭据不进入浏览器、仓库、日志或导入数据流。
-
-## 7. 移动端与可访问性
-
-真实 Google Chrome 对自主导入页执行 360/390/430/1440px 操作验收；全站审计覆盖 8 条路由 × 360×800、390×844、430×932、768×900、1440×1000 共 40 个组合。所有组合 HTTP 200、恰有一个 `main` 和 `h1`、无页面横向溢出、无重复 ID、无未命名交互控件/图像/表格、首个 Tab 焦点可见，并通过 axe 的 WCAG 2 A/AA、2.1 AA、2.2 AA 规则。`prefers-reduced-motion` 同时启用。
-
-## 8. 性能基准
-
-|   订单 |  事件行 |   入库 |   指标 |    诊断 |    模拟 | HTML 导出 |   峰值内存 | 预算结论 |
-| -----: | ------: | -----: | -----: | ------: | ------: | --------: | ---------: | -------- |
-| 10,000 |  20,000 | 0.671s | 0.840s |  1.375s |  2.975s |    3.311s |  365.0 MiB | 通过     |
-| 50,000 | 100,000 | 1.271s | 5.171s | 10.445s | 21.852s |   21.844s | 1345.6 MiB | 通过     |
-
-5 万订单预算分别为入库 60s、指标 90s、诊断/模拟各 120s、HTML 90s、峰值 2048 MiB。浏览器订单明细使用分页，未一次性渲染全部明细。
-
-## 9. 实际命令与结果
-
-| 命令                                                                                                 | 实际结果                                                                                           |
-| ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `npm install`                                                                                        | 成功；336 个包已是锁定最新状态，npm 审计 0 漏洞                                                    |
-| `npm run release:check`                                                                              | 成功；格式、lint、类型、297 项测试、构建、审计、文档、许可证全部通过                               |
-| `python -m pytest apps/api/tests tests`                                                              | 成功；234 项通过                                                                                   |
-| `python scripts/demo_cases.py`                                                                       | 成功；三案例导入/指标/诊断/模拟                                                                    |
-| `python scripts/demo_import.py`                                                                      | 成功；确认后源文件清理、规范化数据保留                                                             |
-| `python scripts/demo_metrics.py`                                                                     | 成功；金标准检查与维度对账                                                                         |
-| `python scripts/demo_dashboard.py`                                                                   | 成功；导入→总览→承运商筛选→异常订单                                                                |
-| `python scripts/demo_diagnostics.py`                                                                 | 成功；五类异常聚合到订单证据                                                                       |
-| `python scripts/demo_simulation.py`                                                                  | 成功；三个方案、原始数据不变、固定种子复现                                                         |
-| `python scripts/demo_reports.py`                                                                     | 成功；Markdown、HTML、安全 CSV 可打开且中文正常                                                    |
-| `python scripts/performance_benchmark.py --sizes 10000 50000 --output docs/performance-results.json` | 成功；全部低于预算                                                                                 |
-| `npm run test:browser`                                                                               | 成功；40 / 40 组合通过                                                                             |
-| `npm run test:browser-import:local`                                                                  | 成功；6 档宽度及 12 个 CSV/XLSX/忽略/必填/刷新/错误场景通过；原始上传请求 0                        |
-| `docker compose -p fulfilllens-v100-gate config --quiet`                                             | 成功；使用隔离项目名，不触碰已有本地卷                                                             |
-| `docker compose -p fulfilllens-v100-gate up --build --detach`                                        | 成功；API healthy、Web 200、深层路由与 40 组合 Chrome 审计通过；日志无错误模式；验收后专用卷已清理 |
-| 容器兼容样例上传/转换                                                                                | 成功；CSV 8/8、XLSX 物流轨迹 36/36，错误均为 0，静态文件均为 200                                   |
-| 容器案例载入/数据清理实测                                                                            | 成功；三张案例表载入，清理后数据集为 0                                                             |
-| `gh run watch 31324511379 --exit-status`                                                             | 成功；quality 与 Docker build/smoke 两个 job 均通过                                                |
-| `npx wrangler deploy`                                                                                | 成功；Worker `fulfilllens`，版本 `6af3ae31-5c45-4e37-aa30-046374157c66`                            |
-| 生产 `npm run test:browser`                                                                          | 成功；8 路由 × 5 视口 = 40/40，通过 axe、焦点、语义和溢出检查                                      |
-| 生产 `node scripts/browser_import_e2e.cjs`                                                           | 成功；6 档映射布局与 CSV/XLSX/忽略/必填/刷新/错误 12 场景通过，原始上传请求 0                      |
-
-本轮本机重跑已完成：发布门禁 297 项测试通过；七个真实演示脚本通过；兼容 CSV/XLSX 的解析、安全忽略、Schema、导入和指标对账成功；正式 Chrome 40/40 路由/视口组合与 12 场景自主导入 E2E 通过；隔离 Docker 项目的 API/Web 与日志正常，专用卷已清理。GitHub Actions 与 Cloudflare 生产 smoke 也已通过；正式 tag 现在只等待指定 54×21 CSV 的真实金标准验收。
-
-## 10. 本轮缺陷与修复证据
-
-| 严重度 | 缺陷/根因                                                                             | 修复                                                                      | 验证                                                 |
-| ------ | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- | ---------------------------------------------------- |
-| 高     | 生产分块强制把 Ant Design 拆为多个小块，循环依赖初始化失败并白屏                      | 取消组内最大尺寸二次切块                                                  | 容器生产构建 + 24 组合 Chrome 通过                   |
-| 高     | API 镜像未复制 `data/cases`，容器一键案例返回 500                                     | 只读复制完全合成案例资产                                                  | 容器案例载入成功                                     |
-| 高     | API 镜像未复制 `data/rules`，容器透明诊断返回 500                                     | 只读复制诊断规则并增加 CI 资产接口探针                                    | 容器规则接口和案例诊断成功                           |
-| 高     | 案例元数据在数据注册后读取，错误请求留下孤儿数据                                      | 资产前置校验；注册失败回滚                                                | 两项新增回归测试 + 清理实测                          |
-| 中     | 设置页空列表文字对比度 1.83:1                                                         | 使用正常正文色                                                            | axe 24 / 24 无违规                                   |
-| 中     | 浏览器审计脚本被应用 CSP 阻止注入 axe                                                 | 仅审计上下文启用 `bypassCSP`                                              | 生产 CSP 不变，审计成功                              |
-| 中     | CI Docker smoke 只验证 HTTP 200，不能识别 React 白屏                                  | 固定 Playwright 依赖并加入生产浏览器审计                                  | 本机命令通过；远端以标签提交 CI 为准                 |
-| 高     | 在线演示使用最近秩分位数并直接改汇总指标，违背统一口径和模拟不变量                    | 改为 Type-7；订单/节点副本变换后统一复算                                  | Worker 分位数、复现、调整明细和非法参数测试          |
-| 中     | 浏览器导入 E2E 可能复用最近一次普通构建，使在线模式标识缺失并误走 Worker 上传拒绝路由 | 启动本地 Worker 前强制执行 Cloudflare 模式构建                            | 同一命令连续构建并完成 12 场景，原始上传请求为 0     |
-| 高     | 在线报告跨 Worker 实例恢复时丢失筛选，下载可能与页面不对账                            | 把公开合成报告请求编码进任务标识并按同一筛选重建                          | 筛选预览与无状态 Markdown 下载订单数一致             |
-| 高     | 在线节点时长含额外噪声且固定从 08:00 开始，可能超出订单生命周期                       | 节点权重归一化并从订单创建时间连续重建时间线                              | 节点和订单首尾、时长总和回归测试                     |
-| 高     | 在线有数据态未进入 CI，导致表格键盘名称和文字对比度回归                               | 增加 Ant Design 无障碍适配层并让 CI 预载合成案例                          | 公网与 Docker 24 / 24 浏览器组合通过                 |
-| 高     | XLSX 未缓存 `max_row` 时旧解析器用空值比较导致 500                                    | 声明值预检并增加实际流式行列上限                                          | 多工作表 6/36/36 行真实解析测试                      |
-| 高     | Docker 镜像未包含新增兼容样例，目录和静态下载会 404                                   | API/Web 构建阶段复制 `data/samples`                                       | 容器目录、CSV/XLSX 静态资源与上传均通过              |
-| 中     | CSV 在解析前用 `splitlines()` 会破坏引号内换行                                        | 改为标准流式 `csv.reader`                                                 | 引号内换行与空白行回归测试通过                       |
-| 高     | Cloudflare 只按两份公开样例摘要放行上传，合法自主文件无法进入流程                     | 浏览器本地导入引擎；Worker 上传路由主动拒绝原始文件                       | 任意文件名 CSV/XLSX 七步 Chrome E2E；上传请求 0      |
-| 高     | 映射变更后旧校验结果可能与任务顶部状态冲突                                            | 最新校验成为唯一确认来源；变更后回到待映射                                | 状态单元测试与 Chrome 返回修改/重校验                |
-| 中     | 新增前端导入层存在 IndexedDB 泛型与 `unknown` 默认字符串化                            | 明确 IDB 请求泛型并集中安全标量转换                                       | ESLint 0 warning、TypeScript 构建通过                |
-| 高     | Web Docker 构建未复制浏览器导入依赖的 `data/schemas`                                  | 镜像构建阶段复制只读 Schema 与共享字段目录                                | 首次失败后修复；重建、健康检查和 40 组合 Chrome 通过 |
-| 中     | Linux CI 只终止 Wrangler 的 `npx` 父进程，浏览器步骤完成后不退出                      | 使用独立 Unix 进程组，SIGTERM 后保留 SIGKILL 兜底                         | Windows E2E 重跑；GitHub 相同提交链路完成后方可发布  |
-| 高     | 目标字段 Select 无有效宽度，Dropdown 随搜索输入缩成纵向单字                           | 桌面目标列 560px、下拉 480px；移动端全宽单列                              | 360/390/430/1366/1440/1920 六档真实 Chrome           |
-| 高     | 空映射同时表示用户忽略和系统未知，可能隐式丢弃或状态冲突                              | 独立 ignored 列表；unresolved 继续阻断                                    | 浏览器/FastAPI 契约、质量报告和标准行排除测试        |
-| 高     | 忽略唯一必填候选可能被误解为取消必填要求                                              | 必填仍按目标 Schema 检查                                                  | 忽略 `order_id` 后 API 与 Chrome 均显示阻断错误      |
-| 中     | 兼容样例测试依赖旧的隐式未映射行为                                                    | 测试按真实用户选择显式忽略，并断言最终行不含源列                          | 兼容 CSV/XLSX 三项与全量 229 项后端测试通过          |
-| 高     | 未处理列只能逐项忽略，现实文件附加列多时操作成本高且可能误忽略关键候选                | 增加可撤销的一键安全忽略；关键语义、中置信度候选和必填唯一来源受保护      | 前端纯函数、组件测试与 12 场景 Chrome E2E            |
-| 高     | 日期解析依赖通用运行时可能让月/日和日/月格式受 locale 影响                            | 年优先、AM/PM 月优先、连字符日优先和显式 GMT 采用确定性解析；歧义输入拒绝 | 前后端主要格式与歧义拒绝回归测试                     |
-| 高     | 重复批次号可能被相似度误映射为唯一轨迹事件 ID                                         | 加入值画像唯一性保护；无可信 ID 时按语义和源行生成稳定 ID                 | 前后端映射、验证与 ID 可复现测试                     |
-| 中     | 仓内诊断节点集合使用无序 `set`，相同严重度发现会随 Python 哈希种子改变报告顺序        | 改为业务流程有序元组，不改变阈值或结论                                    | 34 项诊断测试及连续两次报告章节顺序一致              |
-| 中     | Linux Chrome 在 Ant Design 弹层动画替换节点时，布局 E2E 可能读取过期 0px 节点         | 在同一 DOM 快照选择真实展开且有尺寸的弹层；250/320px 门槛不变             | 本机 6 档布局与 GitHub Actions `31324511379` 成功    |
-
-## 11. 已知非阻断事项
-
-1. Firefox 和 Safari 未实际验证；Chrome/Chromium 是本轮唯一实测浏览器系列。
-2. PDF 未开放；Markdown 与自包含 HTML 是可靠报告路径。
-3. Cloudflare 可在浏览器本地导入自主文件，但这些数据尚未接入 Worker 指标/诊断/模拟/报告，也不跨设备同步；公开合成分析与自有数据路径保持分离。
-4. Ant Design 单块 gzip 约 371 KiB，功能正确但首屏性能仍可继续优化。
-5. 5 万订单峰值约 1.35 GiB；低内存设备应降低规模或分批导入。
-6. RC 阶段不承诺直接跨版本复用本地数据库文件。
-7. `workers.dev` 地址稳定绑定 Worker 名称，但未配置自有域名或可用性 SLA。
-
-## 12. Release Assets
+## Release Assets
 
 - `docs/media/import-mapping.png`
 - `docs/media/dashboard-overview.png`
 - `docs/media/diagnostics-trace.png`
+- `docs/media/professional-action-plan.png`
+- `docs/media/executive-brief.png`
 - `docs/media/scenario-comparison.png`
 - `docs/media/teaching-cases.png`
-- `README.md`、`README_EN.md`、`CHANGELOG.md`、`docs/SCREENSHOTS.md`
+- `README.md`、`README_EN.md`、`CHANGELOG.md`
+- `docs/releases/v1.0.0.md` 与 GitHub 治理模板
 
-以上五张图片来自真实 Cloudflare 模式生产构建和固定种子合成数据，不是 mockup；GIF 未生成且不作为阻断项。
+七张图片均由最终 Cloudflare 生产构建、固定合成数据和真实 Chrome 自动拍摄并人工检查；不是 mockup。GIF 未生成且不是发布阻断项。
 
-## 13. 最终发布结论
+## Defects Fixed in Final Gate
 
-**BLOCKED**
+| 严重度 | 根因                                                                    | 修复与回归                                                                |
+| ------ | ----------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| 高     | ignored 与缺映射校验未统一，产生大量逐行伪错误                          | 缺标准映射只产生一条 actionable 阻断；ignored 问题不计数；单元与 E2E 覆盖 |
+| 高     | 浏览器本地派生订单 sentinel 被当作 IndexedDB 数据集读取，导入后分析白屏 | 显式排除派生 ID 并规范化缺失值；真实生产 CSV→分析回归                     |
+| 高     | 只有 tracking events 时可能诱导用户阅读不存在的订单 KPI                 | OT/IF/OTIF 返回不可计算与所需字段说明；测试断言不出现 0%/100% 伪值        |
+| 中     | 浏览器报告不同 CSV 类型复用同一订单内容，订单导出仍指向远程 URL         | 按用途生成本地安全 CSV；导出和报告 E2E 覆盖                               |
+| 中     | 动态 HTML 报告标题/摘要未统一转义                                       | 统一 HTML 实体转义；报告安全测试                                          |
+| 中     | 建议辅助文本颜色导致生产 axe 对比度失败                                 | 使用正文色和非颜色标签；40/40 生产审计通过                                |
+| 中     | 首次截图请求发生部署传播竞态                                            | 不降低断言；生产 E2E确认稳定后重跑并取得七张真实资产                      |
 
-理由：已实现的一键安全忽略、通用字段识别、确定性时间解析、状态/异常标准化、稳定事件 ID、容器路径、指标、诊断、模拟、报告、安全和 Chrome 可访问性均有实际回归证据；但正式 Gate 明确要求的 54×21 CSV 尚不可访问。未完成真实文件统计、逐行追溯、下游 OT/IF/OTIF 不可计算性检查和浏览器 E2E 前，不能把 `1.0.0-rc.5` 晋级为 `1.0.0`。
+## Known Limitations
+
+1. Firefox、Safari 和物理移动设备尚未实际验证；Chrome/Chromium 是正式验收浏览器系列。
+2. PDF 尚未达到可靠中文字体、分页和长表门槛；Markdown、自包含 HTML 和安全 CSV 是正式路径。
+3. Cloudflare 浏览器自主数据暂不支持 What-if，也不跨设备同步；公开合成 What-if 与本地/Docker 完整路径可用。
+4. Ant Design 单块 gzip 约 371 KiB；功能与可访问性通过，但首屏体积仍可继续优化。
+5. 5 万订单峰值约 1.35 GiB；低内存设备应降低规模或分批导入。
+6. `workers.dev` 地址绑定 Worker 名称，但没有自有域名可用性 SLA、多租户身份或长期云存储承诺。
+7. 自动映射不保证覆盖所有企业私有字段；中低置信度和冲突候选仍需人工确认。
+
+## Final Verdict
+
+**READY FOR v1.0.0**
+
+本机、Docker 和 Cloudflare 生产门槛均通过；没有失败测试、高严重度未修复安全问题、静默丢行、必填绕过或伪造 KPI。最终 tag 和正式 GitHub Release 仍必须等待本记录提交后的 main GitHub Actions 全绿；若远程 CI 失败，结论自动回退为 BLOCKED，先修复再发布。
