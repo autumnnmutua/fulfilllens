@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs";
-
 import { describe, expect, it, vi } from "vitest";
 
 import worker, { type Env } from "../src/index";
@@ -24,17 +22,6 @@ function createEnv(): Env {
       ),
     },
   };
-}
-
-function sampleFile(name: string, mediaType: string): File {
-  const bytes = readFileSync(
-    new URL(`../../../data/samples/${name}`, import.meta.url),
-  );
-  const contents = bytes.buffer.slice(
-    bytes.byteOffset,
-    bytes.byteOffset + bytes.byteLength,
-  ) as ArrayBuffer;
-  return new File([contents], name, { type: mediaType });
 }
 
 async function uploadCompatibilitySample(
@@ -68,7 +55,7 @@ describe("Cloudflare Worker", () => {
 
     await expect(health.json()).resolves.toMatchObject({
       status: "ok",
-      version: "1.0.0-rc.3",
+      version: "1.0.0-rc.4",
     });
     await expect(version.json()).resolves.toMatchObject({
       environment: "cloudflare-online-demo",
@@ -138,7 +125,7 @@ describe("Cloudflare Worker", () => {
     });
   });
 
-  it("lists both compatibility samples and rejects unknown uploads", async () => {
+  it("lists compatibility samples but refuses server-side raw-file processing", async () => {
     const env = createEnv();
     const catalogResponse = await worker.fetch(
       new Request("https://example.test/api/imports/samples"),
@@ -157,160 +144,10 @@ describe("Cloudflare Worker", () => {
         { sample_id: "compatibility_logistics_xlsx", file_format: "xlsx" },
       ],
     });
-    expect(rejected.status).toBe(403);
+    expect(rejected.status).toBe(409);
     await expect(rejected.json()).resolves.toMatchObject({
-      error: { code: "ONLINE_DEMO_SYNTHETIC_SAMPLE_ONLY" },
+      error: { code: "BROWSER_LOCAL_IMPORT_REQUIRED" },
     });
-  });
-
-  it("runs the exact CSV sample through upload, mapping, validation, confirmation, and metrics", async () => {
-    const env = createEnv();
-    const upload = await uploadCompatibilitySample(
-      env,
-      "orders",
-      sampleFile("compatibility_demo_orders.csv", "text/csv"),
-    );
-    const uploaded = (await upload.json()) as {
-      task: { task_id: string };
-    };
-    const parse = await worker.fetch(
-      new Request(
-        `https://example.test/api/imports/${uploaded.task.task_id}/parse`,
-        { method: "POST", body: "{}" },
-      ),
-      env,
-    );
-    const parsed = (await parse.json()) as {
-      detected_data_type: string;
-      total_rows: number;
-      suggestions: Array<{
-        source_column: string;
-        suggested_field: string | null;
-      }>;
-      unmapped_source_columns: string[];
-    };
-    const mapping = Object.fromEntries(
-      parsed.suggestions.map((item) => [
-        item.source_column,
-        item.suggested_field,
-      ]),
-    );
-    const validation = await worker.fetch(
-      new Request(
-        `https://example.test/api/imports/${uploaded.task.task_id}/validation`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            mapping,
-            default_timezone: "Asia/Shanghai",
-            project_status_mappings: {},
-          }),
-        },
-      ),
-      env,
-    );
-    const confirmation = await worker.fetch(
-      new Request(
-        `https://example.test/api/imports/${uploaded.task.task_id}/confirm`,
-        { method: "POST" },
-      ),
-      env,
-    );
-    const confirmed = (await confirmation.json()) as {
-      dataset_id: string;
-      imported_rows: number;
-    };
-    const dashboard = await worker.fetch(
-      new Request(
-        `https://example.test/api/dashboard/overview?orders_dataset_id=${confirmed.dataset_id}`,
-      ),
-      env,
-    );
-
-    expect(upload.status).toBe(201);
-    expect(parse.status).toBe(200);
-    expect(parsed).toMatchObject({
-      detected_data_type: "orders",
-      total_rows: 8,
-    });
-    expect(parsed.unmapped_source_columns).toContain("无关备注");
-    expect(validation.status).toBe(200);
-    await expect(validation.clone().json()).resolves.toMatchObject({
-      report: { total_rows: 8, error_rows: 0, duplicate_keys: 0 },
-    });
-    expect(confirmation.status).toBe(200);
-    expect(confirmed.imported_rows).toBe(8);
-    await expect(dashboard.json()).resolves.toMatchObject({
-      context: { order_count: 8, valid_order_count: 8 },
-      metrics: expect.arrayContaining([
-        expect.objectContaining({ code: "otif_rate" }),
-      ]),
-    });
-  });
-
-  it("accepts the exact multi-sheet XLSX sample and exposes its conversion evidence", async () => {
-    const env = createEnv();
-    const upload = await uploadCompatibilitySample(
-      env,
-      "tracking_events",
-      sampleFile(
-        "compatibility_demo_logistics.xlsx",
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      ),
-    );
-    const uploaded = (await upload.json()) as {
-      task: {
-        task_id: string;
-        status: string;
-        sheets: Array<{ name: string }>;
-      };
-    };
-    const parse = await worker.fetch(
-      new Request(
-        `https://example.test/api/imports/${uploaded.task.task_id}/parse`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sheet_name: "物流轨迹" }),
-        },
-      ),
-      env,
-    );
-    const parsed = (await parse.json()) as {
-      detected_data_type: string;
-      total_rows: number;
-      suggestions: Array<{
-        source_column: string;
-        suggested_field: string | null;
-        method: string;
-        confidence: number;
-      }>;
-      warnings: string[];
-      conversion_notes: string[];
-    };
-
-    expect(upload.status).toBe(201);
-    expect(uploaded.task.status).toBe("awaiting_sheet");
-    expect(uploaded.task.sheets.map((sheet) => sheet.name)).toEqual([
-      "订单数据",
-      "仓库事件",
-      "物流轨迹",
-    ]);
-    expect(parse.status).toBe(200);
-    expect(parsed).toMatchObject({
-      detected_data_type: "tracking_events",
-      total_rows: 36,
-    });
-    expect(
-      parsed.suggestions.every(
-        (item) =>
-          item.suggested_field === null ||
-          (item.method.length > 0 && item.confidence > 0),
-      ),
-    ).toBe(true);
-    expect(parsed.warnings.join(" ")).toContain("Excel 日期");
-    expect(parsed.conversion_notes.join(" ")).toContain("原始值");
   });
 
   it("preserves the carrier case anomaly and comparable carrier groups", async () => {

@@ -72,6 +72,12 @@ jobs:
           npm run build:cloudflare
           npx --yes wrangler@4.120.0 deploy --dry-run --outdir dist/cloudflare-worker
 
+      - name: 验证 Cloudflare 浏览器本地自主导入
+        shell: bash
+        run: |
+          FL_CHROMIUM_PATH="$(command -v google-chrome)" \
+          npm run test:browser-import:local
+
       - name: 检查 Docker Compose 配置
         run: docker compose config --quiet
 

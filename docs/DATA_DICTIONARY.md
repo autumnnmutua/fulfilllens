@@ -150,6 +150,10 @@
 6. 标准模板为 UTF-8、仅含表头，不含数据；
 7. 机器可读 Schema 不通过时，错误必须定位到字段和行；
 8. 跨行语义校验在阶段 3 实现，不以 JSON Schema 单行验证代替。
+9. 浏览器与 FastAPI 的字段名称、中文标签和业务别名共享 `data/schemas/import_field_catalog.json`，避免两套硬编码映射漂移；
+10. 自动识别兼容中文/英文、大小写、camelCase、snake_case、空格、下划线和连字符；中低置信度不得静默绑定；
+11. `order_id`、`shipment_id`、`tracking_event_id`、`event_id` 等标识始终按字符串处理；Excel 连续零显示格式必须保留前导零；
+12. 自动转换只改变表达格式。非法时间、冲突数量、未知状态和缺失字段进入质量报告，不得补造记录、删除错误行或修改业务事实。
 
 ## 8. 关联文件
 
@@ -157,5 +161,6 @@
 - [仓库事件 Schema](../data/schemas/warehouse_event.schema.json)
 - [物流轨迹 Schema](../data/schemas/tracking_event.schema.json)
 - [状态代码 Schema](../data/schemas/status_codes.schema.json)
+- [导入字段目录](../data/schemas/import_field_catalog.json)
 - [状态体系](STATUS_TAXONOMY.md)
 - [指标口径](METRICS.md)

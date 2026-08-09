@@ -158,6 +158,8 @@ shipment_created
 
 包含否定、失败、取消、退回等词时不得仅按部分字符串匹配。
 
+每条标准化结果同时保存 `raw_status`、`normalized_status`、`mapping_source` 和 `mapping_confidence`。浏览器本地引擎使用 `project_user`、`builtin_exact`、`standard_code` 或 `unmapped`；FastAPI 返回语义等价的来源字段。来源名称差异不得改变优先级或允许状态集合。无法可靠命中的值必须保留原文并进入 `unmapped`，不能为提高通过率强制归类。
+
 ### 6.3 中文同义词示例
 
 以下仅是内置候选，不替代人工确认：

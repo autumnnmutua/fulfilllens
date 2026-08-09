@@ -3,6 +3,7 @@ import {
   DownloadOutlined,
   InboxOutlined,
   SafetyCertificateOutlined,
+  UploadOutlined,
 } from "@ant-design/icons";
 import {
   Alert,
@@ -24,13 +25,14 @@ import {
   Typography,
   Upload,
 } from "antd";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { importApi } from "../api/imports";
 import { ApiClientError } from "../api/client";
 import { useNotifications } from "../components/notification-context";
 import { PageHeader } from "../components/PageHeader";
 import { isCloudflareDeploy } from "../config/runtime";
+import { MAX_IMPORT_BYTES, validateFileBasics } from "../imports/parser";
 import type {
   ConfirmResponse,
   CompatibilitySample,
@@ -158,8 +160,15 @@ function statusColor(status: ImportTask["status"]): string {
   return "processing";
 }
 
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KiB`;
+  return `${(bytes / 1024 / 1024).toFixed(2)} MiB`;
+}
+
 export function ImportPage() {
   const notifications = useNotifications();
+  const nativeFileInput = useRef<HTMLInputElement>(null);
   const [current, setCurrent] = useState(0);
   const [dataType, setDataType] = useState<DataType>("orders");
   const [file, setFile] = useState<File | null>(null);
@@ -176,6 +185,7 @@ export function ImportPage() {
   const [confirmed, setConfirmed] = useState<ConfirmResponse | null>(null);
   const [busy, setBusy] = useState(false);
   const [persistentError, setPersistentError] = useState<string | null>(null);
+  const [validationStale, setValidationStale] = useState(false);
   const [sampleCatalog, setSampleCatalog] =
     useState<CompatibilitySampleCatalog | null>(null);
   const [sampleCatalogError, setSampleCatalogError] = useState<string | null>(
@@ -234,7 +244,42 @@ export function ImportPage() {
       ),
     );
     setPersistentError(null);
+    setValidation(null);
+    setConfirmed(null);
+    setValidationStale(false);
     setCurrent(3);
+  }
+
+  function selectFile(selected: File | null) {
+    if (selected === null) {
+      setFile(null);
+      return;
+    }
+    try {
+      validateFileBasics(selected);
+    } catch (error) {
+      setFile(null);
+      setPersistentError(errorMessage(error));
+      return;
+    }
+    setFile(selected);
+    setTask(null);
+    setParsed(null);
+    setValidation(null);
+    setConfirmed(null);
+    setValidationStale(false);
+    setPersistentError(null);
+  }
+
+  function startCustomUpload() {
+    setPersistentError(null);
+    setCurrent(1);
+    window.requestAnimationFrame(() => {
+      if (nativeFileInput.current) {
+        nativeFileInput.current.value = "";
+        nativeFileInput.current.click();
+      }
+    });
   }
 
   async function runAction<T>(action: () => Promise<T>): Promise<T | null> {
@@ -362,6 +407,7 @@ export function ImportPage() {
     if (response !== null) {
       setTask(response.task);
       setValidation(response);
+      setValidationStale(false);
       setCurrent(5);
     }
   }
@@ -370,12 +416,20 @@ export function ImportPage() {
     if (task === null) {
       return;
     }
+    if (!validation?.report.can_confirm || validationStale) {
+      setPersistentError(
+        "当前字段映射或状态映射尚未通过最新校验，不能确认导入。",
+      );
+      return;
+    }
     const response = await runAction(() => importApi.confirm(task.task_id));
     if (response !== null) {
       setTask(response.task);
       setConfirmed(response);
       window.localStorage.setItem(
-        `fulfilllens.dataset.${response.task.data_type}`,
+        response.dataset_id.startsWith("browser-local-")
+          ? `fulfilllens.browser.dataset.${response.task.data_type}`
+          : `fulfilllens.dataset.${response.task.data_type}`,
         response.dataset_id,
       );
       notifications.showSuccess("导入完成", "数据集已进入“可分析”状态。");
@@ -396,6 +450,7 @@ export function ImportPage() {
     setFile(null);
     setMapping({});
     setProjectStatusMappings({});
+    setValidationStale(false);
     setPersistentError(null);
     setCurrent(0);
   }
@@ -446,7 +501,7 @@ export function ImportPage() {
         title="数据导入"
         description={
           isCloudflareDeploy
-            ? "在线版可上传并转换本站两份公开合成兼容样例；真实订单、仓库作业和物流轨迹不会上传到此站点。"
+            ? "在线版支持自主选择 CSV/XLSX，并在当前浏览器内完成解析、转换、映射和质量校验；原始文件不会上传到 Cloudflare。"
             : "逐步导入订单、仓库作业或物流轨迹。系统会先预览、映射和校验，只有确认后才形成可分析数据集。"
         }
       />
@@ -457,12 +512,12 @@ export function ImportPage() {
         type="info"
         message={
           isCloudflareDeploy
-            ? "在线版仅接收本站公开合成样例"
+            ? "在线版文件仅在浏览器本地处理"
             : "文件仅在本机处理"
         }
         description={
           isCloudflareDeploy
-            ? "可下载并重新上传下方两份合成兼容样例，完整检查字段转换。任意真实或未知文件会被拒绝；真实业务数据请使用本地版。"
+            ? "自主文件的原始内容只存在于当前浏览器内存；确认后的标准化数据保存在此浏览器 IndexedDB。请仍先移除分析不需要的个人信息字段。"
             : "限制为 CSV/XLSX，单文件最大 10 MiB；不执行宏与公式。姓名、手机号、详细地址和身份证等字段只提示风险，预览会脱敏。"
         }
       />
@@ -540,7 +595,17 @@ export function ImportPage() {
           size="small"
           aria-label="数据导入步骤"
         />
-        {task !== null ? (
+        <input
+          ref={nativeFileInput}
+          className="visually-hidden"
+          type="file"
+          accept=".csv,.xlsx"
+          aria-label="选择自主上传的 CSV 或 XLSX 文件"
+          onChange={(event) => {
+            selectFile(event.target.files?.[0] ?? null);
+          }}
+        />
+        {task !== null && persistentError === null ? (
           <Flex className="import-task-status" align="center" gap="small" wrap>
             <Typography.Text strong>当前任务</Typography.Text>
             <Tag color={statusColor(task.status)}>{task.status_label}</Tag>
@@ -552,7 +617,7 @@ export function ImportPage() {
             className="import-persistent-error"
             type="error"
             showIcon
-            message="导入操作未完成"
+            message="当前导入操作失败"
             description={persistentError}
           />
         ) : null}
@@ -578,6 +643,12 @@ export function ImportPage() {
               <Flex gap="small" wrap>
                 <Button
                   type="primary"
+                  icon={<UploadOutlined />}
+                  onClick={startCustomUpload}
+                >
+                  自主上传文件
+                </Button>
+                <Button
                   loading={isCloudflareDeploy && busy}
                   onClick={() => {
                     if (isCloudflareDeploy) {
@@ -612,14 +683,13 @@ export function ImportPage() {
               <Dragger
                 accept=".csv,.xlsx"
                 beforeUpload={(selected) => {
-                  setFile(selected);
-                  setPersistentError(null);
+                  selectFile(selected);
                   return false;
                 }}
                 maxCount={1}
                 multiple={false}
                 onRemove={() => {
-                  setFile(null);
+                  selectFile(null);
                 }}
               >
                 <p className="ant-upload-drag-icon">
@@ -630,6 +700,35 @@ export function ImportPage() {
                   支持 UTF-8、UTF-8 BOM、GB18030/GBK CSV 与 XLSX。
                 </p>
               </Dragger>
+              {file !== null ? (
+                <Descriptions bordered size="small" column={{ xs: 1, sm: 3 }}>
+                  <Descriptions.Item label="文件名">
+                    {file.name}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="文件大小">
+                    {formatFileSize(file.size)}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="格式">
+                    {file.name.toLocaleLowerCase().endsWith(".xlsx")
+                      ? "XLSX"
+                      : "CSV"}
+                  </Descriptions.Item>
+                  {task?.file_format === "csv" ? (
+                    <Descriptions.Item label="检测编码">
+                      {task.encoding ?? "需人工选择"}
+                    </Descriptions.Item>
+                  ) : null}
+                  {task?.file_format === "xlsx" ? (
+                    <Descriptions.Item label="工作表数量">
+                      {task.sheet_count ?? task.sheets.length}
+                    </Descriptions.Item>
+                  ) : null}
+                </Descriptions>
+              ) : null}
+              <Typography.Text type="secondary">
+                仅接受 .csv 和 .xlsx，单文件最大{" "}
+                {formatFileSize(MAX_IMPORT_BYTES)}。
+              </Typography.Text>
               <Flex gap="small" wrap>
                 <Button onClick={() => setCurrent(0)}>上一步</Button>
                 <Button
@@ -638,7 +737,7 @@ export function ImportPage() {
                   disabled={file === null}
                   onClick={() => void handleUpload()}
                 >
-                  安全上传并检查
+                  浏览器本地读取并检查
                 </Button>
               </Flex>
             </Flex>
@@ -719,6 +818,57 @@ export function ImportPage() {
                     : "仍建议在导入前删除分析不需要的姓名、电话和详细地址。"
                 }
               />
+              <Row gutter={[12, 12]}>
+                {[
+                  ["原始总行数", parsed.total_rows],
+                  [
+                    "识别字段数",
+                    parsed.suggestions.filter(
+                      (suggestion) => suggestion.candidates.length > 0,
+                    ).length,
+                  ],
+                  ["未识别字段数", parsed.unmapped_source_columns.length],
+                  [
+                    "自动匹配字段数",
+                    parsed.suggestions.filter(
+                      (suggestion) =>
+                        suggestion.suggested_field !== null &&
+                        !suggestion.requires_confirmation,
+                    ).length,
+                  ],
+                  [
+                    "需要人工确认",
+                    parsed.suggestions.filter(
+                      (suggestion) => suggestion.requires_confirmation,
+                    ).length,
+                  ],
+                ].map(([title, value]) => (
+                  <Col xs={12} md={8} xl={4} key={String(title)}>
+                    <Card size="small">
+                      <Statistic title={title} value={value} />
+                    </Card>
+                  </Col>
+                ))}
+              </Row>
+              <Descriptions bordered size="small" column={{ xs: 1, md: 2 }}>
+                <Descriptions.Item label="文件名">
+                  {parsed.task.file_name}
+                </Descriptions.Item>
+                <Descriptions.Item label="数据类型">
+                  {
+                    dataTypeOptions.find((item) => item.value === dataType)
+                      ?.label
+                  }
+                </Descriptions.Item>
+                <Descriptions.Item label="工作表">
+                  {parsed.task.selected_sheet ?? "CSV 单表"}
+                </Descriptions.Item>
+                <Descriptions.Item label="处理位置">
+                  {parsed.task.processing_location === "browser"
+                    ? "当前浏览器"
+                    : "本地 API"}
+                </Descriptions.Item>
+              </Descriptions>
               <Alert
                 showIcon
                 type={
@@ -838,28 +988,65 @@ export function ImportPage() {
                             ...previous,
                             [suggestion.source_column]: value ?? null,
                           }));
+                          setValidation(null);
+                          setValidationStale(false);
+                          setTask((previous) =>
+                            previous === null
+                              ? null
+                              : {
+                                  ...previous,
+                                  message:
+                                    "字段映射已修改，需要重新运行质量校验。",
+                                  status: "awaiting_mapping",
+                                  status_label: "待映射",
+                                },
+                          );
                         }}
                       />
                     ),
                   },
                   {
                     title: "置信度",
-                    dataIndex: "confidence",
                     key: "confidence",
                     width: 160,
-                    render: (confidence: number) => (
-                      <Progress
-                        percent={Math.round(confidence * 100)}
-                        size="small"
-                        status={confidence >= 0.86 ? "success" : "normal"}
-                      />
-                    ),
+                    render: (_, suggestion) => {
+                      const manual =
+                        mapping[suggestion.source_column] !==
+                        suggestion.suggested_field;
+                      const confidence = manual ? 1 : suggestion.confidence;
+                      return (
+                        <Flex vertical gap={4}>
+                          <Progress
+                            percent={Math.round(confidence * 100)}
+                            size="small"
+                            status={confidence >= 0.86 ? "success" : "normal"}
+                          />
+                          {suggestion.requires_confirmation && !manual ? (
+                            <Tag color="warning">需要人工确认</Tag>
+                          ) : null}
+                        </Flex>
+                      );
+                    },
                   },
                   {
                     title: "匹配方式",
-                    dataIndex: "method",
                     key: "method",
                     width: 140,
+                    render: (_, suggestion) => (
+                      <Tag
+                        color={
+                          mapping[suggestion.source_column] !==
+                          suggestion.suggested_field
+                            ? "purple"
+                            : "blue"
+                        }
+                      >
+                        {mapping[suggestion.source_column] !==
+                        suggestion.suggested_field
+                          ? "Manual"
+                          : suggestion.method}
+                      </Tag>
+                    ),
                   },
                 ]}
               />
@@ -960,6 +1147,18 @@ export function ImportPage() {
                               ...previous,
                               [item.raw_status]: value,
                             }));
+                            setValidationStale(true);
+                            setTask((previous) =>
+                              previous === null
+                                ? null
+                                : {
+                                    ...previous,
+                                    message:
+                                      "项目级状态映射已修改，需要重新运行质量校验。",
+                                    status: "awaiting_mapping",
+                                    status_label: "待映射",
+                                  },
+                            );
                           }}
                         />
                       </Flex>
@@ -994,7 +1193,7 @@ export function ImportPage() {
                 </Button>
                 <Button
                   type="primary"
-                  disabled={!validation.report.can_confirm}
+                  disabled={!validation.report.can_confirm || validationStale}
                   onClick={() => setCurrent(6)}
                 >
                   下一步：确认导入
@@ -1039,6 +1238,7 @@ export function ImportPage() {
                     type="primary"
                     icon={<CheckCircleOutlined />}
                     loading={busy}
+                    disabled={!validation.report.can_confirm || validationStale}
                     onClick={() => void handleConfirm()}
                   >
                     确认并生成可分析数据集
@@ -1048,12 +1248,28 @@ export function ImportPage() {
             ) : (
               <Result
                 status="success"
-                title="数据已进入可分析状态"
-                subTitle={`数据集 ${confirmed.dataset_id} 已导入 ${confirmed.imported_rows} 行；可复制数据集标识并前往“分析总览”计算指标。`}
+                title={
+                  confirmed.dataset_id.startsWith("browser-local-")
+                    ? "数据已导入当前浏览器"
+                    : "数据已进入可分析状态"
+                }
+                subTitle={
+                  confirmed.dataset_id.startsWith("browser-local-")
+                    ? `已在浏览器 IndexedDB 保存 ${confirmed.imported_rows} 行标准化数据；原始文件没有上传，建议继续导入同一业务范围的关联表。`
+                    : `数据集 ${confirmed.dataset_id} 已导入 ${confirmed.imported_rows} 行；可前往“分析总览”计算指标。`
+                }
                 extra={[
-                  <Button key="analytics" type="primary" href="/analytics">
-                    前往分析总览
-                  </Button>,
+                  ...(confirmed.dataset_id.startsWith("browser-local-")
+                    ? []
+                    : [
+                        <Button
+                          key="analytics"
+                          type="primary"
+                          href="/analytics"
+                        >
+                          前往分析总览
+                        </Button>,
+                      ]),
                   <Button key="again" onClick={() => void handleCancel()}>
                     导入另一份数据
                   </Button>,

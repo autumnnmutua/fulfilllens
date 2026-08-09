@@ -101,9 +101,14 @@ export function SettingsPage() {
         current.filter((item) => item.dataset_id !== result.dataset_id),
       );
       for (const key of ["orders", "warehouse_events", "tracking_events"]) {
-        const storageKey = `fulfilllens.dataset.${key}`;
-        if (window.localStorage.getItem(storageKey) === result.dataset_id) {
-          window.localStorage.removeItem(storageKey);
+        for (const prefix of [
+          "fulfilllens.dataset",
+          "fulfilllens.browser.dataset",
+        ]) {
+          const storageKey = `${prefix}.${key}`;
+          if (window.localStorage.getItem(storageKey) === result.dataset_id) {
+            window.localStorage.removeItem(storageKey);
+          }
         }
       }
       notifications.showSuccess(
@@ -245,18 +250,20 @@ export function SettingsPage() {
       </Card>
 
       <Card
-        title={isCloudflareDeploy ? "在线合成数据" : "本地数据与隐私清理"}
+        title={
+          isCloudflareDeploy ? "在线示例与浏览器本地数据" : "本地数据与隐私清理"
+        }
         className="section-card"
       >
         <Alert
           type="warning"
           showIcon
           message={
-            isCloudflareDeploy ? "在线案例为只读公开数据" : "删除后无法恢复"
+            isCloudflareDeploy ? "浏览器本地数据可随时清理" : "删除后无法恢复"
           }
           description={
             isCloudflareDeploy
-              ? "这里列出的数据集由 Worker 内置生成，任何访客都可以重新加载；它们不包含真实订单或个人信息，也无需删除。"
+              ? "Worker 合成案例是只读公开数据；自主上传后确认的标准化数据只保存在本浏览器，可在下方单独清理。"
               : "清理会删除分析库中的数据行、关联模拟方案、内存报告和可识别的导入任务文件。请先导出确实需要保留的结果。"
           }
         />
@@ -269,7 +276,8 @@ export function SettingsPage() {
             renderItem={(dataset) => (
               <List.Item
                 actions={
-                  isCloudflareDeploy
+                  isCloudflareDeploy &&
+                  dataset.source_kind !== "browser_local_import"
                     ? []
                     : [
                         <Button
@@ -285,7 +293,13 @@ export function SettingsPage() {
               >
                 <List.Item.Meta
                   title={`${DATA_TYPE_LABELS[dataset.data_type]} · ${dataset.row_count.toLocaleString("zh-CN")} 行`}
-                  description={`${dataset.source_kind === "synthetic_case" ? "合成案例" : "用户导入"} · ${new Date(dataset.created_at).toLocaleString("zh-CN")} · 标识 ${dataset.dataset_id.slice(0, 8)}…`}
+                  description={`${
+                    dataset.source_kind === "synthetic_case"
+                      ? "合成案例"
+                      : dataset.source_kind === "browser_local_import"
+                        ? "浏览器本地导入"
+                        : "用户导入"
+                  } · ${new Date(dataset.created_at).toLocaleString("zh-CN")} · 标识 ${dataset.dataset_id.slice(0, 8)}…`}
                 />
               </List.Item>
             )}

@@ -29,7 +29,7 @@ describe("FulfillLens CN 应用壳", () => {
             jsonResponse({
               status: "ok",
               service: "fulfilllens-api",
-              version: "1.0.0-rc.3",
+              version: "1.0.0-rc.4",
             }),
           );
         }
@@ -38,7 +38,7 @@ describe("FulfillLens CN 应用壳", () => {
           return Promise.resolve(
             jsonResponse({
               app_name: "FulfillLens CN",
-              app_version: "1.0.0-rc.3",
+              app_version: "1.0.0-rc.4",
               api_version: "v1",
               environment: "test",
               contract_versions: {
@@ -152,6 +152,7 @@ describe("FulfillLens CN 应用壳", () => {
     ).toBeVisible();
     expect(screen.getByText("1. 选择数据类型")).toBeVisible();
     expect(screen.getByText("一键导入合成样例")).toBeVisible();
+    expect(screen.getByRole("button", { name: /自主上传文件/ })).toBeVisible();
     expect(
       await screen.findByText("非标准订单 CSV 自动转换示例"),
     ).toBeVisible();

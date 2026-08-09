@@ -1,7 +1,7 @@
 # CSV/XLSX 兼容性验证报告
 
 - 验证日期：2026-08-09（Asia/Shanghai）
-- 版本：`1.0.0-rc.3`
+- 版本：`1.0.0-rc.4`
 - 数据声明：两份文件均为全新合成数据，不含真实个人、企业、订单、运单或地址信息
 
 ## 1. 验证对象
@@ -11,7 +11,9 @@
 | `data/samples/compatibility_demo_orders.csv`     | `4730a123d51e0747c50077147b6121ed7583bbb7f6eb5b53255e3becf828844f` | 8 条订单；UTF-8 BOM、混合中英文字段、camelCase、日期文本、文本数量、前导零、可选空值和附加列    |
 | `data/samples/compatibility_demo_logistics.xlsx` | `05f2c1e56ba8fbae9266ce1389803c73e50f3b8c0c98cfcb0e3688d2ae05fddf` | 订单 6 行、仓库事件 36 行、物流轨迹 36 行；多工作表、Excel 日期、状态别名、不同字段顺序和附加列 |
 
-目录文件 `data/samples/compatibility_samples.json` 保存相同摘要。API 每次提供下载前重新计算摘要；Cloudflare Worker 只接收与这两个摘要精确匹配的公开合成文件。
+目录文件 `data/samples/compatibility_samples.json` 保存相同摘要。本地 API 每次提供下载前重新计算摘要；Cloudflare 在线版下载公开样例后交给同一个浏览器本地引擎处理，不再用摘要白名单阻止其他合法文件名或结构等价的自主 CSV/XLSX。
+
+真实用户路径另使用 `tests/fixtures/nonstandard_tracking_user.csv`（SHA-256 `9608cb97005d9e37064bd65e747f136063773625cf8f9d22964f32f9457b15c4`）：12 条完全合成轨迹、中文非标准表头、字段顺序变化、三种日期表达、状态别名和附加列。测试上传时会重命名文件，证明实现没有文件名白名单。
 
 ## 2. 真实转换结果
 
@@ -35,11 +37,11 @@
 
 ## 4. 自动化证据
 
-兼容性专用测试覆盖目录摘要/下载、CSV 和 XLSX 真实 multipart 上传、解析、映射、Schema 校验、确认导入与指标对账；Worker 测试还验证未知文件返回 `ONLINE_DEMO_SYNTHETIC_SAMPLE_ONLY`。完整发布命令及最终结果见[最终验收记录](RELEASE_ACCEPTANCE.md)和对应版本[发布说明](releases/v1.0.0-rc.3.md)。
+本地兼容性测试覆盖目录摘要/下载、CSV 和 XLSX 真实 multipart 上传、解析、映射、Schema 校验、确认导入与指标对账。浏览器测试覆盖 UTF-8/BOM/GBK/GB18030、引号/换行/逗号、多工作表、Excel 日期、前导零、低置信度人工覆盖、未知状态、文件类型/大小，并断言合法自主文件不调用网络上传接口。真实 Chrome E2E 在 360/390/430/1440px 完成非标准轨迹 CSV 和多工作表 XLSX 七步流程。完整发布命令及最终结果见[最终验收记录](RELEASE_ACCEPTANCE.md)和对应版本[发布说明](releases/v1.0.0-rc.4.md)。
 
 ## 5. 已知边界
 
 - 自动匹配是可解释建议，不保证所有企业自定义字段都能高置信度命中；低置信度或冲突映射必须人工确认；
-- 本地 FastAPI 支持安全限制内的用户 CSV/XLSX；公共 Cloudflare 地址只接收这两份摘要匹配的合成样例；
+- 本地 FastAPI 支持安全限制内的用户 CSV/XLSX；Cloudflare 地址在浏览器内处理自主文件，确认后的数据不跨浏览器同步，且尚未接入 Worker 指标/诊断/模拟/报告；
 - `.xls`、`.xlsm`、宏、加密工作簿、外部链接和嵌入对象不在支持范围；
 - 无时区日期必须由用户选择默认 IANA 时区，系统不会猜测业务时区。

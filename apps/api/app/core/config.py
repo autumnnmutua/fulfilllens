@@ -16,7 +16,7 @@ DEFAULT_CORS_ORIGINS = [
 
 class Settings(BaseSettings):
     app_name: str = "FulfillLens CN"
-    app_version: str = "1.0.0-rc.3"
+    app_version: str = "1.0.0-rc.4"
     api_version: str = "v1"
     environment: Literal["development", "test", "production"] = "development"
     host: str = "127.0.0.1"

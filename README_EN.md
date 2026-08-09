@@ -6,7 +6,7 @@ FulfillLens CN is a local-first, open-source fulfillment analytics tool for logi
 
 The project is designed to make every percentage, anomaly, and scenario traceable to fields, formulas, thresholds, samples, and order-level evidence instead of generating a merely plausible story.
 
-> Version status: `1.0.0-rc.3` improves conversion of real-world CSV/XLSX layouts and adds two reproducible compatibility samples. The Cloudflare demo accepts only those two digest-matched public synthetic samples and provides same-origin Worker analysis APIs plus a native Workers AI binding; real business-data analysis remains local or Docker based. Firefox/Safari and PDF are known non-blocking limitations; see [Project status](#project-status-and-known-limitations).
+> Version status: `1.0.0-rc.4` enables user-selected CSV/XLSX imports in the Cloudflare edition. Raw files are parsed, mapped, normalized, and validated inside the browser and are not uploaded to the Worker; uncertain mappings require confirmation. Full online analytics for browser-owned datasets is not connected yet, so end-to-end analysis of business data remains local or Docker-first. See [Project status](#project-status-and-known-limitations).
 
 ## Why FulfillLens CN
 
@@ -118,6 +118,8 @@ python scripts/demo_simulation.py
 
 To focus on real-world compatibility conversion, open <http://127.0.0.1:5173/import> and choose “Non-standard order CSV auto-conversion sample” or “Non-standard logistics XLSX auto-conversion sample.” Both use the ordinary upload, sheet selection, mapping, Schema validation, and confirmation flow.
 
+To import your own file, select Orders, Warehouse Events, or Tracking Events, then choose “Upload your own file.” The existing seven-step wizard opens the system picker; step 2 also supports click or drag-and-drop for `.csv` and `.xlsx` only.
+
 ### 4. Follow the full path
 
 Open Dashboard → Diagnostics → What-if Scenarios → Reports. Read metric definitions, filter a carrier, open an anomalous order timeline, copy a scenario, and export the guided HTML report.
@@ -176,7 +178,9 @@ The last command is irreversible. A separate GitHub Actions Docker smoke job bui
 
 Online URL: <https://fulfilllens-cn.esthertreu3724.workers.dev>
 
-The online edition loads public deterministic synthetic cases and supports metrics, dashboards, transparent diagnostics, order-level What-if recalculation, and reports. Its import page can upload and convert the two repository compatibility samples, but the Worker verifies their exact SHA-256 digests; unknown or real business files are rejected and not retained. User-created online scenarios live only for the current Worker runtime and are not durable business storage; real business files, the full DuckDB/SQLite pipeline, and durable scenarios still require the local or Docker edition. `wrangler.jsonc` binds Workers AI as `AI`; the Account ID and API token never enter browser assets or the repository.
+The online edition loads public deterministic synthetic cases and supports metrics, dashboards, transparent diagnostics, order-level What-if recalculation, and reports. Its custom-file path performs extension/MIME/signature checks, CSV/XLSX parsing, field suggestions, status normalization, Schema validation, and quality checks in the browser. Raw files are not sent to Cloudflare; after confirmation, only normalized datasets remain in this browser's IndexedDB and can be deleted in Settings. The Worker upload endpoint rejects raw bodies to protect older clients from accidental uploads.
+
+Custom browser imports and public synthetic analysis are currently separate paths: this release does not send user datasets to the Worker, so full metrics, diagnostics, simulation, and report processing for them still require the local or Docker edition. User-created online scenarios remain runtime-only. `wrangler.jsonc` binds Workers AI as `AI`; the Account ID and API token never enter browser assets or the repository.
 
 ```powershell
 npm.cmd run build:cloudflare
@@ -228,7 +232,7 @@ Three data types are supported:
 - `warehouse_events`: one row per warehouse event;
 - `tracking_events`: one row per tracking event.
 
-CSV and XLSX are supported. CSV handles UTF-8, UTF-8 BOM, GBK/GB18030, and other common Chinese encodings; an uncertain result requires user confirmation. Fields may use Chinese, English, camelCase, snake_case, or registered business-system aliases, while the UI shows source, target, matching method, and confidence. XLSX supports multiple sheets, Excel dates, numeric/text numeric cells, blank rows, and additional columns. Times are normalized to timezone-aware ISO 8601, and timezone-less inputs require a selected default timezone.
+CSV and XLSX are supported. CSV handles UTF-8, UTF-8 BOM, GBK/GB18030, CRLF/LF, quoted fields, embedded commas, and blank lines; uncertain encoding requires user confirmation. Fields may use Chinese, English, camelCase, snake_case, or registered business-system aliases. The UI exposes source, target, Exact/Alias/Normalized/Similarity/Manual method, confidence, and confirmation status. XLSX supports multiple sheets, Excel dates, numeric/text numeric cells, blank rows, and extra columns; formulas, macros, scripts, and external links are not executed. Times are normalized to timezone-aware ISO 8601, and timezone-less inputs require a selected default timezone. Conversion only normalizes representation—it does not invent, delete, or alter business facts and does not claim to support every Excel workbook.
 
 Templates live in `data/templates/`, and machine-readable schemas live in `data/schemas/`. See the [Data Dictionary](docs/DATA_DICTIONARY.md), [Status Taxonomy](docs/STATUS_TAXONOMY.md), and [Import Guide](docs/IMPORTING.md).
 
@@ -253,15 +257,15 @@ FastAPI + Pydantic ── domain services and transparent rules
 - `docs`: product, metrics, architecture, risks, teaching, and release materials;
 - `tests`: backend, frontend, contract, end-to-end, security, and performance verification.
 
-See [Architecture](docs/ARCHITECTURE.md) and [ADRs](docs/adr/README.md). The Cloudflare online demo has a separate Worker adapter that only processes public synthetic data; the current FastAPI/DuckDB/SQLite backend still cannot be deployed unchanged. See the [Cloudflare deployment and feasibility notes](docs/CLOUDFLARE_DEPLOYMENT.md).
+See [Architecture](docs/ARCHITECTURE.md) and [ADRs](docs/adr/README.md). The Cloudflare edition combines a browser-local import engine with a Worker adapter for public synthetic analysis; the current FastAPI/DuckDB/SQLite backend still cannot be deployed unchanged. See the [Cloudflare deployment and feasibility notes](docs/CLOUDFLARE_DEPLOYMENT.md).
 
 ## Project status and known limitations
 
 Stages 0–12 are complete for this release-candidate scope, including full local acceptance. Current evidence includes:
 
-- 24 frontend, 16 Cloudflare Worker, and 227 backend/contract tests;
+- 36 frontend, 14 Cloudflare Worker, and 227 backend/contract tests;
 - 10,000/50,000-order performance benchmarks;
-- eight routes at 360/768/1440 with Chromium and axe;
+- real import interaction at 360/390/430/1440 Chromium, plus site-wide 360/390/430/768/1440 audits;
 - npm/Python vulnerability audits and repository secret scans;
 - [GitHub Actions](https://github.com/autumnnmutua/fulfilllens-cn/actions) includes quality and real Docker smoke jobs; the release tag is governed by the actual result for its commit;
 - the public remote repository and Private Vulnerability Reporting are enabled.
@@ -270,7 +274,8 @@ Non-blocking release-candidate limitations:
 
 - Firefox and Safari;
 - PDF Chinese fonts, pagination, and long tables;
-- complete Cloudflare business-data persistence, identity/authorization, and asynchronous large-file workflows.
+- Worker analytics/diagnostics/simulation/reports for browser-owned Cloudflare datasets;
+- Cloudflare identity/authorization, cross-device persistence, and asynchronous large-file workflows.
 
 Reports and benchmarks are evidence for a specific revision, dataset, and machine—not guarantees for every hardware or business dataset.
 
@@ -282,13 +287,14 @@ Reports and benchmarks are evidence for a specific revision, dataset, and machin
 - Stage 11: bilingual open-source docs, license, governance templates, and RC assets;
 - Stage 12: clean-environment acceptance and the v1.0 release decision.
 
-See the [Roadmap](docs/ROADMAP.md), [final acceptance record](docs/RELEASE_ACCEPTANCE.md), [compatibility validation report](docs/COMPATIBILITY_VALIDATION.md), and [v1.0.0-rc.3 release notes](docs/releases/v1.0.0-rc.3.md).
+See the [Roadmap](docs/ROADMAP.md), [final acceptance record](docs/RELEASE_ACCEPTANCE.md), [compatibility validation report](docs/COMPATIBILITY_VALIDATION.md), and [v1.0.0-rc.4 release notes](docs/releases/v1.0.0-rc.4.md).
 
 ## Privacy, security, and disclaimer
 
 - examples, lessons, and sample reports are generated with deterministic synthetic data;
 - names, phone numbers, detailed addresses, and identity numbers are risk indicators and are not written to logs;
 - reports exclude sensitive fields by default, and order identifiers require a second confirmation;
+- Cloudflare custom imports keep raw files in browser memory and store confirmed normalized datasets only in this browser's IndexedDB;
 - Workers AI is disabled by default, does not read imported data, and does not calculate metrics or rules;
 - real secrets belong only in ignored local `.env` files; credentials exposed in chat or logs must be rotated;
 - users must validate field meaning, timezone, quantity unit, promise definition, coverage, and rule thresholds.

@@ -5,7 +5,7 @@ export interface DatasetSummary {
   data_type: DatasetDataType;
   row_count: number;
   created_at: string;
-  source_kind: "user_import" | "synthetic_case";
+  source_kind: "user_import" | "synthetic_case" | "browser_local_import";
 }
 
 export interface DatasetListResponse {

@@ -2653,13 +2653,6 @@ async function requestPayload(
   }
 }
 
-async function sha256Hex(value: ArrayBuffer): Promise<string> {
-  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", value));
-  return Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join(
-    "",
-  );
-}
-
 function sampleStatusNormalizations(sampleId: string) {
   if (sampleId === "compatibility_orders_csv") {
     return [
@@ -3474,55 +3467,10 @@ export async function handleOnlineDemoApi(
     return helpers.json(importParseResponse(dataType), 201);
   }
   if (method === "POST" && pathname === "/api/imports/upload") {
-    let form: FormData;
-    try {
-      form = await request.formData();
-    } catch {
-      return helpers.error(
-        "INVALID_MULTIPART_UPLOAD",
-        "上传请求不是有效的 multipart 表单。",
-        400,
-      );
-    }
-    const file = form.get("file");
-    const requestedDataType = stringValue(form.get("data_type"), "orders");
-    if (!(file instanceof File)) {
-      return helpers.error(
-        "IMPORT_FILE_REQUIRED",
-        "必须选择一个 CSV 或 XLSX 文件。",
-        422,
-      );
-    }
-    if (file.size > 2_000_000) {
-      return helpers.error(
-        "UPLOAD_TOO_LARGE",
-        "在线兼容样例上传上限为 2 MB。",
-        413,
-      );
-    }
-    const digest = await sha256Hex(await file.arrayBuffer());
-    const sample =
-      compatibilitySamples.find((item) => item.sha256 === digest) ?? null;
-    if (sample === null) {
-      return helpers.error(
-        "ONLINE_DEMO_SYNTHETIC_SAMPLE_ONLY",
-        "线上只接收本站两份公开合成兼容样例；未知或真实文件请在本地版处理。",
-        403,
-      );
-    }
-    const allowedDataTypes = ["orders", "warehouse_events", "tracking_events"];
-    if (!allowedDataTypes.includes(requestedDataType)) {
-      return helpers.error("INVALID_DATA_TYPE", "数据类型不受支持。", 422);
-    }
-    return helpers.json(
-      {
-        task: importTask(
-          requestedDataType,
-          sample.file_format === "xlsx" ? "awaiting_sheet" : "parsing",
-          sample.sample_id,
-        ),
-      },
-      201,
+    return helpers.error(
+      "BROWSER_LOCAL_IMPORT_REQUIRED",
+      "Cloudflare 在线版的自主文件必须由网页在浏览器本地处理；原始 CSV/XLSX 不应发送到 Worker。",
+      409,
     );
   }
   const importTemplateMatch = pathname.match(

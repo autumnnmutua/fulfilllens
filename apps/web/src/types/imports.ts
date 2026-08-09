@@ -23,11 +23,14 @@ export interface ImportTask {
   status_label: string;
   file_name: string;
   file_format: "csv" | "xlsx";
+  file_size_bytes?: number | null;
   encoding?: string | null;
   encoding_required: boolean;
   encoding_options: string[];
   sheets: SheetInfo[];
   selected_sheet?: string | null;
+  sheet_count?: number | null;
+  processing_location?: "browser" | "server" | null;
   default_timezone?: string | null;
   message: string;
   can_reconfigure: boolean;
@@ -53,6 +56,7 @@ export interface FieldSuggestion {
   suggested_field?: string | null;
   confidence: number;
   method: string;
+  requires_confirmation?: boolean;
   candidates: FieldCandidate[];
 }
 

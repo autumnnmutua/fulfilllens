@@ -40,6 +40,7 @@
 ## 阶段 3：数据导入、校验与字段映射
 
 - 依赖：阶段 1 数据规范稳定；阶段 2 工程骨架可运行。
+- 当前状态：本地 FastAPI 与 Cloudflare 浏览器本地路径均复用机器可读字段目录、Schema 和状态契约；在线自主 CSV/XLSX 已解除合成样例限制，原始文件不离开浏览器。
 - 阶段成果：CSV/XLSX 导入向导、工作表预览、字段映射、数据质量报告、状态标准化和安全临时文件策略。
 - 验收重点：UTF-8/GBK、空值、重复、非法时间、负数量、公式注入、路径遍历和大文件失败均有可定位反馈。
 - 建议提交：`feat: add secure data import and field mapping`
@@ -112,7 +113,7 @@
 - 阶段成果：全流程复验、人工复算、最终缺陷修复、`docs/RELEASE_ACCEPTANCE.md` 和明确发布结论。
 - 验收重点：干净环境安装、三套案例端到端、全量质量命令、安全隐私和文档一致性；任何阻断项必须如实阻止发布。
 - 建议提交：`release: prepare fulfilllens-cn v1.0.0`
-- 当前状态：`1.0.0-rc.3` 已完成 CSV/XLSX 兼容转换增强；最终发布以本机全量检查、Docker、Cloudflare 线上复验和相同提交上的 GitHub Actions 成功结果为准。
+- 当前状态：`1.0.0-rc.4` 已完成 Cloudflare 自主 CSV/XLSX 浏览器本地导入、状态一致性修复和真实 Chrome 七步验收；最终发布以本机全量检查、Docker、Cloudflare 线上复验和相同提交上的 GitHub Actions 成功结果为准。浏览器自有数据接入 Worker 分析仍为后续明确事项。
 
 ## 提交与回滚约定
 

@@ -6,7 +6,7 @@
 
 ## 1. 七步流程
 
-1. 选择订单表、仓库事件表或物流轨迹表；
+1. 选择订单表、仓库事件表或物流轨迹表；可点击“自主上传文件”直接进入第 2 步并打开系统文件选择器；
 2. 上传 CSV/XLSX，或载入完全合成的内置样例；
 3. 对无法可靠识别编码的 CSV 人工选择编码；XLSX 人工选择工作表；
 4. 查看最多 20 行脱敏预览；
@@ -14,7 +14,7 @@
 6. 查看常驻质量报告，下载逐项错误 CSV，必要时返回修改映射或新增项目级状态映射；
 7. 仅在无阻断错误时确认导入，任务进入“可分析”状态。
 
-返回预览、解析设置或字段映射不会要求重新上传。取消任务会清理该任务的上传文件和派生产物。
+返回预览、解析设置或字段映射不会要求重新上传。取消任务会清理该任务的文件引用和派生产物。Cloudflare 在线版的自主文件全程由浏览器本地引擎处理；本地开发/Docker 版继续调用 FastAPI 临时任务接口。
 
 ## 2. 文件与解析规则
 
@@ -73,6 +73,17 @@
 
 ## 6. 隐私与本地生命周期
 
+### 6.1 Cloudflare 浏览器本地路径
+
+- 原始 `File` 只保存在当前页面内存，解析、映射、标准化和质量校验均在浏览器执行；
+- 页面不会调用 `POST /api/imports/upload`，Worker 对该路径返回 `BROWSER_LOCAL_IMPORT_REQUIRED`，防止旧客户端误传原始文件；
+- 确认或取消后立即释放原始文件引用；确认后的标准化行、质量报告和来源元数据写入当前浏览器 IndexedDB；
+- 浏览器本地数据可在“设置 → 在线示例与浏览器本地数据”删除，不会自动跨设备同步；
+- 在线公开合成案例仍由 Worker 分析。浏览器自有数据尚未接入 Worker 指标、诊断、模拟和报告，不得把在线确认导入宣传成完整云端分析或持久 SaaS；
+- Workers AI 只执行固定合成连通探针，不读取导入文件、标准化行或质量报告。
+
+### 6.2 本地 FastAPI/Docker 路径
+
 - 任务目录为 `data/local/imports/<UUID>/`，客户端文件名只保留安全基名；
 - 日志和错误接口不输出姓名、手机号、详细地址或身份证原值；
 - 脱敏预览只展示风险提示和遮罩值，建议在源文件中删除分析不需要的个人信息；
@@ -85,18 +96,18 @@
 
 ## 7. 接口
 
-| 方法与路径                               | 用途                    |
-| ---------------------------------------- | ----------------------- |
-| `POST /api/imports/upload`               | multipart 上传 CSV/XLSX |
-| `POST /api/imports/synthetic`            | 创建完全合成样例        |
-| `GET /api/imports/samples`               | 列出两份兼容性合成样例  |
-| `GET /api/imports/samples/{id}/file`     | 下载指定兼容性合成样例  |
-| `GET /api/imports/templates/{data_type}` | 下载空白模板            |
-| `POST /api/imports/{task_id}/parse`      | 选择编码/工作表并预览   |
-| `PUT /api/imports/{task_id}/validation`  | 应用字段/状态映射并校验 |
-| `GET /api/imports/{task_id}/errors.csv`  | 下载错误明细            |
-| `POST /api/imports/{task_id}/confirm`    | 确认为可分析数据集      |
-| `DELETE /api/imports/{task_id}`          | 取消并清理任务          |
+| 方法与路径                               | 用途                                                         |
+| ---------------------------------------- | ------------------------------------------------------------ |
+| `POST /api/imports/upload`               | 本地/Docker multipart 上传 CSV/XLSX；Cloudflare 拒绝原始上传 |
+| `POST /api/imports/synthetic`            | 创建完全合成样例                                             |
+| `GET /api/imports/samples`               | 列出两份兼容性合成样例                                       |
+| `GET /api/imports/samples/{id}/file`     | 下载指定兼容性合成样例                                       |
+| `GET /api/imports/templates/{data_type}` | 下载空白模板                                                 |
+| `POST /api/imports/{task_id}/parse`      | 选择编码/工作表并预览                                        |
+| `PUT /api/imports/{task_id}/validation`  | 应用字段/状态映射并校验                                      |
+| `GET /api/imports/{task_id}/errors.csv`  | 下载错误明细                                                 |
+| `POST /api/imports/{task_id}/confirm`    | 确认为可分析数据集                                           |
+| `DELETE /api/imports/{task_id}`          | 取消并清理任务                                               |
 
 ## 8. 演示与人工验收
 
@@ -116,3 +127,12 @@ python scripts/demo_import.py
 脚本通过真实上传接口提交内存生成的合成 CSV，依次完成解析、映射、校验和确认，并在临时目录中验证源文件已删除、标准数据仍保留。
 
 兼容性验收可在导入页选择“非标准订单 CSV 自动转换示例”或“非标准物流 XLSX 自动转换示例”。两份文件都经过普通上传、解析、映射、Schema 校验、确认导入和分析路径；逐表结果见[兼容性验证报告](COMPATIBILITY_VALIDATION.md)。
+
+Cloudflare 浏览器路径还可执行：
+
+```powershell
+npm.cmd run build:cloudflare
+npm.cmd run test:browser-import:local
+```
+
+该真实 Chrome 流程覆盖 360/390/430px、任意文件名的非标准物流 CSV、多工作表 XLSX、刷新持久化和错误文件拒绝，并断言自主文件没有产生原始上传请求。

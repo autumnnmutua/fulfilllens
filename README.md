@@ -6,7 +6,7 @@ FulfillLens CN 是面向物流管理专业学生、教师和中小电商商家�
 
 项目的核心不是“自动讲一个听起来合理的故事”，而是让每个百分比、异常和模拟结果都能回到字段、公式、阈值、样本和具体订单证据。
 
-> 版本状态：`1.0.0-rc.3` 增强了现实 CSV/XLSX 的自动转换，并加入两份可复验兼容性样例。Cloudflare 在线演示只接收这两份摘要匹配的公开合成样例，并提供同源 Worker 分析 API 与原生 Workers AI 绑定；真实业务数据分析仍以本地或 Docker 为主。Firefox/Safari 和 PDF 是已知非阻断限制，详见[项目状态](#项目状态与已知限制)。
+> 版本状态：`1.0.0-rc.4` 已在 Cloudflare 在线版开放自主 CSV/XLSX 导入。原始文件在浏览器内完成解析、字段建议、标准化与质量校验，不上传到 Worker；无法可靠判断的映射必须人工确认。在线自有数据的完整指标分析尚未接入 Worker，真实业务数据的端到端分析仍优先使用本地或 Docker。详见[项目状态](#项目状态与已知限制)。
 
 ## 为什么使用 FulfillLens CN
 
@@ -118,6 +118,8 @@ python scripts/demo_simulation.py
 
 要专门体验现实文件兼容转换，打开 <http://127.0.0.1:5173/import>，点击“非标准订单 CSV 自动转换示例”或“非标准物流 XLSX 自动转换示例”。它们会进入与普通文件相同的上传、工作表、映射、Schema 校验和确认流程，不会绕过校验。
 
+要导入自己的文件，先选择“订单表”“仓库事件表”或“物流轨迹表”，再点击“自主上传文件”。系统会直接进入既有七步向导并打开文件选择器；也可以在第 2 步点击或拖拽 `.csv` / `.xlsx`。
+
 ### 4. 浏览完整路径
 
 依次打开“分析总览 → 异常诊断 → 方案模拟 → 分析报告”。查看指标解释、筛选承运商、进入异常订单时间线，复制方案并生成“快速阅读版”HTML 报告。
@@ -176,7 +178,9 @@ docker compose down --volumes
 
 在线地址：<https://fulfilllens-cn.esthertreu3724.workers.dev>
 
-在线版默认加载公开、确定性的合成案例，可体验指标、总览、透明诊断、订单级 What-if 复算和报告。导入页允许真实上传并转换仓库发布的两份合成兼容样例，但 Worker 会以 SHA-256 精确核验；任何未知或真实业务文件都会被拒绝且不会保存。自建在线方案只保存在 Worker 当前运行期，不是持久业务存储；真实业务文件、DuckDB/SQLite 完整分析和长期方案保存仍使用本地或 Docker。部署配置在 `wrangler.jsonc`，AI 通过 `AI` binding 调用，Account ID 和 API Token 不进入浏览器或仓库。
+在线版默认加载公开、确定性的合成案例，可体验指标、总览、透明诊断、订单级 What-if 复算和报告。自主文件路径在浏览器本地完成扩展名/MIME/签名检查、CSV/XLSX 解析、字段建议、状态标准化、Schema 与质量校验；原始文件不发送到 Cloudflare，确认后只把标准化数据集保存在当前浏览器 IndexedDB，可在“设置”中删除。Worker 的原始上传接口主动拒绝请求，避免旧客户端误传文件。
+
+在线自主导入与公开合成分析是两条独立路径：本次版本没有把浏览器内自有数据自动发送给 Worker，因此其完整指标、诊断、模拟和报告仍需本地/Docker 版。自建在线方案只保存在 Worker 当前运行期，不是持久业务存储。部署配置在 `wrangler.jsonc`，AI 通过 `AI` binding 调用，Account ID 和 API Token 不进入浏览器或仓库。
 
 ```powershell
 npm.cmd run build:cloudflare
@@ -228,7 +232,7 @@ npm run dev:api
 - `warehouse_events`：一行一个仓库节点事件；
 - `tracking_events`：一行一个物流轨迹事件。
 
-支持 CSV 与 XLSX。CSV 支持 UTF-8、UTF-8 BOM、GBK/GB18030 等常见中文编码；无法可靠识别时要求用户确认。字段支持中文、英文、camelCase、snake_case 和登记的常见业务名称；界面展示原字段、目标字段、匹配方法和置信度。XLSX 支持多工作表、Excel 日期、数值/文本数字、空白行与附加列。时间统一按带时区 ISO 8601；无时区数据必须指定默认时区。
+支持 CSV 与 XLSX。CSV 支持 UTF-8、UTF-8 BOM、GBK/GB18030，兼容 CRLF/LF、引号、字段内逗号和空行；无法可靠识别编码时要求用户确认。字段支持中文、英文、camelCase、snake_case 和登记的常见业务名称；界面展示原字段、目标字段、Exact/Alias/Normalized/Similarity/Manual 方法、置信度和人工确认提示。XLSX 支持多工作表、Excel 日期、数值/文本数字、空白行与附加列，不执行公式、宏、脚本或外部链接。时间统一按带时区 ISO 8601；无时区数据必须指定默认时区。自动转换只标准化表达，不补造、删除或篡改业务事实，也不承诺支持任意 Excel。
 
 模板位于 `data/templates/`，机器可读 Schema 位于 `data/schemas/`。完整字段见[数据字典](docs/DATA_DICTIONARY.md)，状态见[状态体系](docs/STATUS_TAXONOMY.md)，导入限制见[导入规范](docs/IMPORTING.md)。
 
@@ -253,15 +257,15 @@ FastAPI + Pydantic ── 领域服务与透明规则
 - `docs`：产品、口径、架构、风险、教学和发布资料；
 - `tests`：后端、前端、契约、端到端、安全和性能验证。
 
-完整说明见[架构文档](docs/ARCHITECTURE.md)和[ADR](docs/adr/README.md)。Cloudflare 在线演示已建立只处理公开合成数据的独立 Worker 适配层；当前 FastAPI/DuckDB/SQLite 后端仍不能零修改部署，见[部署与可行性说明](docs/CLOUDFLARE_DEPLOYMENT.md)。
+完整说明见[架构文档](docs/ARCHITECTURE.md)和[ADR](docs/adr/README.md)。Cloudflare 在线版由浏览器本地导入引擎与公开合成分析 Worker 共同组成；当前 FastAPI/DuckDB/SQLite 后端仍不能零修改部署，见[部署与可行性说明](docs/CLOUDFLARE_DEPLOYMENT.md)。
 
 ## 项目状态与已知限制
 
 阶段 0–12 已完成当前候选版本范围内的实现与全量验收。当前证据：
 
-- 前端 24 项、Cloudflare Worker 16 项、后端与契约 227 项测试；
+- 前端 36 项、Cloudflare Worker 14 项、后端与契约 227 项测试；
 - 1 万/5 万订单性能基准；
-- 8 个路由 × 360/768/1440 Chromium + axe 检查；
+- 导入流程已在 360/390/430/1440 Chromium 真实操作；全站审计覆盖 360/390/430/768/1440；
 - npm/Python 漏洞审计和敏感信息扫描；
 - [GitHub Actions](https://github.com/autumnnmutua/fulfilllens-cn/actions)包含质量与真实 Docker smoke job；发布标签以对应提交的实际成功结果为准；
 - 公开远程仓库与 Private Vulnerability Reporting 已启用。
@@ -270,7 +274,8 @@ FastAPI + Pydantic ── 领域服务与透明规则
 
 - Firefox/Safari；
 - PDF 中文字体、分页和长表；
-- Cloudflare 完整业务数据持久化、身份权限和异步大文件链路。
+- Cloudflare 浏览器自有数据尚未接入 Worker 指标/诊断/模拟/报告；
+- Cloudflare 身份权限、跨设备持久化和异步大文件链路。
 
 报告和基准是特定代码、数据和机器条件下的证据，不是对所有硬件或业务数据的保证。
 
@@ -282,13 +287,14 @@ FastAPI + Pydantic ── 领域服务与透明规则
 - 阶段 11：中英文开源文档、许可证、治理模板和 RC 资料；
 - 阶段 12：干净环境全量验收与 v1.0 发布判断。
 
-详见[路线图](docs/ROADMAP.md)、[最终验收记录](docs/RELEASE_ACCEPTANCE.md)、[兼容性验证报告](docs/COMPATIBILITY_VALIDATION.md)和[v1.0.0-rc.3 发布说明](docs/releases/v1.0.0-rc.3.md)。
+详见[路线图](docs/ROADMAP.md)、[最终验收记录](docs/RELEASE_ACCEPTANCE.md)、[兼容性验证报告](docs/COMPATIBILITY_VALIDATION.md)和[v1.0.0-rc.4 发布说明](docs/releases/v1.0.0-rc.4.md)。
 
 ## 隐私、安全与免责声明
 
 - 示例、教材和报告样例全部由固定种子程序生成；
 - 姓名、手机号、详细地址、身份证等只提示风险，不写入日志；
 - 报告默认排除敏感字段，订单标识需要二次确认；
+- Cloudflare 自主导入的原始文件只在浏览器内存中处理，确认后的标准化数据只保存在当前浏览器 IndexedDB；
 - Workers AI 默认关闭，不读取导入数据，也不参与指标或规则；
 - 真实凭据只允许放在被忽略的本机 `.env`，曾出现在聊天或日志中的凭据应立即轮换；
 - 使用者负责确认字段语义、时区、数量单位、承诺口径、覆盖率和阈值。

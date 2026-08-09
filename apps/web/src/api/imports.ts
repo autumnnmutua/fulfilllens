@@ -1,4 +1,6 @@
 import { apiDownloadUrl, apiRequest } from "./client";
+import { isCloudflareDeploy } from "../config/runtime";
+import { browserImportService } from "../imports/browserImportService";
 import type {
   ConfirmResponse,
   CompatibilitySampleCatalog,
@@ -20,6 +22,9 @@ export const importApi = {
   sampleFileUrl: (sampleId: string) =>
     apiDownloadUrl(`/api/imports/samples/${encodeURIComponent(sampleId)}/file`),
   upload: (dataType: DataType, file: File) => {
+    if (isCloudflareDeploy) {
+      return browserImportService.upload(dataType, file);
+    }
     const body = new FormData();
     body.append("data_type", dataType);
     body.append("file", file);
@@ -36,26 +41,44 @@ export const importApi = {
   parse: (
     taskId: string,
     payload: { encoding?: string; sheet_name?: string },
-  ) =>
-    apiRequest<ParseResponse>(`/api/imports/${taskId}/parse`, {
+  ) => {
+    if (browserImportService.isTask(taskId)) {
+      return browserImportService.parse(taskId, payload);
+    }
+    return apiRequest<ParseResponse>(`/api/imports/${taskId}/parse`, {
       body: JSON.stringify(payload),
       method: "POST",
-    }),
-  validate: (taskId: string, payload: ValidationPayload) =>
-    apiRequest<ValidationResponse>(`/api/imports/${taskId}/validation`, {
+    });
+  },
+  validate: (taskId: string, payload: ValidationPayload) => {
+    if (browserImportService.isTask(taskId)) {
+      return browserImportService.validate(taskId, payload);
+    }
+    return apiRequest<ValidationResponse>(`/api/imports/${taskId}/validation`, {
       body: JSON.stringify(payload),
       method: "PUT",
-    }),
-  confirm: (taskId: string) =>
-    apiRequest<ConfirmResponse>(`/api/imports/${taskId}/confirm`, {
+    });
+  },
+  confirm: (taskId: string) => {
+    if (browserImportService.isTask(taskId)) {
+      return browserImportService.confirm(taskId);
+    }
+    return apiRequest<ConfirmResponse>(`/api/imports/${taskId}/confirm`, {
       method: "POST",
-    }),
-  cancel: (taskId: string) =>
-    apiRequest<ImportTask>(`/api/imports/${taskId}`, {
+    });
+  },
+  cancel: (taskId: string) => {
+    if (browserImportService.isTask(taskId)) {
+      return browserImportService.cancel(taskId);
+    }
+    return apiRequest<ImportTask>(`/api/imports/${taskId}`, {
       method: "DELETE",
-    }),
+    });
+  },
   templateUrl: (dataType: DataType) =>
     apiDownloadUrl(`/api/imports/templates/${dataType}`),
   errorsUrl: (taskId: string) =>
-    apiDownloadUrl(`/api/imports/${taskId}/errors.csv`),
+    browserImportService.isTask(taskId)
+      ? browserImportService.errorsUrl(taskId)
+      : apiDownloadUrl(`/api/imports/${taskId}/errors.csv`),
 };
