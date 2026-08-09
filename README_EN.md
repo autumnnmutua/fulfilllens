@@ -257,7 +257,7 @@ See [Architecture](docs/ARCHITECTURE.md) and [ADRs](docs/adr/README.md). The Clo
 
 Stages 0–12 are complete for this release-candidate scope, including full local acceptance. Current evidence includes:
 
-- 22 frontend, 13 Cloudflare Worker, and 220 backend/contract tests;
+- 23 frontend, 13 Cloudflare Worker, and 220 backend/contract tests;
 - 10,000/50,000-order performance benchmarks;
 - eight routes at 360/768/1440 with Chromium and axe;
 - npm/Python vulnerability audits and repository secret scans;

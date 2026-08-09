@@ -119,6 +119,7 @@ jobs:
         run: |
           FL_CHROMIUM_PATH="$(command -v google-chrome)" \
           FL_WEB_URL="http://127.0.0.1:5173" \
+          FL_AUDIT_CASE_ID="promotion_surge" \
           FL_AUDIT_OUTPUT="${RUNNER_TEMP}/chromium-audit-results.json" \
           npm run test:browser
 

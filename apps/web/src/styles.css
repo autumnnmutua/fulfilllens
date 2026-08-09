@@ -57,12 +57,25 @@ a {
   color: #843c00 !important;
 }
 
+.ant-tag-volcano {
+  color: #a82708 !important;
+}
+
 .ant-tag-cyan {
   color: #005d63 !important;
 }
 
 .ant-tag-success {
   color: #205b12 !important;
+}
+
+.ant-tag-green {
+  color: #205b12 !important;
+}
+
+.ant-statistic .ant-statistic-title,
+.ant-descriptions .ant-descriptions-item-label {
+  color: #434f5a !important;
 }
 
 .ant-tag-error,

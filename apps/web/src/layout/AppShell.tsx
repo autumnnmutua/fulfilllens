@@ -24,6 +24,7 @@ import {
 import { useState, type PropsWithChildren } from "react";
 
 import { useRouting } from "../app/routing-context";
+import { AntdAccessibilityBridge } from "../components/AntdAccessibilityBridge";
 import { isCloudflareDeploy } from "../config/runtime";
 import { zhCNMessages } from "../i18n/zh-CN";
 
@@ -109,6 +110,7 @@ export function AppShell({ children }: PropsWithChildren) {
 
   return (
     <Layout className="app-shell">
+      <AntdAccessibilityBridge />
       <a className="skip-link" href="#main-content">
         跳到主要内容
       </a>
