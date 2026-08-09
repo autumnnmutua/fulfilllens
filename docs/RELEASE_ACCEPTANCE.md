@@ -13,7 +13,7 @@
 
 - version：`1.0.0-rc.5`（未晋级）
 - branch：`main`
-- baseline commit：`570cdd22ff4f515cb2cb1914f23cb7f4c99099a1`
+- functional gate commit：`0006a79ff16963dd998c93f114ab5438a0465e36`
 - date：2026-08-10（Asia/Shanghai）
 
 ### 当前阻断
@@ -34,6 +34,17 @@
 | 必填字段误忽略 |                      0 | 通用单元/E2E 已通过；指定文件未执行              | BLOCKED |
 
 现有公开合成兼容样例继续通过：非标准订单 CSV 8/8、XLSX 订单 6/6、仓库事件 36/36、物流轨迹 36/36；`tests/fixtures/nonstandard_tracking_user.csv` 的 12 条轨迹完成浏览器本地七步导入、批量安全忽略、必填保护和原始文件零上传。它们证明通用能力，但不替代上述正式金标准。
+
+### Cloudflare Evidence
+
+- Worker：`fulfilllens`
+- production URL：<https://fulfilllens.esthertreu3724.workers.dev>
+- deployment/version ID：`6af3ae31-5c45-4e37-aa30-046374157c66`
+- deployment time：2026-08-10 00:49:02（Asia/Shanghai）
+- GitHub CI：<https://github.com/autumnnmutua/fulfilllens/actions/runs/31324511379>，quality 与 Docker smoke 均成功
+- HTTP：8 个 SPA 路由、`/health`、`/api/version`、案例、样例和 Workers AI 状态均为 200
+- Workers AI：原生绑定探针 `reachable=true`、`sentinel_matched=true`；只发送固定合成短句
+- Chrome：40/40 路由/视口审计通过；生产 CSV/XLSX 12 场景 E2E 通过，`raw_upload_requests=0`
 
 ## 1. 发布阻断标准与结论依据
 
@@ -141,8 +152,12 @@ Dashboard 维度订单数与总体对账；订单级不可计算状态没有进�
 | `docker compose -p fulfilllens-v100-gate up --build --detach`                                        | 成功；API healthy、Web 200、深层路由与 40 组合 Chrome 审计通过；日志无错误模式；验收后专用卷已清理 |
 | 容器兼容样例上传/转换                                                                                | 成功；CSV 8/8、XLSX 物流轨迹 36/36，错误均为 0，静态文件均为 200                                   |
 | 容器案例载入/数据清理实测                                                                            | 成功；三张案例表载入，清理后数据集为 0                                                             |
+| `gh run watch 31324511379 --exit-status`                                                             | 成功；quality 与 Docker build/smoke 两个 job 均通过                                                |
+| `npx wrangler deploy`                                                                                | 成功；Worker `fulfilllens`，版本 `6af3ae31-5c45-4e37-aa30-046374157c66`                            |
+| 生产 `npm run test:browser`                                                                          | 成功；8 路由 × 5 视口 = 40/40，通过 axe、焦点、语义和溢出检查                                      |
+| 生产 `node scripts/browser_import_e2e.cjs`                                                           | 成功；6 档映射布局与 CSV/XLSX/忽略/必填/刷新/错误 12 场景通过，原始上传请求 0                      |
 
-本轮本机重跑已完成：发布门禁 297 项测试通过；七个真实演示脚本通过；兼容 CSV/XLSX 的解析、安全忽略、Schema、导入和指标对账成功；正式 Chrome 40/40 路由/视口组合与 12 场景自主导入 E2E 通过；隔离 Docker 项目的 API/Web 与日志正常，专用卷已清理。正式 tag 仍必须等待指定 CSV、GitHub Actions 和 Cloudflare 生产 smoke 全部完成。
+本轮本机重跑已完成：发布门禁 297 项测试通过；七个真实演示脚本通过；兼容 CSV/XLSX 的解析、安全忽略、Schema、导入和指标对账成功；正式 Chrome 40/40 路由/视口组合与 12 场景自主导入 E2E 通过；隔离 Docker 项目的 API/Web 与日志正常，专用卷已清理。GitHub Actions 与 Cloudflare 生产 smoke 也已通过；正式 tag 现在只等待指定 54×21 CSV 的真实金标准验收。
 
 ## 10. 本轮缺陷与修复证据
 
@@ -176,7 +191,7 @@ Dashboard 维度订单数与总体对账；订单级不可计算状态没有进�
 | 高     | 日期解析依赖通用运行时可能让月/日和日/月格式受 locale 影响                            | 年优先、AM/PM 月优先、连字符日优先和显式 GMT 采用确定性解析；歧义输入拒绝 | 前后端主要格式与歧义拒绝回归测试                     |
 | 高     | 重复批次号可能被相似度误映射为唯一轨迹事件 ID                                         | 加入值画像唯一性保护；无可信 ID 时按语义和源行生成稳定 ID                 | 前后端映射、验证与 ID 可复现测试                     |
 | 中     | 仓内诊断节点集合使用无序 `set`，相同严重度发现会随 Python 哈希种子改变报告顺序        | 改为业务流程有序元组，不改变阈值或结论                                    | 34 项诊断测试及连续两次报告章节顺序一致              |
-| 中     | Linux Chrome 在 Ant Design 弹层动画替换节点时，布局 E2E 可能读取过期 0px 节点         | 在同一 DOM 快照选择真实展开且有尺寸的弹层；250/320px 门槛不变             | 本机 6 档布局与 GitHub Actions 重跑                  |
+| 中     | Linux Chrome 在 Ant Design 弹层动画替换节点时，布局 E2E 可能读取过期 0px 节点         | 在同一 DOM 快照选择真实展开且有尺寸的弹层；250/320px 门槛不变             | 本机 6 档布局与 GitHub Actions `31324511379` 成功    |
 
 ## 11. 已知非阻断事项
 
