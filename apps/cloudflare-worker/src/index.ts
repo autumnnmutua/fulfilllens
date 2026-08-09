@@ -1,6 +1,6 @@
 import { handleOnlineDemoApi } from "./online-demo";
 
-const APP_VERSION = "1.0.0-rc.5";
+const APP_VERSION = "1.0.0";
 const API_VERSION = "v1";
 const MODEL = "@cf/meta/llama-3.1-8b-instruct-fast";
 const PROBE_SENTINEL = "FULFILLLENS_WORKERS_AI_OK";

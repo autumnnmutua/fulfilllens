@@ -113,7 +113,7 @@
 - 阶段成果：全流程复验、人工复算、最终缺陷修复、`docs/RELEASE_ACCEPTANCE.md` 和明确发布结论。
 - 验收重点：干净环境安装、三套案例端到端、全量质量命令、安全隐私和文档一致性；任何阻断项必须如实阻止发布。
 - 建议提交：`release: prepare fulfilllens v1.0.0`
-- 当前状态：`1.0.0-rc.5` 已增加字段映射可读布局、显式 ignored/unresolved、安全批量忽略、现实时间/状态兼容与必填防绕过，并把公开品牌迁移为 FulfillLens。正式 `v1.0.0` 仍要求用户指定的 54×21 非标准轨迹 CSV 实文件验收、全量检查、Docker、Cloudflare 线上复验和相同提交上的 GitHub Actions 成功；缺少任一证据都保持 BLOCKED。浏览器自有数据接入 Worker 分析仍为后续明确事项。
+- 当前状态：`1.0.0` 正式 Gate 已覆盖可读字段映射、推荐映射、generated/inferred/ignored/unresolved/blocking 状态、安全批量忽略、现实时间/状态兼容、必填防绕过、浏览器本地指标/诊断/建议/报告及品牌迁移。一次性的 54×21 用户附件不是正式依赖；通用非标准导入能力由完全合成 fixture 持续回归。浏览器自有数据 What-if、跨设备持久化、Firefox/Safari 与可靠 PDF 是后续明确事项。
 
 ## 提交与回滚约定
 

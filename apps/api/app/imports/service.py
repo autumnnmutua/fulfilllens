@@ -436,7 +436,11 @@ class ImportService:
                 "target_field",
                 "raw_value",
                 "message",
+                "cause",
+                "impact",
                 "suggestion",
+                "action_label",
+                "recommended_source_column",
             ]
         )
         for issue in report.issues:
@@ -452,7 +456,11 @@ class ImportService:
                         issue.target_field,
                         issue.raw_value,
                         issue.message,
+                        issue.cause,
+                        issue.impact,
                         issue.suggestion,
+                        issue.action_label,
+                        issue.recommended_source_column,
                     )
                 ]
             )

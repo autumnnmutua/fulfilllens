@@ -55,7 +55,7 @@ describe("Cloudflare Worker", () => {
 
     await expect(health.json()).resolves.toMatchObject({
       status: "ok",
-      version: "1.0.0-rc.5",
+      version: "1.0.0",
     });
     await expect(version.json()).resolves.toMatchObject({
       environment: "cloudflare-online-demo",
@@ -254,6 +254,12 @@ describe("Cloudflare Worker", () => {
     });
     await expect(report.json()).resolves.toMatchObject({
       header: { synthetic_data: true },
+      recommendations: {
+        ai_used: false,
+        presentation_source: "deterministic_template",
+        professional_action_plan: expect.any(Array),
+        executive_brief: { top_priorities: expect.any(Array) },
+      },
     });
   });
 

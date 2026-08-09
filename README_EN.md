@@ -6,7 +6,7 @@ FulfillLens is a local-first, open-source fulfillment analytics tool for logisti
 
 The project is designed to make every percentage, anomaly, and scenario traceable to fields, formulas, thresholds, samples, and order-level evidence instead of generating a merely plausible story.
 
-> Version status: `1.0.0-rc.5` unifies the public brand as FulfillLens and further hardens real-world file compatibility. Suggestions combine normalized headers, a shared business alias catalog, and limited value profiling. A conservative, undoable bulk action ignores only clearly non-analytical columns; required and plausible critical candidates remain protected. The Cloudflare edition still parses and validates custom CSV/XLSX files locally in the browser and does not upload raw files to the Worker. See [Project status](#project-status-and-known-limitations).
+> Version status: `1.0.0` is the first stable FulfillLens release. Suggestions combine normalized headers, a shared business alias catalog, and limited value profiling. Users can apply high-confidence recommendations and conservatively ignore non-analytical columns in bulk; required and plausible critical candidates remain protected. The Cloudflare edition parses custom CSV/XLSX files locally in the browser, runs metrics and diagnostics locally after confirmation, and generates deterministic action recommendations without uploading raw files to the Worker. See [Project status](#project-status-and-known-limitations).
 
 ## Why FulfillLens
 
@@ -31,21 +31,26 @@ The following images are captured reproducibly from the real production build wi
 
 ![Three deterministic, fully synthetic teaching cases](docs/media/teaching-cases.png)
 
+| Professional Action Plan                                                                                               | Executive Brief                                                                                 |
+| ---------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| ![Professional actions with priorities, evidence, KPIs, and validation steps](docs/media/professional-action-plan.png) | ![Management-ready brief based on the same deterministic facts](docs/media/executive-brief.png) |
+
 Start the project, open <http://127.0.0.1:5173/cases>, and load Stable Operations, Promotion Surge, or Carrier Disruption.
 
 ## Core capabilities
 
-| Module               | What users can do                                                                   | Important boundary                                                         |
-| -------------------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| Data import          | Convert non-template CSV/XLSX, map or ignore source columns, and validate           | Ignored and unresolved differ; required fields cannot be bypassed          |
-| Status normalization | Keep raw/normalized status, source, confidence, and project mappings                | Unknown values remain available as `unmapped`                              |
-| Fulfillment metrics  | Calculate OT, IF, OTIF, duration, node, cancellation, return, anomaly, and coverage | Non-computable orders are not counted as success or failure                |
-| Dashboard            | Explore trends, distributions, nodes, dimensions, and paginated orders              | Charts show units, sample size, coverage, and text summaries               |
-| Diagnostics          | Use eight transparent rule categories, severity, Pareto, variants, and evidence     | Possible causes are not proven causality                                   |
-| What-if              | Change warehouse time, pickup wait, carrier mix, or promise strategy                | Scenario estimates are not forecasts or guarantees                         |
-| Teaching cases       | Load three fully synthetic cases and follow guided exercises                        | No real person, company, address, or tracking number is used               |
-| Reports              | Preview/export Markdown, self-contained HTML, and safe CSV                          | PDF has not met its release gate; sensitive fields are excluded by default |
-| Local cleanup        | List and delete datasets, identifiable artifacts, scenarios, and report jobs        | Deletion is irreversible and requires confirmation                         |
+| Module                 | What users can do                                                                   | Important boundary                                                         |
+| ---------------------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Data import            | Convert non-template CSV/XLSX, map or ignore source columns, and validate           | Ignored and unresolved differ; required fields cannot be bypassed          |
+| Status normalization   | Keep raw/normalized status, source, confidence, and project mappings                | Unknown values remain available as `unmapped`                              |
+| Fulfillment metrics    | Calculate OT, IF, OTIF, duration, node, cancellation, return, anomaly, and coverage | Non-computable orders are not counted as success or failure                |
+| Dashboard              | Explore trends, distributions, nodes, dimensions, and paginated orders              | Charts show units, sample size, coverage, and text summaries               |
+| Diagnostics            | Use eight transparent rule categories, severity, Pareto, variants, and evidence     | Possible causes are not proven causality                                   |
+| Action recommendations | Review a Professional Action Plan and Executive Brief derived from shared facts     | Templates never recalculate KPIs or assert unproven causes                 |
+| What-if                | Change warehouse time, pickup wait, carrier mix, or promise strategy                | Scenario estimates are not forecasts or guarantees                         |
+| Teaching cases         | Load three fully synthetic cases and follow guided exercises                        | No real person, company, address, or tracking number is used               |
+| Reports                | Preview/export Markdown, self-contained HTML, and safe CSV                          | PDF has not met its release gate; sensitive fields are excluded by default |
+| Local cleanup          | List and delete datasets, identifiable artifacts, scenarios, and report jobs        | Deletion is irreversible and requires confirmation                         |
 
 ## Suitable and unsuitable use cases
 
@@ -132,7 +137,7 @@ To import your own file, select Orders, Warehouse Events, or Tracking Events, th
 
 ### 4. Follow the full path
 
-Open Dashboard → Diagnostics → What-if Scenarios → Reports. Read metric definitions, filter a carrier, open an anomalous order timeline, copy a scenario, and export the guided HTML report.
+Open Dashboard → Diagnostics → What-if Scenarios → Reports. Read metric definitions, filter a carrier, open an anomalous order timeline, compare the Professional Action Plan with the Executive Brief, copy a scenario, and export the guided HTML report.
 
 ### 5. Run tests
 
@@ -190,9 +195,9 @@ Online URL: <https://fulfilllens.esthertreu3724.workers.dev>
 
 During the brand migration, the legacy `fulfilllens-cn.esthertreu3724.workers.dev` deployment is retained as a historical rollback entry. It does not replace the new primary URL above and should not be used in new documentation or bookmarks. A controlled redirect can be evaluated only after independent validation of the new address.
 
-The online edition loads public deterministic synthetic cases and supports metrics, dashboards, transparent diagnostics, order-level What-if recalculation, and reports. Its custom-file path performs extension/MIME/signature checks, CSV/XLSX parsing, field suggestions, status normalization, Schema validation, and quality checks in the browser. Raw files are not sent to Cloudflare; after confirmation, only normalized datasets remain in this browser's IndexedDB and can be deleted in Settings. The Worker upload endpoint rejects raw bodies to protect older clients from accidental uploads.
+The online edition loads public deterministic synthetic cases and supports metrics, dashboards, transparent diagnostics, order-level What-if recalculation, reports, and action recommendations. Its custom-file path performs extension/MIME/signature checks, CSV/XLSX parsing, field suggestions, status normalization, Schema validation, and quality checks in the browser. After confirmation, the browser-local engine calculates supported metrics, diagnostics, deterministic recommendation facts, and reports. Raw files and normalized rows are not sent to Cloudflare; confirmed normalized datasets remain only in this browser's IndexedDB and can be deleted in Settings. The Worker upload endpoint rejects raw bodies to protect older clients from accidental uploads.
 
-Custom browser imports and public synthetic analysis are currently separate paths: this release does not send user datasets to the Worker, so full metrics, diagnostics, simulation, and report processing for them still require the local or Docker edition. User-created online scenarios remain runtime-only. `wrangler.jsonc` binds Workers AI as `AI`; the Account ID and API token never enter browser assets or the repository.
+The current Cloudflare custom-file path does not yet run What-if simulation for browser-owned datasets; use the local or Docker edition for that workflow. User-created online scenarios for public cases remain runtime-only. `wrangler.jsonc` binds Workers AI as `AI`; AI is optional presentation assistance, receives no raw imported rows by default, and never calculates core KPIs or rule triggers. The Account ID and API token never enter browser assets or the repository.
 
 ```powershell
 npm.cmd run build:cloudflare
@@ -273,20 +278,20 @@ See [Architecture](docs/ARCHITECTURE.md) and [ADRs](docs/adr/README.md). The Clo
 
 ## Project status and known limitations
 
-Stages 0–12 are complete for this release-candidate scope, including full local acceptance. Current evidence includes:
+Stages 0–12 are complete for the v1.0.0 scope, including local, Docker, and production acceptance. Current evidence includes:
 
-- 37 frontend, 14 Cloudflare Worker, and 229 backend/contract tests;
+- 50 frontend, 14 Cloudflare Worker, and 234 backend/contract tests;
 - 10,000/50,000-order performance benchmarks;
 - real import interaction at 360/390/430/1440 Chromium, plus site-wide 360/390/430/768/1440 audits;
 - npm/Python vulnerability audits and repository secret scans;
 - [GitHub Actions](https://github.com/autumnnmutua/fulfilllens/actions) includes quality and real Docker smoke jobs; the release tag is governed by the actual result for its commit;
 - the public remote repository and Private Vulnerability Reporting are enabled.
 
-Non-blocking release-candidate limitations:
+Known non-blocking limitations:
 
 - Firefox and Safari;
 - PDF Chinese fonts, pagination, and long tables;
-- Worker analytics/diagnostics/simulation/reports for browser-owned Cloudflare datasets;
+- What-if simulation for browser-owned Cloudflare datasets;
 - Cloudflare identity/authorization, cross-device persistence, and asynchronous large-file workflows.
 
 Reports and benchmarks are evidence for a specific revision, dataset, and machine—not guarantees for every hardware or business dataset.
@@ -299,7 +304,7 @@ Reports and benchmarks are evidence for a specific revision, dataset, and machin
 - Stage 11: bilingual open-source docs, license, governance templates, and RC assets;
 - Stage 12: clean-environment acceptance and the v1.0 release decision.
 
-See the [Roadmap](docs/ROADMAP.md), [final acceptance record](docs/RELEASE_ACCEPTANCE.md), [compatibility validation report](docs/COMPATIBILITY_VALIDATION.md), and [v1.0.0-rc.5 release notes](docs/releases/v1.0.0-rc.5.md).
+See the [Roadmap](docs/ROADMAP.md), [final acceptance record](docs/RELEASE_ACCEPTANCE.md), [compatibility validation report](docs/COMPATIBILITY_VALIDATION.md), and [v1.0.0 release notes](docs/releases/v1.0.0.md).
 
 ## Privacy, security, and disclaimer
 

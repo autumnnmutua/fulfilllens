@@ -128,6 +128,20 @@ export interface QualityIssue {
   target_field?: string | null;
   raw_value?: string | null;
   suggestion: string;
+  cause?: string | null;
+  impact?: string | null;
+  action_label?: string | null;
+  recommended_source_column?: string | null;
+}
+
+export type FieldResolutionStatus =
+  "mapped" | "generated" | "inferred" | "ignored" | "unresolved" | "blocking";
+
+export interface FieldResolution {
+  source_column?: string | null;
+  target_field?: string | null;
+  status: FieldResolutionStatus;
+  reason: string;
 }
 
 export interface StatusNormalization {
@@ -154,6 +168,7 @@ export interface QualityReport {
   exact_duplicate_rows: number;
   ignored_source_columns: string[];
   unresolved_source_columns: string[];
+  field_resolutions: FieldResolution[];
   sensitive_risks: SensitiveRisk[];
   status_normalizations: StatusNormalization[];
   issues: QualityIssue[];

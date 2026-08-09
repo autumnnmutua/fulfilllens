@@ -177,6 +177,31 @@ def _markdown_section(section: ReportSection) -> str:
                     "",
                 ]
             )
+    elif section.code == "recommendations":
+        lines.extend(["### 专业行动方案", ""])
+        for item in data.get("professional_action_plan", []):
+            lines.extend(
+                [
+                    f"#### [{_md_text(item.get('priority'))}] {_md_text(item.get('problem_diagnosis'))}",
+                    "",
+                    "- **数据依据**：" + _md_text("；".join(item.get("data_evidence", []))),
+                    "- **根因判断边界**：" + _md_text(item.get("root_cause_judgement")),
+                    "- **改善动作**：" + _md_text("；".join(item.get("improvement_actions", []))),
+                    "- **影响范围**：" + _md_text(item.get("impact_scope")),
+                    "- **建议 KPI**：" + _md_text("；".join(item.get("suggested_kpis", []))),
+                    "- **建议目标**：" + _md_text(item.get("suggested_target")),
+                    "- **风险**：" + _md_text(item.get("risk")),
+                    "- **下一步验证**：" + _md_text(item.get("next_validation")),
+                    "",
+                ]
+            )
+        brief = data.get("executive_brief", {})
+        lines.extend(["### 管理层简报", "", _md_text(brief.get("overall_conclusion")), ""])
+        lines.extend(
+            f"- **{_md_text(item.get('what_happened'))}**：{_md_text(item.get('impact'))} "
+            f"行动：{_md_text(item.get('action'))} 关注：{_md_text(item.get('monitor'))}"
+            for item in brief.get("top_priorities", [])
+        )
     elif section.code == "order_samples":
         lines.append(
             _md_table(
@@ -499,6 +524,29 @@ def _html_section(section: ReportSection) -> str:
                 f'<p class="evidence">影响订单 {_h(item.get("affected_order_count"))} · 样本 {_h(item.get("sample_size"))} · 覆盖率 {_h(_metric_value(item.get("coverage"), "ratio"))}</p></article>'
             )
         content = "".join(findings) or '<p class="empty">当前筛选下未触发诊断规则。</p>'
+    elif section.code == "recommendations":
+        plans = "".join(
+            f'<article class="finding"><h3>{_h(item.get("problem_diagnosis"))} <code>{_h(item.get("priority"))}</code></h3>'
+            f"<dl><dt>数据依据</dt><dd>{_h('；'.join(item.get('data_evidence', [])))}</dd>"
+            f"<dt>根因判断边界</dt><dd>{_h(item.get('root_cause_judgement'))}</dd>"
+            f"<dt>改善动作</dt><dd>{_h('；'.join(item.get('improvement_actions', [])))}</dd>"
+            f"<dt>影响范围</dt><dd>{_h(item.get('impact_scope'))}</dd>"
+            f"<dt>建议 KPI</dt><dd>{_h('；'.join(item.get('suggested_kpis', [])))}</dd>"
+            f"<dt>建议目标</dt><dd>{_h(item.get('suggested_target'))}</dd>"
+            f"<dt>风险</dt><dd>{_h(item.get('risk'))}</dd>"
+            f"<dt>下一步验证</dt><dd>{_h(item.get('next_validation'))}</dd></dl></article>"
+            for item in data.get("professional_action_plan", [])
+        )
+        brief = data.get("executive_brief", {})
+        brief_items = "".join(
+            f"<li><strong>{_h(item.get('what_happened'))}</strong>：{_h(item.get('impact'))} "
+            f"行动：{_h(item.get('action'))}；关注：{_h(item.get('monitor'))}</li>"
+            for item in brief.get("top_priorities", [])
+        )
+        content = (
+            f"<h3>专业行动方案</h3>{plans}<h3>管理层简报</h3>"
+            f"<p>{_h(brief.get('overall_conclusion'))}</p><ol>{brief_items}</ol>"
+        )
     elif section.code == "order_samples":
         content = _html_table(
             ["订单标识", "状态", "仓库", "承运商", "地区", "OTIF", "时效", "异常"],

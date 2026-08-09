@@ -235,7 +235,17 @@ function criticalFields(contract: ImportContract): Set<string> {
 }
 
 const CRITICAL_HEADER_PATTERN =
-  /(订单|运单|物流|轨迹|事件|时间|时刻|日期|状态|扫描|承运|快递|节点|网点|场站|位置|区域|城市|异常|序号|流水|批次|签收|老码|代码|编号|标识|参考|order|shipment|tracking|event|time|date|status|scan|carrier|courier|location|region|exception|sequence|batch|reference|\bid\b|\bno\b)/i;
+  /(订单|运单|物流|轨迹|事件|时间|时刻|日期|状态|扫描|承运|快递|节点|网点|场站|位置|区域|城市|异常|序号|签收|老码|代码|编号|标识|参考|order|shipment|tracking|event|time|date|status|scan|carrier|courier|location|region|exception|sequence|reference|\bid\b|\bno\b)/i;
+const NON_ANALYSIS_HEADER_PATTERN =
+  /(客户?备注|内部备注|营销|推广|标签|批次|班次|设备|采集来源|计费重|流向简述|销售员)/i;
+
+function auxiliaryHeaders(contract: ImportContract): Set<string> {
+  return new Set(
+    Object.values(contract.auxiliaryAliases)
+      .flat()
+      .flatMap(normalizeFieldVariants),
+  );
+}
 
 /**
  * Returns only unresolved columns that have no plausible analytical or
@@ -249,10 +259,22 @@ export function findSafelyIgnorableColumns(
 ): string[] {
   const ignored = new Set(ignoredSourceColumns);
   const critical = criticalFields(contract);
+  const auxiliary = auxiliaryHeaders(contract);
   return suggestions
     .filter((suggestion) => {
       const source = suggestion.source_column;
       if (ignored.has(source) || mapping[source] != null) return false;
+      if (
+        normalizeFieldVariants(source).some((variant) => auxiliary.has(variant))
+      ) {
+        return false;
+      }
+      if (NON_ANALYSIS_HEADER_PATTERN.test(source.normalize("NFKC"))) {
+        return !suggestion.candidates.some(
+          (candidate) =>
+            critical.has(candidate.field) && candidate.confidence >= 0.75,
+        );
+      }
       if (CRITICAL_HEADER_PATTERN.test(source.normalize("NFKC"))) return false;
       if (
         suggestion.candidates.some(
@@ -267,6 +289,24 @@ export function findSafelyIgnorableColumns(
           candidate.confidence >= CRITICAL_CANDIDATE_CONFIDENCE,
       );
     })
+    .map((suggestion) => suggestion.source_column);
+}
+
+/** High-confidence recommendations that still need an explicit user decision. */
+export function findRecommendedMappingSources(
+  suggestions: FieldSuggestion[],
+  mapping: Record<string, string | null>,
+  ignoredSourceColumns: string[],
+): string[] {
+  const ignored = new Set(ignoredSourceColumns);
+  return suggestions
+    .filter(
+      (suggestion) =>
+        !ignored.has(suggestion.source_column) &&
+        mapping[suggestion.source_column] != null &&
+        suggestion.requires_confirmation === true &&
+        suggestion.confidence >= 0.86,
+    )
     .map((suggestion) => suggestion.source_column);
 }
 

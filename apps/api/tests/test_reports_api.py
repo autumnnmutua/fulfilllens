@@ -50,6 +50,7 @@ def report_request(*, include_identifiers: bool = False) -> dict[str, Any]:
             "node_duration",
             "dimension_breakdown",
             "diagnostics",
+            "recommendations",
             "order_samples",
             "simulation",
             "methods_limits",
@@ -114,6 +115,15 @@ def test_preview_follows_filters_versions_sections_and_masks_identifiers(
             evidence.get("order_id") in {None, ""} or evidence["order_id"].startswith("***")
             for evidence in result["evidence"]
         )
+    recommendations = payload["recommendations"]
+    assert recommendations["ai_used"] is False
+    assert recommendations["presentation_source"] == "deterministic_template"
+    fact_ids = {item["fact_id"] for item in recommendations["facts"]}
+    assert fact_ids
+    assert {item["fact_id"] for item in recommendations["professional_action_plan"]} == fact_ids
+    assert {
+        item["fact_id"] for item in recommendations["executive_brief"]["top_priorities"]
+    } <= fact_ids
 
 
 def test_sensitive_identifier_export_requires_confirmation(client: TestClient) -> None:
@@ -143,6 +153,8 @@ def test_markdown_and_self_contained_html_are_complete_and_chinese_safe(
     assert "Executive Summary" in markdown_text
     assert "数据观察事实" in markdown_text
     assert "情景估算" in markdown_text
+    assert "专业行动方案" in markdown_text
+    assert "管理层简报" in markdown_text
     assert "<script>" not in markdown_text
     assert "&lt;script&gt;" in markdown_text
 

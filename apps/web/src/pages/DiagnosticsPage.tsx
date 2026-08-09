@@ -33,7 +33,7 @@ import { diagnosticsApi } from "../api/diagnostics";
 import { EChart, type EChartOption } from "../components/EChart";
 import { useNotifications } from "../components/notification-context";
 import { PageHeader } from "../components/PageHeader";
-import { onlineDemoDatasetId } from "../config/runtime";
+import { initialAnalysisDataset } from "../analysis/browserSelection";
 import type {
   DiagnosticAnalysis,
   DiagnosticCategory,
@@ -80,14 +80,7 @@ const DEFAULT_ORDER_FILTERS: DiagnosticOrderFilters = {
 };
 
 function initialDataset(dataType: string): string {
-  const fromUrl = new URLSearchParams(window.location.search)
-    .get(`${dataType}_dataset_id`)
-    ?.trim();
-  return (
-    fromUrl ||
-    window.localStorage.getItem(`fulfilllens.dataset.${dataType}`) ||
-    onlineDemoDatasetId(dataType)
-  );
+  return initialAnalysisDataset(dataType);
 }
 
 function readableError(error: unknown): string {

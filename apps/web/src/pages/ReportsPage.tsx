@@ -19,6 +19,7 @@ import {
   Modal,
   Progress,
   Row,
+  Segmented,
   Select,
   Skeleton,
   Space,
@@ -34,7 +35,10 @@ import { reportsApi } from "../api/reports";
 import { simulationApi } from "../api/simulation";
 import { useNotifications } from "../components/notification-context";
 import { PageHeader } from "../components/PageHeader";
-import { onlineDemoDatasetId } from "../config/runtime";
+import {
+  hasBrowserDatasetSelection,
+  initialAnalysisDataset,
+} from "../analysis/browserSelection";
 import type { DashboardFilters } from "../types/dashboard";
 import type { DatasetSelection } from "../types/metrics";
 import type {
@@ -70,6 +74,7 @@ const SECTION_OPTIONS: Array<{ label: string; value: ReportSectionCode }> = [
   { label: "节点耗时", value: "node_duration" },
   { label: "维度对比", value: "dimension_breakdown" },
   { label: "异常诊断", value: "diagnostics" },
+  { label: "行动建议", value: "recommendations" },
   { label: "订单样例", value: "order_samples" },
   { label: "模拟方案", value: "simulation" },
   { label: "方法与限制", value: "methods_limits" },
@@ -91,14 +96,7 @@ const JOB_STATUS: Record<ReportJob["status"], string> = {
 };
 
 function datasetId(key: string): string {
-  const fromUrl = new URLSearchParams(window.location.search)
-    .get(`${key}_dataset_id`)
-    ?.trim();
-  return (
-    fromUrl ??
-    window.localStorage.getItem(`fulfilllens.dataset.${key}`)?.trim() ??
-    onlineDemoDatasetId(key)
-  );
+  return initialAnalysisDataset(key);
 }
 
 function storedFilters(): DashboardFilters {
@@ -162,6 +160,9 @@ function valueText(value: unknown): string {
 }
 
 function PreviewSection({ section }: { section: ReportSection }) {
+  const [recommendationView, setRecommendationView] = useState<
+    "professional" | "executive"
+  >("professional");
   const metrics = arrayOfRecords(section.data.metrics);
   const findings = arrayOfRecords(section.data.results);
   const orders = arrayOfRecords(section.data.orders);
@@ -174,6 +175,14 @@ function PreviewSection({ section }: { section: ReportSection }) {
   const result =
     typeof section.data.result === "object" && section.data.result !== null
       ? (section.data.result as Record<string, unknown>)
+      : null;
+  const professionalPlans = arrayOfRecords(
+    section.data.professional_action_plan,
+  );
+  const executiveBrief =
+    typeof section.data.executive_brief === "object" &&
+    section.data.executive_brief !== null
+      ? (section.data.executive_brief as Record<string, unknown>)
       : null;
 
   return (
@@ -271,6 +280,100 @@ function PreviewSection({ section }: { section: ReportSection }) {
               </Descriptions>
             </Card>
           ))}
+        </Space>
+      ) : null}
+      {section.code === "recommendations" ? (
+        <Space direction="vertical" size="middle" className="report-stack">
+          <Alert
+            type="info"
+            showIcon
+            title="两种视图使用同一组分析事实"
+            description="优先级、数值和触发条件由确定性指标与诊断生成；AI 不参与核心计算，服务不可用时仍可完整展示。"
+          />
+          <Segmented
+            value={recommendationView}
+            options={[
+              { label: "专业行动方案", value: "professional" },
+              { label: "管理层简报", value: "executive" },
+            ]}
+            onChange={(value) =>
+              setRecommendationView(value as "professional" | "executive")
+            }
+          />
+          {recommendationView === "professional" ? (
+            professionalPlans.map((plan) => (
+              <Card
+                key={valueText(plan.fact_id)}
+                size="small"
+                title={valueText(plan.problem_diagnosis)}
+                extra={
+                  <Tag
+                    color={
+                      plan.priority === "high"
+                        ? "red"
+                        : plan.priority === "medium"
+                          ? "default"
+                          : "blue"
+                    }
+                  >
+                    {valueText(plan.priority)}
+                  </Tag>
+                }
+              >
+                <Descriptions bordered size="small" column={1}>
+                  <Descriptions.Item label="数据依据">
+                    {valueText(plan.data_evidence)}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="根因判断边界">
+                    {valueText(plan.root_cause_judgement)}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="改善动作">
+                    {valueText(plan.improvement_actions)}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="影响范围">
+                    {valueText(plan.impact_scope)}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="建议 KPI">
+                    {valueText(plan.suggested_kpis)}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="建议目标">
+                    {valueText(plan.suggested_target)}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="风险">
+                    {valueText(plan.risk)}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="下一步验证">
+                    {valueText(plan.next_validation)}
+                  </Descriptions.Item>
+                </Descriptions>
+                <Typography.Text>
+                  事实编号：{valueText(plan.fact_id)}
+                </Typography.Text>
+              </Card>
+            ))
+          ) : executiveBrief ? (
+            <Card size="small" title="管理层简报">
+              <Typography.Paragraph strong>
+                {valueText(executiveBrief.overall_conclusion)}
+              </Typography.Paragraph>
+              <ol>
+                {arrayOfRecords(executiveBrief.top_priorities).map((item) => (
+                  <li key={valueText(item.fact_id)}>
+                    <Typography.Paragraph>
+                      <strong>{valueText(item.what_happened)}</strong>：
+                      {valueText(item.impact)}
+                      <br />
+                      建议：{valueText(item.action)}
+                      <br />
+                      后续关注：{valueText(item.monitor)}
+                    </Typography.Paragraph>
+                  </li>
+                ))}
+              </ol>
+            </Card>
+          ) : (
+            <Empty description="当前没有可展示的管理层建议" />
+          )}
         </Space>
       ) : null}
       {section.code === "diagnostics" && findings.length === 0 ? (
@@ -480,7 +583,7 @@ export function ReportsPage() {
     const controller = new AbortController();
     Promise.all([
       reportsApi.capabilities(controller.signal),
-      datasets.orders_dataset_id
+      datasets.orders_dataset_id && !hasBrowserDatasetSelection(datasets)
         ? simulationApi.scenarios(datasets.orders_dataset_id, controller.signal)
         : Promise.resolve([]),
     ])
@@ -495,7 +598,7 @@ export function ReportsPage() {
       })
       .finally(() => setLoading(false));
     return () => controller.abort();
-  }, [datasets.orders_dataset_id]);
+  }, [datasets]);
 
   useEffect(() => {
     if (!job || (job.status !== "queued" && job.status !== "running")) return;

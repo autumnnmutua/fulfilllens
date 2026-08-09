@@ -40,7 +40,7 @@ import type { DatasetSelection, OrderMetricDetail } from "../../types/metrics";
 
 interface DashboardOrderListProps {
   busy: boolean;
-  csvUrl: string;
+  onExportCsv: () => Promise<void>;
   data: DashboardOrderPage | null;
   selection: DatasetSelection;
   sortBy: OrderSort;
@@ -84,7 +84,7 @@ function AnomalyTags({ order }: { order: DashboardOrderItem }) {
 
 export function DashboardOrderList({
   busy,
-  csvUrl,
+  onExportCsv,
   data,
   selection,
   sortBy,
@@ -97,6 +97,22 @@ export function DashboardOrderList({
   const [detail, setDetail] = useState<OrderMetricDetail | null>(null);
   const [detailBusy, setDetailBusy] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
+  const [exportBusy, setExportBusy] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  async function exportCsv() {
+    setExportBusy(true);
+    setExportError(null);
+    try {
+      await onExportCsv();
+    } catch (error) {
+      setExportError(
+        error instanceof Error ? error.message : "订单明细导出失败，请重试。",
+      );
+    } finally {
+      setExportBusy(false);
+    }
+  }
 
   async function openDetail(order: DashboardOrderItem) {
     setDetail(order);
@@ -139,8 +155,8 @@ export function DashboardOrderList({
       />
       <Button
         icon={<DownloadOutlined />}
-        href={data && data.total > 0 ? csvUrl : undefined}
-        download
+        loading={exportBusy}
+        onClick={() => void exportCsv()}
         disabled={!data || data.total === 0}
       >
         导出当前筛选 CSV
@@ -162,6 +178,14 @@ export function DashboardOrderList({
           共 {data?.total ?? 0} 单；导出沿用当前全局筛选和排序，且对 CSV
           公式前缀做安全转义。异常是版本化基线规则结果，不代表已确认根因。
         </Typography.Paragraph>
+        {exportError ? (
+          <Alert
+            type="error"
+            showIcon
+            title="订单明细导出失败"
+            description={exportError}
+          />
+        ) : null}
         {data === null || data.total === 0 ? (
           <Empty
             description={

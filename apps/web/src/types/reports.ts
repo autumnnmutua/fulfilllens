@@ -14,6 +14,7 @@ export type ReportSectionCode =
   | "node_duration"
   | "dimension_breakdown"
   | "diagnostics"
+  | "recommendations"
   | "order_samples"
   | "simulation"
   | "methods_limits";
@@ -78,6 +79,7 @@ export interface ReportDocument {
   header: ReportHeader;
   filters: DashboardFilters;
   executive_summary: string[];
+  recommendations: RecommendationBundle;
   sections: ReportSection[];
   warnings: string[];
   source_notes: string[];
@@ -92,6 +94,61 @@ export interface ReportDocument {
     requires_context: boolean;
   }>;
   contract_version: string;
+}
+
+export type RecommendationPriority = "high" | "medium" | "watch";
+
+export interface RecommendationFact {
+  fact_id: string;
+  topic: string;
+  priority: RecommendationPriority;
+  priority_score: number;
+  title: string;
+  factual_observation: string;
+  evidence: Array<{ label: string; value: string }>;
+  affected_order_count: number | null;
+  coverage: number | null;
+  confidence_warning: string[];
+  recommended_action: string[];
+  suggested_kpis: string[];
+  suggested_target: string;
+  risk: string;
+  next_validation: string;
+}
+
+export interface RecommendationBundle {
+  facts: RecommendationFact[];
+  professional_action_plan: Array<{
+    fact_id: string;
+    priority: RecommendationPriority;
+    problem_diagnosis: string;
+    data_evidence: string[];
+    root_cause_judgement: string;
+    improvement_actions: string[];
+    impact_scope: string;
+    suggested_kpis: string[];
+    suggested_target: string;
+    risk: string;
+    next_validation: string;
+  }>;
+  executive_brief: {
+    overall_conclusion: string;
+    major_findings: string[];
+    top_priorities: Array<{
+      fact_id: string;
+      priority: RecommendationPriority;
+      what_happened: string;
+      impact: string;
+      action: string;
+      monitor: string;
+    }>;
+    expected_direction: string;
+    monitor_metrics: string[];
+  };
+  definition_version: string;
+  ai_used: boolean;
+  presentation_source: string;
+  privacy_note: string;
 }
 
 export interface ReportCapabilities {

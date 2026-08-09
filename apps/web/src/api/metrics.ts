@@ -7,6 +7,8 @@ import type {
   OrderMetricDetail,
   TrendResponse,
 } from "../types/metrics";
+import { browserLocalAnalyticsService } from "../analysis/browserLocalAnalyticsService";
+import { hasBrowserDatasetSelection } from "../analysis/browserSelection";
 
 function selectionQuery(selection: DatasetSelection): URLSearchParams {
   const query = new URLSearchParams({
@@ -64,7 +66,9 @@ export const metricsApi = {
     );
   },
   orderDetail: (selection: DatasetSelection, orderId: string) =>
-    apiRequest<OrderMetricDetail>(
-      `/api/metrics/orders/${encodeURIComponent(orderId)}?${selectionQuery(selection).toString()}`,
-    ),
+    hasBrowserDatasetSelection(selection)
+      ? browserLocalAnalyticsService.orderDetail(selection, orderId)
+      : apiRequest<OrderMetricDetail>(
+          `/api/metrics/orders/${encodeURIComponent(orderId)}?${selectionQuery(selection).toString()}`,
+        ),
 };

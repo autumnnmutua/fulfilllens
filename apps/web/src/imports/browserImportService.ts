@@ -336,7 +336,11 @@ export const browserImportService = {
       "target_field",
       "raw_value",
       "message",
+      "cause",
+      "impact",
       "suggestion",
+      "action_label",
+      "recommended_source_column",
     ];
     const lines = [
       header.map(csvSafe).join(","),

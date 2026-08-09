@@ -1,10 +1,11 @@
 import { getImportContract, type ImportContract } from "./contracts";
-import { validateMapping } from "./mapping";
+import { suggestMappings, validateMapping } from "./mapping";
 import type { BrowserParsedTable } from "./parser";
 import { scalarText } from "./scalar";
 import statusKeywordRulesJson from "../../../../data/schemas/status_keyword_rules.json";
 import type {
   DataType,
+  FieldResolution,
   QualityIssue,
   QualityReport,
   SensitiveRisk,
@@ -604,20 +605,85 @@ export function validateBrowserImport(
     });
   };
 
-  validateMapping(
-    mapping,
+  const ignoredSources = new Set(ignoredSourceColumns);
+  const activeMappings = Object.entries(mapping).filter(
+    (entry): entry is [string, string] =>
+      entry[1] !== null && !ignoredSources.has(entry[0]),
+  );
+  const mappedTargets = new Set(activeMappings.map(([, target]) => target));
+  const requiredTargets = new Set(
+    contract.fields
+      .filter((field) => field.required)
+      .map((field) => field.field),
+  );
+  if (dataType === "tracking_events")
+    requiredTargets.delete("tracking_event_id");
+  requiredTargets.delete(contract.normalizedStatusField);
+  if (
+    mappedTargets.has(contract.rawStatusField) ||
+    mappedTargets.has(contract.normalizedStatusField)
+  ) {
+    requiredTargets.delete(contract.rawStatusField);
+    requiredTargets.delete(contract.normalizedStatusField);
+  }
+  const missingRequiredTargets = [...requiredTargets].filter(
+    (field) => !mappedTargets.has(field),
+  );
+  const mappingSuggestions = suggestMappings(
     table.headers,
     contract,
-    ignoredSourceColumns,
-  ).forEach((message) =>
+    table.rows,
+  );
+  const candidateSource = (target: string): string | null => {
+    const candidate = mappingSuggestions
+      .flatMap((suggestion) =>
+        suggestion.candidates
+          .filter((item) => item.field === target)
+          .map((item) => ({
+            confidence: item.confidence,
+            source: suggestion.source_column,
+          })),
+      )
+      .filter(
+        (item) =>
+          !ignoredSources.has(item.source) && mapping[item.source] == null,
+      )
+      .sort((left, right) => right.confidence - left.confidence)[0];
+    return candidate?.confidence >= 0.55 ? candidate.source : null;
+  };
+
+  missingRequiredTargets.forEach((field) => {
+    const definition = contract.fields.find((item) => item.field === field);
+    const recommendedSource = candidateSource(field);
     addIssue({
-      code: "INVALID_FIELD_MAPPING",
-      message,
+      code: "MISSING_REQUIRED_MAPPING",
+      message: `没有识别到“${definition?.label ?? field}”（${field}）。`,
       raw_value: null,
       severity: "error",
-      suggestion: "返回字段映射步骤，确保必填字段完整且目标字段不重复。",
-    }),
-  );
+      cause: `当前映射中没有源列可形成标准字段 ${field}。`,
+      impact: "缺少该字段会使记录无法通过数据契约，相关分析不能可靠执行。",
+      suggestion: recommendedSource
+        ? `系统检测到“${recommendedSource}”可能符合该含义；请返回字段映射并确认。`
+        : `请返回字段映射，选择记录“${definition?.label ?? field}”的源列。`,
+      action_label: recommendedSource ? `使用“${recommendedSource}”` : null,
+      recommended_source_column: recommendedSource,
+      target_field: field,
+    });
+  });
+
+  validateMapping(mapping, table.headers, contract, ignoredSourceColumns)
+    .filter((message) => !message.startsWith("缺少必填目标字段："))
+    .forEach((message) =>
+      addIssue({
+        code: "INVALID_FIELD_MAPPING",
+        message,
+        raw_value: null,
+        severity: "error",
+        suggestion: "返回字段映射步骤，确保必填字段完整且目标字段不重复。",
+        cause: "字段处理状态与当前数据契约不一致。",
+        impact: "系统无法确定应写入标准数据集的字段，导入会被阻止。",
+      }),
+    );
   table.issues.forEach((issue) =>
     addIssue({
       code: issue.code,
@@ -643,7 +709,6 @@ export function validateBrowserImport(
     }
   });
 
-  const ignoredSources = new Set(ignoredSourceColumns);
   const targetToSource = new Map(
     Object.entries(mapping)
       .filter(
@@ -691,6 +756,7 @@ export function validateBrowserImport(
         nullCounts[definition.field] = (nullCounts[definition.field] ?? 0) + 1;
         if (
           definition.required &&
+          source !== undefined &&
           !(
             deriveTrackingEventId && definition.field === "tracking_event_id"
           ) &&
@@ -699,13 +765,16 @@ export function validateBrowserImport(
         ) {
           addIssue({
             code: "REQUIRED_VALUE_MISSING",
-            message: "必填字段为空。",
+            message: `第 ${sourceRow.row_number} 行的“${source}”为空，无法形成“${definition.label}”。`,
             raw_value: null,
             row_number: sourceRow.row_number,
             severity: "error",
             sheet: table.sheetName,
             source_column: source ?? null,
-            suggestion: "补充原值或修改字段映射。",
+            suggestion: `请在源文件“${source}”列补充该行原值，或确认该列是否映射错了。系统不会代填业务事实。`,
+            cause: `该源列已映射到 ${definition.field}，但这一行没有值。`,
+            impact:
+              "该行无法进入标准分析数据集；系统不会把空值当作成功或正常。",
             target_field: definition.field,
           });
         }
@@ -771,19 +840,21 @@ export function validateBrowserImport(
       targetToSource.get(contract.rawStatusField) ??
       targetToSource.get(contract.normalizedStatusField);
     const rawValue = rawSource ? sourceRow.values[rawSource] : null;
-    if (isEmpty(rawValue)) {
+    if (isEmpty(rawValue) && rawSource !== undefined) {
       addIssue({
         code: "REQUIRED_STATUS_MISSING",
-        message: "原始状态为空，无法生成标准状态。",
+        message: `第 ${sourceRow.row_number} 行的“${rawSource}”为空，无法识别物流状态。`,
         raw_value: null,
         row_number: sourceRow.row_number,
         severity: "error",
         sheet: table.sheetName,
         source_column: rawSource ?? null,
-        suggestion: "映射一个含原始业务状态的列。",
+        suggestion: `请在源文件“${rawSource}”列补充该行真实状态；若列含义不正确，请返回映射步骤重新选择。`,
+        cause: "状态源列已完成映射，但当前行没有原始状态值。",
+        impact: "系统无法生成物流节点和状态分析；该行不会被猜测为正常状态。",
         target_field: contract.rawStatusField,
       });
-    } else {
+    } else if (!isEmpty(rawValue)) {
       status = normalizeStatus(
         dataType,
         rawValue,
@@ -1046,6 +1117,52 @@ export function validateBrowserImport(
         (source) => !ignoredSources.has(source) && mapping[source] == null,
       )
       .sort(),
+    field_resolutions: [
+      ...table.headers.map((source): FieldResolution => ({
+        reason: ignoredSources.has(source)
+          ? "用户已明确排除该源字段，后续标准数据与分析不会包含它。"
+          : mapping[source] == null
+            ? "系统尚未确定该源字段的业务含义。"
+            : `该源字段写入标准字段 ${mapping[source]}。`,
+        source_column: source,
+        status: ignoredSources.has(source)
+          ? "ignored"
+          : mapping[source] == null
+            ? "unresolved"
+            : "mapped",
+        target_field: mapping[source] ?? null,
+      })),
+      ...(deriveTrackingEventId
+        ? [
+            {
+              reason:
+                "依据订单、运单、事件时间、原始状态、承运商和源行号生成稳定可复现 ID。",
+              source_column: null,
+              status: "generated" as const,
+              target_field: "tracking_event_id",
+            },
+          ]
+        : []),
+      ...(targetToSource.has(contract.rawStatusField) &&
+      !targetToSource.has(contract.normalizedStatusField)
+        ? [
+            {
+              reason:
+                "由保留的原始状态通过确定性状态词典生成；未知值保持 unmapped。",
+              source_column:
+                targetToSource.get(contract.rawStatusField) ?? null,
+              status: "inferred" as const,
+              target_field: contract.normalizedStatusField,
+            },
+          ]
+        : []),
+      ...missingRequiredTargets.map((field): FieldResolution => ({
+        reason: "标准 Schema 必填字段尚无可靠来源，不能被忽略绕过。",
+        source_column: candidateSource(field),
+        status: "blocking",
+        target_field: field,
+      })),
+    ],
     invalid_times:
       codeCount("INVALID_TIME") +
       codeCount("TIMEZONE_REQUIRED") +

@@ -161,6 +161,26 @@ class QualityIssue(BaseModel):
     target_field: str | None = None
     raw_value: str | None = None
     suggestion: str
+    cause: str | None = None
+    impact: str | None = None
+    action_label: str | None = None
+    recommended_source_column: str | None = None
+
+
+class FieldResolutionStatus(StrEnum):
+    MAPPED = "mapped"
+    GENERATED = "generated"
+    INFERRED = "inferred"
+    IGNORED = "ignored"
+    UNRESOLVED = "unresolved"
+    BLOCKING = "blocking"
+
+
+class FieldResolution(BaseModel):
+    source_column: str | None = None
+    target_field: str | None = None
+    status: FieldResolutionStatus
+    reason: str
 
 
 class StatusNormalizationSummary(BaseModel):
@@ -187,6 +207,7 @@ class QualityReport(BaseModel):
     exact_duplicate_rows: int
     ignored_source_columns: list[str] = Field(default_factory=list)
     unresolved_source_columns: list[str] = Field(default_factory=list)
+    field_resolutions: list[FieldResolution] = Field(default_factory=list)
     sensitive_risks: list[SensitiveRisk]
     status_normalizations: list[StatusNormalizationSummary]
     issues: list[QualityIssue]

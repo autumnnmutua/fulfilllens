@@ -15,7 +15,7 @@ from jsonschema import Draft202012Validator, FormatChecker
 from referencing import Registry, Resource
 
 from app.imports.contracts import SCHEMA_DIR, Contract
-from app.imports.mapping import normalize_field_variants
+from app.imports.mapping import normalize_field_variants, suggest_mappings, validate_mapping
 from app.imports.parser import ParsedTable, ParseIssue
 from app.imports.security import mask_sensitive_value
 from app.imports.statuses import (
@@ -24,6 +24,8 @@ from app.imports.statuses import (
     summarize_statuses,
 )
 from app.schemas.imports import (
+    FieldResolution,
+    FieldResolutionStatus,
     IssueSeverity,
     QualityIssue,
     QualityReport,
@@ -127,6 +129,10 @@ class IssueCollector:
         source_column: str | None = None,
         target_field: str | None = None,
         raw_value: object = None,
+        cause: str | None = None,
+        impact: str | None = None,
+        action_label: str | None = None,
+        recommended_source_column: str | None = None,
     ) -> None:
         safe_raw: str | None
         if source_column in self.sensitive_columns:
@@ -149,6 +155,10 @@ class IssueCollector:
                 target_field=target_field,
                 raw_value=safe_raw,
                 suggestion=suggestion,
+                cause=cause,
+                impact=impact,
+                action_label=action_label,
+                recommended_source_column=recommended_source_column,
             )
         )
 
@@ -409,6 +419,74 @@ def validate_import(
         for source, target in mapping.items()
         if target is not None and source not in ignored_sources
     }
+    mapped_targets = set(target_to_source)
+    required_targets = {field.field for field in contract.fields if field.required}
+    if contract.data_type.value == "tracking_events":
+        required_targets.discard("tracking_event_id")
+    required_targets.discard(contract.normalized_status_field)
+    if (
+        contract.raw_status_field in mapped_targets
+        or contract.normalized_status_field in mapped_targets
+    ):
+        required_targets.discard(contract.raw_status_field)
+    missing_required_targets = sorted(required_targets - mapped_targets)
+    suggestions = suggest_mappings(
+        table.headers,
+        contract,
+        [row.values for row in table.rows],
+    )
+
+    def candidate_source(target: str) -> str | None:
+        candidates = sorted(
+            (
+                (candidate.confidence, suggestion.source_column)
+                for suggestion in suggestions
+                for candidate in suggestion.candidates
+                if candidate.field == target
+                and suggestion.source_column not in ignored_sources
+                and mapping.get(suggestion.source_column) is None
+            ),
+            reverse=True,
+        )
+        if candidates and candidates[0][0] >= 0.55:
+            return candidates[0][1]
+        return None
+
+    for field in missing_required_targets:
+        definition = next(item for item in contract.fields if item.field == field)
+        recommended_source = candidate_source(field)
+        collector.add(
+            severity=IssueSeverity.ERROR,
+            code="MISSING_REQUIRED_MAPPING",
+            message=f"没有识别到“{definition.label}”（{field}）。",
+            suggestion=(
+                f"系统检测到“{recommended_source}”可能符合该含义；请返回字段映射并确认。"
+                if recommended_source
+                else f"请返回字段映射，选择记录“{definition.label}”的源列。"
+            ),
+            cause=f"当前映射中没有源列可形成标准字段 {field}。",
+            impact="缺少该字段会使记录无法通过数据契约，相关分析不能可靠执行。",
+            action_label=(f"使用“{recommended_source}”" if recommended_source else None),
+            recommended_source_column=recommended_source,
+            target_field=field,
+        )
+
+    for message in validate_mapping(
+        mapping,
+        table.headers,
+        contract,
+        list(ignored_sources),
+    ):
+        if message.startswith("缺少必填目标字段："):
+            continue
+        collector.add(
+            severity=IssueSeverity.ERROR,
+            code="INVALID_FIELD_MAPPING",
+            message=message,
+            suggestion="返回字段映射步骤，确保必填字段完整且目标字段不重复。",
+            cause="字段处理状态与当前数据契约不一致。",
+            impact="系统无法确定应写入标准数据集的字段，导入会被阻止。",
+        )
     auxiliary_sources: dict[str, str] = {}
     for purpose, aliases in contract.auxiliary_aliases.items():
         normalized_aliases = {
@@ -451,6 +529,7 @@ def validate_import(
                 null_counts[field] += 1
                 if (
                     definition.required
+                    and source is not None
                     and not (derive_tracking_event_id and field == "tracking_event_id")
                     and field
                     not in {
@@ -461,8 +540,16 @@ def validate_import(
                     collector.add(
                         severity=IssueSeverity.ERROR,
                         code="REQUIRED_VALUE_MISSING",
-                        message="必填字段为空。",
-                        suggestion="补充原值或修改字段映射。",
+                        message=(
+                            f"第 {parsed_row.row_number} 行的“{source}”为空，"
+                            f"无法形成“{definition.label}”。"
+                        ),
+                        suggestion=(
+                            f"请在源文件“{source}”列补充该行原值，或确认该列是否映射错了。"
+                            "系统不会代填业务事实。"
+                        ),
+                        cause=f"该源列已映射到 {field}，但这一行没有值。",
+                        impact="该行无法进入标准分析数据集；系统不会把空值当作成功或正常。",
                         sheet=table.sheet_name,
                         row_number=parsed_row.row_number,
                         source_column=source,
@@ -542,12 +629,17 @@ def validate_import(
                     target_field=normalized_field,
                     raw_value=raw_value,
                 )
-        else:
+        elif raw_source is not None:
             collector.add(
                 severity=IssueSeverity.ERROR,
                 code="REQUIRED_STATUS_MISSING",
-                message="原始状态为空，无法生成标准状态。",
-                suggestion="映射一个含原始业务状态的列。",
+                message=(f"第 {parsed_row.row_number} 行的“{raw_source}”为空，无法识别物流状态。"),
+                suggestion=(
+                    f"请在源文件“{raw_source}”列补充该行真实状态；"
+                    "若列含义不正确，请返回映射步骤重新选择。"
+                ),
+                cause="状态源列已完成映射，但当前行没有原始状态值。",
+                impact="系统无法生成物流节点和状态分析；该行不会被猜测为正常状态。",
                 sheet=table.sheet_name,
                 row_number=parsed_row.row_number,
                 source_column=raw_source,
@@ -748,6 +840,68 @@ def validate_import(
             for source in table.headers
             if source not in ignored_sources and mapping.get(source) is None
         ),
+        field_resolutions=[
+            *[
+                FieldResolution(
+                    source_column=source,
+                    target_field=mapping.get(source),
+                    status=(
+                        FieldResolutionStatus.IGNORED
+                        if source in ignored_sources
+                        else (
+                            FieldResolutionStatus.UNRESOLVED
+                            if mapping.get(source) is None
+                            else FieldResolutionStatus.MAPPED
+                        )
+                    ),
+                    reason=(
+                        "用户已明确排除该源字段，后续标准数据与分析不会包含它。"
+                        if source in ignored_sources
+                        else (
+                            "系统尚未确定该源字段的业务含义。"
+                            if mapping.get(source) is None
+                            else f"该源字段写入标准字段 {mapping.get(source)}。"
+                        )
+                    ),
+                )
+                for source in table.headers
+            ],
+            *(
+                [
+                    FieldResolution(
+                        target_field="tracking_event_id",
+                        status=FieldResolutionStatus.GENERATED,
+                        reason=(
+                            "依据订单、运单、事件时间、原始状态、承运商和源行号生成稳定可复现 ID。"
+                        ),
+                    )
+                ]
+                if derive_tracking_event_id
+                else []
+            ),
+            *(
+                [
+                    FieldResolution(
+                        source_column=target_to_source.get(contract.raw_status_field),
+                        target_field=contract.normalized_status_field,
+                        status=FieldResolutionStatus.INFERRED,
+                        reason=("由保留的原始状态通过确定性状态词典生成；未知值保持 unmapped。"),
+                    )
+                ]
+                if contract.raw_status_field in target_to_source
+                and contract.normalized_status_field not in target_to_source
+                else []
+            ),
+            *[
+                FieldResolution(
+                    source_column=candidate_source(field),
+                    target_field=field,
+                    status=FieldResolutionStatus.BLOCKING,
+                    reason="标准 Schema 必填字段尚无可靠来源，不能被忽略绕过。",
+                )
+                for field in missing_required_targets
+            ],
+        ],
         sensitive_risks=sensitive_risks,
         status_normalizations=summarize_statuses(status_normalizations),
         issues=collector.issues,

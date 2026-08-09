@@ -7,6 +7,8 @@ import type {
   DashboardViewOptions,
 } from "../types/dashboard";
 import type { DatasetSelection } from "../types/metrics";
+import { browserLocalAnalyticsService } from "../analysis/browserLocalAnalyticsService";
+import { hasBrowserDatasetSelection } from "../analysis/browserSelection";
 
 function dashboardQuery(
   selection: DatasetSelection,
@@ -53,6 +55,9 @@ export const dashboardApi = {
     options: DashboardViewOptions,
     signal?: AbortSignal,
   ) => {
+    if (hasBrowserDatasetSelection(selection)) {
+      return browserLocalAnalyticsService.overview(selection, filters, options);
+    }
     const query = dashboardQuery(selection, filters);
     query.set("grain", options.grain);
     query.set("dimension", options.dimension);
@@ -69,6 +74,9 @@ export const dashboardApi = {
     options: DashboardOrderOptions,
     signal?: AbortSignal,
   ) => {
+    if (hasBrowserDatasetSelection(selection)) {
+      return browserLocalAnalyticsService.orders(selection, filters, options);
+    }
     const query = dashboardQuery(selection, filters);
     query.set("page", String(options.page));
     query.set("page_size", String(options.pageSize));
@@ -83,10 +91,36 @@ export const dashboardApi = {
     selection: DatasetSelection,
     filters: DashboardFilters,
     options: Pick<DashboardOrderOptions, "sortBy" | "sortDirection">,
-  ) => {
+  ): string => {
+    if (hasBrowserDatasetSelection(selection)) return "";
     const query = dashboardQuery(selection, filters);
     query.set("sort_by", options.sortBy);
     query.set("sort_direction", options.sortDirection);
     return apiDownloadUrl(`/api/dashboard/orders.csv?${query.toString()}`);
+  },
+  downloadOrdersCsv: async (
+    selection: DatasetSelection,
+    filters: DashboardFilters,
+    options: Pick<DashboardOrderOptions, "sortBy" | "sortDirection">,
+  ): Promise<void> => {
+    const remoteUrl = dashboardApi.ordersCsvUrl(selection, filters, options);
+    const link = document.createElement("a");
+    if (remoteUrl) {
+      link.href = remoteUrl;
+    } else {
+      const content = await browserLocalAnalyticsService.ordersCsv(
+        selection,
+        filters,
+        options,
+      );
+      link.href = URL.createObjectURL(
+        new Blob([content], { type: "text/csv;charset=utf-8" }),
+      );
+      link.download = "fulfilllens-order-details.csv";
+    }
+    document.body.append(link);
+    link.click();
+    link.remove();
+    if (!remoteUrl) URL.revokeObjectURL(link.href);
   },
 };

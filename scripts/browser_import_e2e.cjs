@@ -174,6 +174,13 @@ async function ignoreSource(page, source) {
 }
 
 async function resolveMapping(page, options = {}) {
+  const recommended = page.getByRole("button", {
+    name: /一键应用推荐映射（[1-9]\d*）/,
+  });
+  if ((await recommended.count()) > 0 && (await recommended.isEnabled())) {
+    await recommended.click();
+    await page.getByText(/已应用 \d+ 个推荐映射/).waitFor();
+  }
   while ((await page.getByRole("button", { name: "确认建议" }).count()) > 0) {
     await page.getByRole("button", { name: "确认建议" }).first().click();
   }
@@ -311,6 +318,39 @@ async function runImport(page, filePath, sheetName) {
     }
     records.push({ scenario: "nonstandard-csv", passed: true });
     records.push({ scenario: "ignored-field-excluded", passed: true });
+    await page.getByRole("link", { name: "前往分析总览" }).click();
+    await page.getByRole("heading", { name: "分析总览" }).waitFor();
+    try {
+      await page.getByText("行动建议", { exact: true }).waitFor();
+    } catch (error) {
+      throw new Error(
+        `Browser-local analytics did not render recommendations. Visible text:\n${(
+          await page.locator("body").innerText()
+        ).slice(-5000)}`,
+        { cause: error },
+      );
+    }
+    await page
+      .getByRole("button", { name: "查看按时足量交付率（OTIF）定义" })
+      .click();
+    await page.getByText(/当前数据不足以计算 OTIF/).waitFor();
+    await page.keyboard.press("Escape");
+    await page.getByText("管理层简报", { exact: true }).click();
+    await page.getByText("最值得先处理的 3 件事", { exact: true }).waitFor();
+    records.push({ scenario: "browser-local-analysis-recommendations", passed: true });
+    await page.goto(`${baseUrl}/diagnostics`, { waitUntil: "networkidle" });
+    await page.getByRole("heading", { name: "异常诊断" }).waitFor();
+    await page.getByText(/只有事件数据/).first().waitFor();
+    records.push({ scenario: "browser-local-diagnostics", passed: true });
+    await page.goto(`${baseUrl}/reports`, { waitUntil: "networkidle" });
+    await page.getByRole("button", { name: "生成预览" }).click();
+    await page.getByText("两种视图使用同一组分析事实", { exact: true }).waitFor();
+    await page.getByText("管理层简报", { exact: true }).last().click();
+    await page
+      .getByText(/当前共形成 \d+ 项有数据依据的行动建议/)
+      .last()
+      .waitFor();
+    records.push({ scenario: "browser-local-report-recommendations", passed: true });
     await page.reload({ waitUntil: "networkidle" });
     await page.goto(`${baseUrl}/settings`, { waitUntil: "networkidle" });
     await page.getByText("浏览器本地导入", { exact: false }).first().waitFor();

@@ -91,7 +91,7 @@ export function DashboardMetricCards({ metrics }: DashboardMetricCardsProps) {
               />
             ) : null}
             <Typography.Paragraph>
-              此结果由后端统一指标引擎计算，页面未复制公式。分母只包含符合该指标口径且可计算的订单。
+              此结果由当前数据上下文的统一指标引擎计算，展示层未临时改写公式。分母只包含符合该指标口径且可计算的订单。
             </Typography.Paragraph>
             <Descriptions
               bordered

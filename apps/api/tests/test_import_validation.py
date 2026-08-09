@@ -174,3 +174,13 @@ def test_tracking_id_status_and_exception_normalization(tmp_path: Path) -> None:
     assert first.normalized_rows == second.normalized_rows
     assert "客户备注" not in first.normalized_rows[0]
     assert any(issue.code == "GENERIC_OR_UNKNOWN_EXCEPTION" for issue in first.report.issues)
+    assert not any(issue.source_column == "客户备注" for issue in first.report.issues)
+    resolutions = {
+        (item.target_field, item.status.value) for item in first.report.field_resolutions
+    }
+    assert ("tracking_event_id", "generated") in resolutions
+    assert ("event_code", "inferred") in resolutions
+    assert any(
+        item.source_column == "客户备注" and item.status.value == "ignored"
+        for item in first.report.field_resolutions
+    )

@@ -2035,75 +2035,244 @@ function reportContext(value: unknown) {
   return { request, selection, filters, orders };
 }
 
+function onlineRecommendationBundle(
+  metrics: Array<Record<string, unknown>>,
+  diagnostics: Array<Record<string, unknown>>,
+  orderCount: number,
+) {
+  const metric = (code: string) =>
+    metrics.find((item) => stringValue(item.code) === code);
+  const facts: Array<Record<string, unknown>> = [];
+  const otif = metric("otif_rate");
+  const otifValue = otif ? numberValue(otif.value, Number.NaN) : Number.NaN;
+  if (Number.isFinite(otifValue) && otifValue < 0.95) {
+    const denominator = numberValue(otif?.denominator, 0);
+    const numerator = numberValue(otif?.numerator, 0);
+    facts.push({
+      fact_id: "metric:otif",
+      topic: "otif",
+      priority: otifValue < 0.85 ? "high" : "medium",
+      priority_score: otifValue < 0.85 ? 82 : 62,
+      title: "按时足量交付仍有改善空间",
+      factual_observation: `OTIF 为 ${(otifValue * 100).toFixed(1)}%，分子/分母为 ${numerator}/${denominator}。`,
+      evidence: [
+        { label: "OTIF", value: `${(otifValue * 100).toFixed(1)}%` },
+        {
+          label: "未达成订单",
+          value: String(Math.max(0, denominator - numerator)),
+        },
+      ],
+      affected_order_count: Math.max(0, denominator - numerator),
+      coverage: numberValue(otif?.coverage, 0),
+      confidence_warning: [],
+      recommended_action: [
+        "分别核对 OT 与 IF 的失败订单，先处理贡献更高的一侧。",
+      ],
+      suggested_kpis: ["OTIF", "OT", "IF", "可计算覆盖率"],
+      suggested_target:
+        "先将 OTIF 稳定提升至接近 95%；正式目标需按线路和服务等级复核。",
+      risk: "样本结构或承诺口径变化时，指标变化不能直接归因于单一动作。",
+      next_validation: "按相同筛选与口径复算，并对比失败订单明细。",
+    });
+  }
+  diagnostics.slice(0, 3).forEach((item) => {
+    const affected = numberValue(item.affected_order_count, 0);
+    const severity = stringValue(item.severity, "medium");
+    facts.push({
+      fact_id: `diagnostic:${stringValue(item.rule_id)}:${stringValue(item.dimension_value, "all")}`,
+      topic: stringValue(item.category),
+      priority:
+        severity === "critical" || severity === "high"
+          ? "high"
+          : severity === "medium"
+            ? "medium"
+            : "watch",
+      priority_score:
+        severity === "critical"
+          ? 95
+          : severity === "high"
+            ? 82
+            : severity === "medium"
+              ? 62
+              : 42,
+      title: stringValue(item.title, "诊断发现"),
+      factual_observation: stringValue(item.factual_observation),
+      evidence: [
+        { label: "影响订单", value: `${affected} / ${orderCount}` },
+        { label: "样本量", value: String(numberValue(item.sample_size, 0)) },
+      ],
+      affected_order_count: affected,
+      coverage: numberValue(item.coverage, 0),
+      confidence_warning: Array.isArray(item.confidence_warning)
+        ? item.confidence_warning
+        : [],
+      recommended_action: Array.isArray(item.recommended_checks)
+        ? item.recommended_checks
+        : [],
+      suggested_kpis: ["受影响订单数", "规则覆盖率", "同类规则再次触发率"],
+      suggested_target:
+        "先减少高置信度规则覆盖的受影响订单；具体目标需用同口径基线确认。",
+      risk: "规则判断用于筛查而非责任认定，可能原因仍需核查。",
+      next_validation:
+        "复核订单级证据，并在相同时间窗与服务等级下重新运行规则。",
+    });
+  });
+  if (facts.length === 0) {
+    facts.push({
+      fact_id: "observe:stable",
+      topic: "overall",
+      priority: "watch",
+      priority_score: 30,
+      title: "当前未发现需要立即升级的主要问题",
+      factual_observation: "可计算指标和已启用规则未形成高优先级改善触发。",
+      evidence: [{ label: "有效订单", value: String(orderCount) }],
+      affected_order_count: 0,
+      coverage: 1,
+      confidence_warning: [],
+      recommended_action: ["保持当前口径，按固定周期复算并关注新出现的长尾。"],
+      suggested_kpis: ["OTIF", "P90 履约时长", "异常率"],
+      suggested_target: "保持核心指标稳定，并确保覆盖率不下降。",
+      risk: "小样本可能掩盖局部问题。",
+      next_validation: "下一周期使用相同口径复算。",
+    });
+  }
+  facts.sort(
+    (left, right) =>
+      numberValue(right.priority_score) - numberValue(left.priority_score),
+  );
+  const professional = facts.map((fact) => ({
+    fact_id: fact.fact_id,
+    priority: fact.priority,
+    problem_diagnosis: fact.title,
+    data_evidence: (
+      fact.evidence as Array<{ label: string; value: string }>
+    ).map((item) => `${item.label}：${item.value}`),
+    root_cause_judgement: `确定性规则支持上述数据判断；不能仅凭该结果认定经营因果。${stringValue(fact.risk)}`,
+    improvement_actions: fact.recommended_action,
+    impact_scope: `影响 ${numberValue(fact.affected_order_count, 0)} 个订单`,
+    suggested_kpis: fact.suggested_kpis,
+    suggested_target: fact.suggested_target,
+    risk: fact.risk,
+    next_validation: fact.next_validation,
+  }));
+  const top = facts.slice(0, 3);
+  return {
+    facts,
+    professional_action_plan: professional,
+    executive_brief: {
+      overall_conclusion: `当前形成 ${facts.length} 项有数据依据的行动建议。`,
+      major_findings: top.map((item) => stringValue(item.factual_observation)),
+      top_priorities: top.map((item) => ({
+        fact_id: item.fact_id,
+        priority: item.priority,
+        what_happened: item.title,
+        impact: `影响 ${numberValue(item.affected_order_count, 0)} 个订单。`,
+        action: Array.isArray(item.recommended_action)
+          ? item.recommended_action[0]
+          : "继续核查",
+        monitor: Array.isArray(item.suggested_kpis)
+          ? item.suggested_kpis.slice(0, 3).join("、")
+          : "覆盖率",
+      })),
+      expected_direction:
+        "优先处理高影响、高偏差且数据覆盖充分的问题，再复算同口径指标验证方向。",
+      monitor_metrics: [
+        ...new Set(
+          top.flatMap((item) =>
+            Array.isArray(item.suggested_kpis) ? item.suggested_kpis : [],
+          ),
+        ),
+      ].slice(0, 6),
+    },
+    definition_version: "recommendations-v1.0.0",
+    ai_used: false,
+    presentation_source: "deterministic_template",
+    privacy_note:
+      "仅使用聚合指标、诊断结果与匿名化证据生成；不需要原始 CSV 或个人信息。",
+  };
+}
+
 function reportDocument(value: unknown) {
   const { request, selection, filters, orders } = reportContext(value);
   const reportSections = Array.isArray(request.sections)
     ? request.sections.filter(
         (item): item is string => typeof item === "string",
       )
-    : ["executive_summary", "metrics_overview", "diagnostics"];
+    : [
+        "executive_summary",
+        "metrics_overview",
+        "diagnostics",
+        "recommendations",
+      ];
   const metrics = metricsFor(orders);
   const diagnostics = findingsFor(orders);
+  const recommendations = onlineRecommendationBundle(
+    metrics,
+    diagnostics,
+    orders.length,
+  );
   const sections = reportSections.map((code) => {
     const content =
       code === "metrics_overview"
         ? { metrics }
         : code === "diagnostics"
           ? { results: diagnostics }
-          : code === "trend"
-            ? {
-                groups: trendResponse(
-                  selection,
-                  orders,
-                  stringValue(request.trend_grain, "date"),
-                  filters.timezone,
-                ).groups,
-              }
-            : code === "node_duration"
-              ? { nodes: nodeSummary(orders) }
-              : code === "dimension_breakdown"
-                ? {
-                    groups: breakdownResponse(
-                      selection,
-                      orders,
-                      stringValue(request.breakdown_dimension, "carrier_id"),
-                    ).groups,
-                  }
-                : code === "order_samples"
+          : code === "recommendations"
+            ? recommendations
+            : code === "trend"
+              ? {
+                  groups: trendResponse(
+                    selection,
+                    orders,
+                    stringValue(request.trend_grain, "date"),
+                    filters.timezone,
+                  ).groups,
+                }
+              : code === "node_duration"
+                ? { nodes: nodeSummary(orders) }
+                : code === "dimension_breakdown"
                   ? {
-                      orders: orders
-                        .slice(
-                          0,
-                          Math.min(
-                            100,
-                            Math.max(
-                              1,
-                              numberValue(request.order_sample_limit, 12),
-                            ),
-                          ),
-                        )
-                        .map((order) => ({
-                          ...orderDetail(order),
-                          anomaly_types: order.anomaly_reasons,
-                        })),
+                      groups: breakdownResponse(
+                        selection,
+                        orders,
+                        stringValue(request.breakdown_dimension, "carrier_id"),
+                      ).groups,
                     }
-                  : code === "data_quality"
+                  : code === "order_samples"
                     ? {
-                        order_count: orders.length,
-                        valid_order_count: orders.length,
-                        data_coverage: 1,
-                        warning_count: 0,
-                        warnings: [],
+                        orders: orders
+                          .slice(
+                            0,
+                            Math.min(
+                              100,
+                              Math.max(
+                                1,
+                                numberValue(request.order_sample_limit, 12),
+                              ),
+                            ),
+                          )
+                          .map((order) => ({
+                            ...orderDetail(order),
+                            anomaly_types: order.anomaly_reasons,
+                          })),
                       }
-                    : code === "methods_limits"
+                    : code === "data_quality"
                       ? {
-                          items: [
-                            "在线版只处理公开合成数据。",
-                            "规则触发并不等于已确认根因。",
-                            "情景模拟不代表预测。",
-                          ],
+                          order_count: orders.length,
+                          valid_order_count: orders.length,
+                          data_coverage: 1,
+                          warning_count: 0,
+                          warnings: [],
                         }
-                      : {};
+                      : code === "methods_limits"
+                        ? {
+                            items: [
+                              "在线版只处理公开合成数据。",
+                              "规则触发并不等于已确认根因。",
+                              "情景模拟不代表预测。",
+                            ],
+                          }
+                        : {};
     return {
       code,
       title:
@@ -2111,6 +2280,7 @@ function reportDocument(value: unknown) {
           executive_summary: "执行摘要",
           metrics_overview: "指标总览",
           diagnostics: "透明诊断",
+          recommendations: "行动建议与管理层简报",
           trend: "时效趋势",
           node_duration: "节点耗时",
           dimension_breakdown: "维度对比",
@@ -2150,6 +2320,7 @@ function reportDocument(value: unknown) {
       `已加载 ${orders.length} 条公开合成履约订单。`,
       "在线分析、诊断与报告均不接收或保存真实订单数据。",
     ],
+    recommendations,
     sections,
     warnings: ["此报告为在线合成演示，不能作为真实业务决策依据。"],
     source_notes: ["数据源：Worker 内置的确定性合成案例。"],

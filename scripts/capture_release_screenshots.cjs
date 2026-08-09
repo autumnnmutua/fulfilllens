@@ -78,6 +78,24 @@ async function assertNoLegacyBrand(page) {
     await contextHeading.scrollIntoViewIfNeeded();
     await screenshotViewport(page, "dashboard-overview.png");
 
+    const recommendationCard = page
+      .locator(".ant-card")
+      .filter({ has: page.getByText("行动建议", { exact: true }) })
+      .first();
+    await recommendationCard.waitFor();
+    await recommendationCard.evaluate((element) =>
+      element.scrollIntoView({ block: "start" }),
+    );
+    await screenshotViewport(page, "professional-action-plan.png");
+    await recommendationCard.getByText("管理层简报", { exact: true }).click();
+    await recommendationCard
+      .getByText("最值得先处理的 3 件事", { exact: true })
+      .waitFor();
+    await recommendationCard.evaluate((element) =>
+      element.scrollIntoView({ block: "start" }),
+    );
+    await screenshotViewport(page, "executive-brief.png");
+
     await page.goto(`${baseUrl}/diagnostics`, { waitUntil: "networkidle" });
     await page.getByText("当前诊断上下文", { exact: true }).waitFor();
     const timelineButton = page

@@ -279,6 +279,14 @@ describe("浏览器本地 CSV/XLSX 导入", () => {
     expect(ignored.report.can_confirm).toBe(true);
     expect(ignored.report.ignored_source_columns).toEqual(["客服备注"]);
     expect(ignored.normalized_preview[0]).not.toHaveProperty("客服备注");
+    expect(
+      ignored.report.issues.some((issue) => issue.source_column === "客服备注"),
+    ).toBe(false);
+    expect(
+      ignored.report.field_resolutions.find(
+        (resolution) => resolution.source_column === "客服备注",
+      )?.status,
+    ).toBe("ignored");
 
     const orderSource = parsed.suggestions.find(
       (suggestion) => suggestion.suggested_field === "order_id",
@@ -298,8 +306,15 @@ describe("浏览器本地 CSV/XLSX 导入", () => {
     expect(
       requiredIgnored.report.issues.some(
         (issue) =>
-          issue.code === "INVALID_FIELD_MAPPING" &&
+          issue.code === "MISSING_REQUIRED_MAPPING" &&
           issue.message.includes("order_id"),
+      ),
+    ).toBe(true);
+    expect(
+      requiredIgnored.report.field_resolutions.some(
+        (resolution) =>
+          resolution.status === "blocking" &&
+          resolution.target_field === "order_id",
       ),
     ).toBe(true);
   });
@@ -373,10 +388,10 @@ describe("浏览器本地 CSV/XLSX 导入", () => {
 
     const mapping = mappingFrom(suggestions);
     const safe = findSafelyIgnorableColumns(suggestions, mapping, [], contract);
-    expect(safe).toEqual(expect.arrayContaining(["客户备注", "额外字段-营销"]));
-    expect(safe).not.toEqual(
-      expect.arrayContaining(["批次流水", "系统老码", "签收回传"]),
+    expect(safe).toEqual(
+      expect.arrayContaining(["批次流水", "客户备注", "额外字段-营销"]),
     );
+    expect(safe).not.toEqual(expect.arrayContaining(["系统老码", "签收回传"]));
   });
 
   it.each([

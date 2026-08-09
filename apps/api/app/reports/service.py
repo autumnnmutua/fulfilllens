@@ -14,6 +14,7 @@ from app.datasets.store import DatasetStore
 from app.diagnostics.models import DIAGNOSTIC_RULE_SET_VERSION, DiagnosticRequest
 from app.diagnostics.service import DiagnosticsService
 from app.metrics.models import DataWarning, MetricResult
+from app.recommendations.engine import build_recommendations
 from app.reports.models import (
     DEFAULT_REPORT_SECTIONS,
     CsvExportKind,
@@ -45,6 +46,7 @@ SECTION_TITLES = {
     "node_duration": "流程节点耗时与瓶颈",
     "dimension_breakdown": "问题集中在哪些业务维度",
     "diagnostics": "异常事实、规则判断与核查方向",
+    "recommendations": "行动建议与管理层简报",
     "order_samples": "可追溯订单样例",
     "simulation": "What-if 情景估算",
     "methods_limits": "建议核查、进一步问题与方法限制",
@@ -269,7 +271,9 @@ class ReportService:
         report_progress(8, "正在读取筛选一致的分析结果")
         overview, filtered_order_ids = self._overview(request)
 
-        needs_diagnostics = "diagnostics" in request.sections
+        needs_diagnostics = (
+            "diagnostics" in request.sections or "recommendations" in request.sections
+        )
         diagnostic = None
         if needs_diagnostics:
             _check_cancel(is_cancelled)
@@ -327,6 +331,7 @@ class ReportService:
             finding_count=finding_count,
             simulation=simulation,
         )
+        recommendations = build_recommendations(overview, diagnostic)
         sections: list[ReportSection] = []
         for code in DEFAULT_REPORT_SECTIONS:
             if code not in request.sections:
@@ -427,6 +432,23 @@ class ReportService:
                         warnings=(diagnostic.analysis_warnings if diagnostic is not None else []),
                     )
                 )
+            elif code == "recommendations":
+                sections.append(
+                    ReportSection(
+                        code=code,
+                        title=SECTION_TITLES[code],
+                        narrative=[
+                            "专业行动方案和管理层简报来自同一组确定性分析事实；"
+                            "AI 不参与核心指标、优先级或触发条件计算。"
+                        ],
+                        data=recommendations.model_dump(mode="json"),
+                        warnings=[
+                            warning
+                            for fact in recommendations.facts
+                            for warning in fact.confidence_warning
+                        ][:10],
+                    )
+                )
             elif code == "order_samples":
                 sections.append(
                     ReportSection(
@@ -494,6 +516,7 @@ class ReportService:
             f"指标来源：MetricsService / {overview.definition_version}",
             f"诊断来源：DiagnosticsService / {DIAGNOSTIC_RULE_SET_VERSION}",
             f"模拟来源：SimulationService / {SIMULATION_DEFINITION_VERSION}",
+            f"建议来源：RecommendationEngine / {recommendations.definition_version}",
             "筛选来源：DashboardFilters；报告、页面与 CSV 使用相同字段和时区。",
         ]
         chart_map = [
@@ -551,6 +574,7 @@ class ReportService:
             ),
             filters=request.filters,
             executive_summary=executive_summary,
+            recommendations=recommendations,
             sections=sections,
             warnings=list(dict.fromkeys(report_warnings)),
             source_notes=source_notes,

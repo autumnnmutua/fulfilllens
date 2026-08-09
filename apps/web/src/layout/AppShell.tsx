@@ -124,7 +124,7 @@ export function AppShell({ children }: PropsWithChildren) {
             </Tag>
             <Typography.Paragraph>
               {isCloudflareDeploy
-                ? "在线演示已开放合成案例、指标、诊断、情景模拟和报告；真实业务数据请使用本地或经授权的私有云版本。"
+                ? "合成案例可完整体验；自主文件留在浏览器内，可查看指标、诊断、行动建议和报告。"
                 : "数据导入、履约指标、透明诊断、情景模拟、教学案例和安全报告已开放。"}
             </Typography.Paragraph>
           </div>
@@ -145,7 +145,7 @@ export function AppShell({ children }: PropsWithChildren) {
           ) : null}
           {!isDesktop ? <Brand /> : <span />}
           <Space>
-            <Tag color="blue">v1.0.0-rc.5</Tag>
+            <Tag color="blue">v1.0.0</Tag>
           </Space>
         </Header>
 
@@ -156,8 +156,8 @@ export function AppShell({ children }: PropsWithChildren) {
                 className="prominent-alert"
                 type="info"
                 showIcon
-                message="Cloudflare 在线合成演示"
-                description="当前站点通过同源 Worker 提供合成案例、指标、透明诊断、情景模拟和报告。Workers AI 只在你确认后发送固定连接探针；本站不接收或保存真实订单、仓库事件、物流轨迹或个人信息。"
+                message="Cloudflare 在线版：合成演示与浏览器本地分析"
+                description="同源 Worker 提供合成案例；自主 CSV/XLSX 的解析、标准化、指标、诊断、行动建议和报告在当前浏览器完成，原始文件和标准化行不发送给 Worker。Workers AI 只在你确认后发送固定连接探针。"
               />
             ) : null}
             {children}

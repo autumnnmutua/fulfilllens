@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.dashboard.models import BreakdownDimension, DashboardFilters
 from app.metrics.models import DatasetSelection
+from app.recommendations.models import RecommendationBundle
 from app.simulation.models import ScenarioParameters
 
 REPORT_CONTRACT_VERSION = "report-v1.0.0"
@@ -20,6 +21,7 @@ ReportSectionCode = Literal[
     "node_duration",
     "dimension_breakdown",
     "diagnostics",
+    "recommendations",
     "order_samples",
     "simulation",
     "methods_limits",
@@ -49,6 +51,7 @@ DEFAULT_REPORT_SECTIONS: list[ReportSectionCode] = [
     "node_duration",
     "dimension_breakdown",
     "diagnostics",
+    "recommendations",
     "order_samples",
     "simulation",
     "methods_limits",
@@ -144,6 +147,7 @@ class ReportDocument(BaseModel):
     header: ReportHeader
     filters: DashboardFilters
     executive_summary: list[str]
+    recommendations: RecommendationBundle
     sections: list[ReportSection]
     warnings: list[str]
     source_notes: list[str]

@@ -36,7 +36,10 @@ import { PageHeader } from "../components/PageHeader";
 import { isCloudflareDeploy } from "../config/runtime";
 import { MAX_IMPORT_BYTES, validateFileBasics } from "../imports/parser";
 import { getImportContract } from "../imports/contracts";
-import { findSafelyIgnorableColumns } from "../imports/mapping";
+import {
+  findRecommendedMappingSources,
+  findSafelyIgnorableColumns,
+} from "../imports/mapping";
 import type {
   ConfirmResponse,
   CompatibilitySample,
@@ -289,6 +292,17 @@ export function ImportPage() {
           ),
     [dataType, ignoredSourceColumns, mapping, parsed],
   );
+  const recommendedMappingSources = useMemo(
+    () =>
+      parsed === null
+        ? []
+        : findRecommendedMappingSources(
+            parsed.suggestions,
+            mapping,
+            ignoredSourceColumns,
+          ).filter((source) => !manualSourceSet.has(source)),
+    [ignoredSourceColumns, manualSourceSet, mapping, parsed],
+  );
   const blockingMappingCount =
     mappingSummary.pendingConfirmation + mappingSummary.unresolved;
 
@@ -390,6 +404,22 @@ export function ImportPage() {
     notifications.showSuccess(
       `已忽略 ${columns.length} 个非分析字段`,
       "必填字段、关键语义候选和辅助解析字段均未被忽略。",
+    );
+  }
+
+  function applyRecommendedMappings() {
+    if (recommendedMappingSources.length === 0) return;
+    setManualSourceColumns((previous) => [
+      ...new Set([...previous, ...recommendedMappingSources]),
+    ]);
+    setIgnoredSourceColumns((previous) =>
+      previous.filter((column) => !recommendedMappingSources.includes(column)),
+    );
+    setLastBulkIgnored([]);
+    invalidateValidation("已应用高置信度推荐映射，需要运行最新质量校验。");
+    notifications.showSuccess(
+      `已应用 ${recommendedMappingSources.length} 个推荐映射`,
+      "系统只确认高置信度且无目标冲突的建议；低置信度字段仍需人工决定。",
     );
   }
 
@@ -729,6 +759,23 @@ export function ImportPage() {
     return <Tag color="blue">{suggestion.method}</Tag>;
   }
 
+  function applyIssueRecommendation(issue: QualityIssue) {
+    const source = issue.recommended_source_column;
+    const target = issue.target_field;
+    if (!source || !target) return;
+    setMapping((previous) => ({ ...previous, [source]: target }));
+    setIgnoredSourceColumns((previous) =>
+      previous.filter((column) => column !== source),
+    );
+    setManualSourceColumns((previous) => [...new Set([...previous, source])]);
+    invalidateValidation("已应用推荐修复，请复核后重新运行质量校验。");
+    setCurrent(4);
+    notifications.showSuccess(
+      "已应用推荐修复",
+      `已将“${source}”映射到 ${target}，请复核后重新校验。`,
+    );
+  }
+
   const qualityIssueColumns = [
     {
       title: "级别",
@@ -753,7 +800,22 @@ export function ImportPage() {
       key: "source_column",
       width: 140,
     },
-    { title: "问题", dataIndex: "message", key: "message", width: 260 },
+    {
+      title: "问题 / 原因 / 影响",
+      key: "message",
+      width: 360,
+      render: (_: unknown, issue: QualityIssue) => (
+        <Flex vertical gap={4}>
+          <Typography.Text strong>{issue.message}</Typography.Text>
+          {issue.cause ? (
+            <Typography.Text>原因：{issue.cause}</Typography.Text>
+          ) : null}
+          {issue.impact ? (
+            <Typography.Text>影响：{issue.impact}</Typography.Text>
+          ) : null}
+        </Flex>
+      ),
+    },
     {
       title: "原始值",
       dataIndex: "raw_value",
@@ -763,9 +825,21 @@ export function ImportPage() {
     },
     {
       title: "建议修复",
-      dataIndex: "suggestion",
       key: "suggestion",
       width: 260,
+      render: (_: unknown, issue: QualityIssue) => (
+        <Flex vertical gap={6} align="start">
+          <Typography.Text>{issue.suggestion}</Typography.Text>
+          {issue.action_label && issue.recommended_source_column ? (
+            <Button
+              size="small"
+              onClick={() => applyIssueRecommendation(issue)}
+            >
+              {issue.action_label}
+            </Button>
+          ) : null}
+        </Flex>
+      ),
     },
   ];
 
@@ -1245,6 +1319,14 @@ export function ImportPage() {
                 ))}
               </Row>
               <Flex gap="small" wrap>
+                <Tooltip title="只应用高置信度且没有目标冲突的字段建议；系统仍保留人工复核。">
+                  <Button
+                    disabled={recommendedMappingSources.length === 0}
+                    onClick={applyRecommendedMappings}
+                  >
+                    一键应用推荐映射（{recommendedMappingSources.length}）
+                  </Button>
+                </Tooltip>
                 <Tooltip title="仅忽略不影响当前数据类型和后续分析的未处理字段">
                   <Button
                     disabled={safelyIgnorableColumns.length === 0}
@@ -1486,6 +1568,38 @@ export function ImportPage() {
                   size="small"
                 />
               </Card>
+              <Card title="字段处理状态" size="small">
+                <Flex gap="small" wrap>
+                  {(
+                    [
+                      "mapped",
+                      "generated",
+                      "inferred",
+                      "ignored",
+                      "unresolved",
+                      "blocking",
+                    ] as const
+                  ).map((status) => (
+                    <Tag
+                      key={status}
+                      color={
+                        status === "blocking"
+                          ? "red"
+                          : status === "unresolved"
+                            ? "orange"
+                            : undefined
+                      }
+                    >
+                      {status}：
+                      {
+                        validation.report.field_resolutions.filter(
+                          (item) => item.status === status,
+                        ).length
+                      }
+                    </Tag>
+                  ))}
+                </Flex>
+              </Card>
               <Flex gap="small" wrap>
                 <Button onClick={() => setCurrent(4)}>返回修改映射</Button>
                 <Button
@@ -1563,21 +1677,13 @@ export function ImportPage() {
                 }
                 subTitle={
                   confirmed.dataset_id.startsWith("browser-local-")
-                    ? `已在浏览器 IndexedDB 保存 ${confirmed.imported_rows} 行标准化数据；原始文件没有上传，建议继续导入同一业务范围的关联表。`
+                    ? `已在浏览器 IndexedDB 保存 ${confirmed.imported_rows} 行标准化数据；原始文件没有上传。可以立即分析当前可用信息，缺少订单表时 OT、IF、OTIF 会明确显示不可计算。`
                     : `数据集 ${confirmed.dataset_id} 已导入 ${confirmed.imported_rows} 行；可前往“分析总览”计算指标。`
                 }
                 extra={[
-                  ...(confirmed.dataset_id.startsWith("browser-local-")
-                    ? []
-                    : [
-                        <Button
-                          key="analytics"
-                          type="primary"
-                          href="/analytics"
-                        >
-                          前往分析总览
-                        </Button>,
-                      ]),
+                  <Button key="analytics" type="primary" href="/analytics">
+                    前往分析总览
+                  </Button>,
                   <Button key="again" onClick={() => void handleCancel()}>
                     导入另一份数据
                   </Button>,

@@ -26,6 +26,8 @@ import { DashboardContextBar } from "../components/dashboard/DashboardContextBar
 import { DashboardFiltersPanel } from "../components/dashboard/DashboardFiltersPanel";
 import { DashboardMetricCards } from "../components/dashboard/DashboardMetricCards";
 import { DashboardOrderList } from "../components/dashboard/DashboardOrderList";
+import { RecommendationPanel } from "../components/recommendations/RecommendationPanel";
+import { buildClientRecommendations } from "../analysis/recommendations";
 import {
   formatHours,
   formatMetricValue,
@@ -35,7 +37,7 @@ import {
 import { EChart, type EChartOption } from "../components/EChart";
 import { useNotifications } from "../components/notification-context";
 import { PageHeader } from "../components/PageHeader";
-import { onlineDemoDatasetId } from "../config/runtime";
+import { initialAnalysisDataset } from "../analysis/browserSelection";
 import type {
   BreakdownDimension,
   BreakdownSort,
@@ -85,15 +87,7 @@ const breakdownMetricLabels: Record<BreakdownSort, string> = {
 };
 
 function initialDataset(dataType: string): string {
-  const parameter = `${dataType}_dataset_id`;
-  const fromUrl = new URLSearchParams(window.location.search)
-    .get(parameter)
-    ?.trim();
-  return (
-    fromUrl ||
-    window.localStorage.getItem(`fulfilllens.dataset.${dataType}`) ||
-    onlineDemoDatasetId(dataType)
-  );
+  return initialAnalysisDataset(dataType);
 }
 
 function errorMessage(error: unknown): string {
@@ -444,17 +438,15 @@ export function AnalyticsPage() {
   };
 
   const bottleneck = overview?.nodes.find((node) => node.is_bottleneck);
-  const csvUrl = dashboardApi.ordersCsvUrl(
-    selection,
-    appliedFilters,
-    orderOptions,
+  const recommendations = useMemo(
+    () => (overview ? buildClientRecommendations(overview) : null),
+    [overview],
   );
-
   return (
     <>
       <PageHeader
         title="分析总览"
-        description="用一致筛选回答整体表现、问题位置和需核查订单；所有数值来自后端统一指标引擎。"
+        description="用一致筛选回答整体表现、问题位置和需核查订单；服务端与浏览器本地数据均使用统一、可追溯的指标口径。"
       />
       <Alert
         className="prominent-alert"
@@ -818,9 +810,19 @@ export function AnalyticsPage() {
             </>
           )}
 
+          {recommendations ? (
+            <RecommendationPanel bundle={recommendations} />
+          ) : null}
+
           <DashboardOrderList
             busy={ordersBusy}
-            csvUrl={csvUrl}
+            onExportCsv={() =>
+              dashboardApi.downloadOrdersCsv(
+                selection,
+                appliedFilters,
+                orderOptions,
+              )
+            }
             data={orders}
             selection={selection}
             sortBy={orderOptions.sortBy}
