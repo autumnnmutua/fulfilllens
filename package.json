@@ -1,6 +1,6 @@
 {
   "name": "fulfilllens-cn",
-  "version": "1.0.0-rc.1",
+  "version": "1.0.0-rc.2",
   "private": true,
   "license": "MIT",
   "description": "FulfillLens CN 本地优先履约分析工具",
@@ -42,6 +42,7 @@
     "test:web": "npm run test --workspace @fulfilllens/web",
     "test:api": "python -m pytest apps/api/tests tests",
     "test:cloudflare": "npm run test --workspace @fulfilllens/cloudflare-worker",
+    "test:browser": "node scripts/chromium_accessibility_audit.cjs",
     "demo:import": "python scripts/demo_import.py",
     "demo:metrics": "python scripts/demo_metrics.py",
     "demo:dashboard": "python scripts/demo_dashboard.py",

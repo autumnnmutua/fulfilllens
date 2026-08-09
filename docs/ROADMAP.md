@@ -93,7 +93,7 @@
 ## 阶段 10：专项测试、安全、性能与可访问性
 
 - 依赖：阶段 2–9 的全部 MVP 能力基本完成。
-- 当前状态：已完成数据清理、首次使用者解释、三条端到端流程、依赖/输入/导出安全复验、三档 Chromium + axe 审计，以及 1 万/5 万单性能基线；Docker 实机烟雾测试因当前机器没有 Docker 未执行，Firefox/Safari 未验证。
+- 当前状态：已完成数据清理、首次使用者解释、三条端到端流程、依赖/输入/导出安全复验、三档 Chromium + axe 审计，以及 1 万/5 万单性能基线；阶段 10 当时缺少 Docker，现已在阶段 12 的 Windows 重启后实机复验中补齐。Firefox/Safari 未验证。
 - 阶段成果：测试矩阵、缺陷修复、性能基线、安全与隐私检查、移动端和可访问性改进。
 - 验收重点：全量检查真实通过；目标数据规模下无明显卡死或失控；不存在高严重度安全问题和被跳过的关键测试。
 - 建议提交：`test: harden quality security performance and a11y`
@@ -101,7 +101,7 @@
 ## 阶段 11：开源文档与 GitHub 发布准备
 
 - 依赖：阶段 10 的本机质量门禁通过；Docker 与跨浏览器保留为明确的阶段 12 发布验收项。
-- 当前状态：已完成中英文 README、MIT 与依赖许可审查、贡献/安全/行为准则、FAQ/故障排查、Issue/PR 模板、`1.0.0-rc.1` 发布说明、截图清单、文档/隐私/许可证检查；GitHub 公开远程、首次推送、Private Vulnerability Reporting、质量/Docker smoke 首次实跑和 Cloudflare 受限在线预览均已完成，标签和 Release 仍待阶段 12 决定。
+- 当前状态：已完成中英文 README、MIT 与依赖许可审查、贡献/安全/行为准则、FAQ/故障排查、Issue/PR 模板、截图清单、文档/隐私/许可证检查；GitHub 公开远程、Private Vulnerability Reporting、质量/Docker smoke 和 Cloudflare 合成在线演示均已完成。
 - 阶段成果：中英文 README、许可证、贡献/安全/行为准则、Issue/PR 模板、变更日志、发布候选说明和发布前 CI。
 - 验收重点：陌生用户可按真实命令在 10 分钟内载入示例；依赖许可证兼容；仓库无敏感信息和本地产物。
 - 建议提交：`docs: prepare open-source release assets`
@@ -112,6 +112,7 @@
 - 阶段成果：全流程复验、人工复算、最终缺陷修复、`docs/RELEASE_ACCEPTANCE.md` 和明确发布结论。
 - 验收重点：干净环境安装、三套案例端到端、全量质量命令、安全隐私和文档一致性；任何阻断项必须如实阻止发布。
 - 建议提交：`release: prepare fulfilllens-cn v1.0.0`
+- 当前状态：`1.0.0-rc.2` 已完成本机全量验收；最终发布以相同提交上的 GitHub Actions 成功结果为准。
 
 ## 提交与回滚约定
 

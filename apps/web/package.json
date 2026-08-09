@@ -1,6 +1,6 @@
 {
   "name": "@fulfilllens/web",
-  "version": "1.0.0-rc.1",
+  "version": "1.0.0-rc.2",
   "private": true,
   "license": "MIT",
   "type": "module",
@@ -42,6 +42,7 @@
     "eslint-plugin-react-refresh": "0.5.3",
     "globals": "17.8.0",
     "jsdom": "30.0.1",
+    "playwright": "1.62.1",
     "prettier": "3.9.6",
     "typescript": "5.9.3",
     "typescript-eslint": "8.65.0",

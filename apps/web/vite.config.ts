@@ -35,19 +35,16 @@ export default defineConfig(({ mode }) => ({
     rolldownOptions: {
       output: {
         codeSplitting: {
-          maxSize: 450_000,
           groups: [
             {
               name: "echarts",
               test: /node_modules[\\/]echarts/,
               priority: 30,
-              maxSize: 400_000,
             },
             {
               name: "antd",
               test: /node_modules[\\/](?:antd|@ant-design|rc-)/,
               priority: 20,
-              maxSize: 450_000,
             },
             {
               name: "react",
@@ -58,7 +55,6 @@ export default defineConfig(({ mode }) => ({
               name: "vendor",
               test: /node_modules/,
               priority: 1,
-              maxSize: 400_000,
             },
           ],
         },

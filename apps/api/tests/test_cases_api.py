@@ -6,6 +6,9 @@ from typing import Any
 import pytest
 from app.cases.generator import CASE_CONFIGS
 from app.cases.models import CaseId
+from app.cases.service import CaseService
+from app.core.errors import AppError
+from app.datasets.store import DatasetStore
 from fastapi.testclient import TestClient
 
 CASE_ROOT = Path(__file__).resolve().parents[3] / "data" / "cases"
@@ -78,6 +81,49 @@ def test_case_catalog_download_and_one_click_load(client: TestClient) -> None:
         next(item for item in summary.json()["metrics"] if item["code"] == "order_count")["value"]
         == 240
     )
+
+
+def test_case_load_missing_metadata_does_not_leave_datasets(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    before = client.get("/api/datasets").json()["datasets"]
+
+    def missing_metadata(_case_id: CaseId) -> None:
+        raise AppError(
+            code="CASE_ARTIFACT_MISSING",
+            message="synthetic missing metadata",
+            status_code=500,
+        )
+
+    monkeypatch.setattr(CaseService, "_metadata", staticmethod(missing_metadata))
+    response = client.post("/api/cases/normal_operations/load")
+
+    assert response.status_code == 500
+    assert response.json()["error"]["code"] == "CASE_ARTIFACT_MISSING"
+    assert client.get("/api/datasets").json()["datasets"] == before
+
+
+def test_case_load_rolls_back_when_dataset_registration_fails(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    before = client.get("/api/datasets").json()["datasets"]
+    original_register = DatasetStore.register
+    calls = 0
+
+    def fail_second_registration(self: DatasetStore, **kwargs: Any):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise RuntimeError("synthetic registration failure")
+        return original_register(self, **kwargs)
+
+    monkeypatch.setattr(DatasetStore, "register", fail_second_registration)
+    with pytest.raises(RuntimeError, match="synthetic registration failure"):
+        client.post("/api/cases/normal_operations/load")
+
+    assert client.get("/api/datasets").json()["datasets"] == before
 
 
 @pytest.mark.parametrize("case_id", list(CaseId))

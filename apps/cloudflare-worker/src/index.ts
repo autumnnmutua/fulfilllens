@@ -1,4 +1,6 @@
-const APP_VERSION = "1.0.0-rc.1";
+import { handleOnlineDemoApi } from "./online-demo";
+
+const APP_VERSION = "1.0.0-rc.2";
 const API_VERSION = "v1";
 const MODEL = "@cf/meta/llama-3.1-8b-instruct-fast";
 const PROBE_SENTINEL = "FULFILLLENS_WORKERS_AI_OK";
@@ -118,10 +120,10 @@ async function probeWorkersAI(request: Request, env: Env): Promise<Response> {
   }
 }
 
-function apiResponse(
+async function apiResponse(
   request: Request,
   env: Env,
-): Response | Promise<Response> | null {
+): Promise<Response | null> {
   const url = new URL(request.url);
   if (request.method === "GET" && url.pathname === "/health") {
     return jsonResponse({
@@ -135,7 +137,7 @@ function apiResponse(
       app_name: "FulfillLens CN",
       app_version: APP_VERSION,
       api_version: API_VERSION,
-      environment: "cloudflare-preview",
+      environment: "cloudflare-online-demo",
       contract_versions: {
         data: "1.0.0",
         metrics: "1.1.0",
@@ -157,7 +159,7 @@ function apiResponse(
       configured: true,
       model: MODEL,
       external_data_policy:
-        "原生 AI 绑定；仅在用户确认后发送固定合成探针，不发送业务数据或个人信息。",
+        "原生 AI 绑定；在线演示只处理公开合成数据。Workers AI 探针仅在用户确认后发送固定短句，不发送业务数据或个人信息。",
     });
   }
   if (
@@ -166,14 +168,18 @@ function apiResponse(
   ) {
     return probeWorkersAI(request, env);
   }
-  if (request.method === "GET" && url.pathname === "/api/datasets") {
-    return jsonResponse({ datasets: [], total: 0 });
+  const onlineDemoResponse = await handleOnlineDemoApi(request, url, {
+    json: jsonResponse,
+    error: errorResponse,
+  });
+  if (onlineDemoResponse !== null) {
+    return onlineDemoResponse;
   }
   if (url.pathname.startsWith("/api/")) {
     return errorResponse(
-      "CLOUD_PREVIEW_LOCAL_API_REQUIRED",
-      "此在线预览未保存订单数据；导入、指标、诊断、模拟和报告请使用本地或 Docker 完整版。",
-      501,
+      "ONLINE_DEMO_API_NOT_FOUND",
+      "该在线演示接口不存在。",
+      404,
     );
   }
   return null;
@@ -198,7 +204,7 @@ function withAssetSecurityHeaders(response: Response): Response {
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    const handled = apiResponse(request, env);
+    const handled = await apiResponse(request, env);
     if (handled !== null) {
       return handled;
     }

@@ -244,12 +244,21 @@ export function SettingsPage() {
         )}
       </Card>
 
-      <Card title="本地数据与隐私清理" className="section-card">
+      <Card
+        title={isCloudflareDeploy ? "在线合成数据" : "本地数据与隐私清理"}
+        className="section-card"
+      >
         <Alert
           type="warning"
           showIcon
-          message="删除后无法恢复"
-          description="清理会删除分析库中的数据行、关联模拟方案、内存报告和可识别的导入任务文件。请先导出确实需要保留的结果。"
+          message={
+            isCloudflareDeploy ? "在线案例为只读公开数据" : "删除后无法恢复"
+          }
+          description={
+            isCloudflareDeploy
+              ? "这里列出的数据集由 Worker 内置生成，任何访客都可以重新加载；它们不包含真实订单或个人信息，也无需删除。"
+              : "清理会删除分析库中的数据行、关联模拟方案、内存报告和可识别的导入任务文件。请先导出确实需要保留的结果。"
+          }
         />
         {datasetsLoading ? (
           <Spin tip="正在读取本地数据清单" />
@@ -259,16 +268,20 @@ export function SettingsPage() {
             dataSource={datasets}
             renderItem={(dataset) => (
               <List.Item
-                actions={[
-                  <Button
-                    danger
-                    key="delete"
-                    loading={deleting === dataset.dataset_id}
-                    onClick={() => setPendingDelete(dataset)}
-                  >
-                    清理此数据集
-                  </Button>,
-                ]}
+                actions={
+                  isCloudflareDeploy
+                    ? []
+                    : [
+                        <Button
+                          danger
+                          key="delete"
+                          loading={deleting === dataset.dataset_id}
+                          onClick={() => setPendingDelete(dataset)}
+                        >
+                          清理此数据集
+                        </Button>,
+                      ]
+                }
               >
                 <List.Item.Meta
                   title={`${DATA_TYPE_LABELS[dataset.data_type]} · ${dataset.row_count.toLocaleString("zh-CN")} 行`}

@@ -34,6 +34,7 @@ import { reportsApi } from "../api/reports";
 import { simulationApi } from "../api/simulation";
 import { useNotifications } from "../components/notification-context";
 import { PageHeader } from "../components/PageHeader";
+import { onlineDemoDatasetId } from "../config/runtime";
 import type { DashboardFilters } from "../types/dashboard";
 import type { DatasetSelection } from "../types/metrics";
 import type {
@@ -96,7 +97,7 @@ function datasetId(key: string): string {
   return (
     fromUrl ??
     window.localStorage.getItem(`fulfilllens.dataset.${key}`)?.trim() ??
-    ""
+    onlineDemoDatasetId(key)
   );
 }
 

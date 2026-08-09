@@ -158,10 +158,10 @@ export function HomePage() {
         <div className="principle-grid">
           <PrincipleCard
             icon={<DatabaseOutlined />}
-            title={isCloudflareDeploy ? "本地分析为主" : "本地分析"}
+            title={isCloudflareDeploy ? "在线合成案例" : "本地分析"}
             description={
               isCloudflareDeploy
-                ? "此在线预览不接收业务数据；完整导入和分析仍在用户本机或本机 Docker 中完成。"
+                ? "在线版默认加载公开合成数据，可直接完成分析、诊断、模拟和报告；不会接收或保存真实业务数据。"
                 : "浏览器连接本机 API；当前版本没有云端上传、账号或外部数据库。"
             }
           />
@@ -180,7 +180,7 @@ export function HomePage() {
 
       <section aria-labelledby="system-status-title">
         <Typography.Title id="system-status-title" level={2}>
-          {isCloudflareDeploy ? "在线预览状态" : "本地服务状态"}
+          {isCloudflareDeploy ? "在线服务状态" : "本地服务状态"}
         </Typography.Title>
         <Card className="section-card">
           {status.kind === "loading" ? (
@@ -205,8 +205,8 @@ export function HomePage() {
                 {status.version.api_version}
               </Descriptions.Item>
               <Descriptions.Item label="运行环境">
-                {status.version.environment === "cloudflare-preview"
-                  ? "Cloudflare 在线预览"
+                {status.version.environment === "cloudflare-online-demo"
+                  ? "Cloudflare 在线合成演示"
                   : status.version.environment}
               </Descriptions.Item>
               <Descriptions.Item label="指标定义">

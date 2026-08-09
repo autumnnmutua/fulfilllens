@@ -33,6 +33,7 @@ import { diagnosticsApi } from "../api/diagnostics";
 import { EChart, type EChartOption } from "../components/EChart";
 import { useNotifications } from "../components/notification-context";
 import { PageHeader } from "../components/PageHeader";
+import { onlineDemoDatasetId } from "../config/runtime";
 import type {
   DiagnosticAnalysis,
   DiagnosticCategory,
@@ -85,7 +86,7 @@ function initialDataset(dataType: string): string {
   return (
     fromUrl ||
     window.localStorage.getItem(`fulfilllens.dataset.${dataType}`) ||
-    ""
+    onlineDemoDatasetId(dataType)
   );
 }
 

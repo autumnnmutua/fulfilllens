@@ -85,6 +85,15 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v4
 
+      - name: 配置 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: 安装浏览器审计依赖
+        run: npm ci
+
       - name: 检查 Compose 配置
         run: docker compose config --quiet
 
@@ -104,6 +113,20 @@ jobs:
           done
           docker compose ps
           exit 1
+
+      - name: 审计生产网页、移动端与可访问性
+        shell: bash
+        run: |
+          FL_CHROMIUM_PATH="$(command -v google-chrome)" \
+          FL_WEB_URL="http://127.0.0.1:5173" \
+          FL_AUDIT_OUTPUT="${RUNNER_TEMP}/chromium-audit-results.json" \
+          npm run test:browser
+
+      - name: 验证容器运行期只读资产
+        run: |
+          curl --fail --silent http://127.0.0.1:8000/api/version >/dev/null
+          curl --fail --silent http://127.0.0.1:8000/api/cases >/dev/null
+          curl --fail --silent http://127.0.0.1:8000/api/diagnostics/rules >/dev/null
 
       - name: 输出脱敏启动日志
         if: always()

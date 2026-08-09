@@ -35,6 +35,7 @@ import {
 import { EChart, type EChartOption } from "../components/EChart";
 import { useNotifications } from "../components/notification-context";
 import { PageHeader } from "../components/PageHeader";
+import { onlineDemoDatasetId } from "../config/runtime";
 import type {
   BreakdownDimension,
   BreakdownSort,
@@ -91,7 +92,7 @@ function initialDataset(dataType: string): string {
   return (
     fromUrl ||
     window.localStorage.getItem(`fulfilllens.dataset.${dataType}`) ||
-    ""
+    onlineDemoDatasetId(dataType)
   );
 }
 

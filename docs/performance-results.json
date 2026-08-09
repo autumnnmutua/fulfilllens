@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-02T00:15:51.944489+08:00",
+  "generated_at": "2026-08-08T16:16:54.159555+08:00",
   "environment": {
     "platform": "Windows-11-10.0.26200-SP0",
     "python": "3.13.14",
@@ -28,15 +28,15 @@
       "finding_count": 3,
       "export_bytes": 15709,
       "timings": {
-        "synthetic_generation_seconds": 0.123,
-        "csv_parse_seconds": 0.067,
-        "dataset_import_seconds": 0.442,
-        "metrics_seconds": 0.817,
-        "diagnostics_seconds": 1.496,
-        "simulation_seconds": 3.153,
-        "html_export_seconds": 2.743
+        "synthetic_generation_seconds": 0.097,
+        "csv_parse_seconds": 0.055,
+        "dataset_import_seconds": 0.671,
+        "metrics_seconds": 0.84,
+        "diagnostics_seconds": 1.375,
+        "simulation_seconds": 2.975,
+        "html_export_seconds": 3.311
       },
-      "peak_rss_mib": 363.3
+      "peak_rss_mib": 365.0
     },
     {
       "order_count": 50000,
@@ -45,15 +45,15 @@
       "finding_count": 3,
       "export_bytes": 15715,
       "timings": {
-        "synthetic_generation_seconds": 0.557,
-        "csv_parse_seconds": 0.213,
-        "dataset_import_seconds": 1.172,
-        "metrics_seconds": 4.568,
-        "diagnostics_seconds": 8.928,
-        "simulation_seconds": 18.859,
-        "html_export_seconds": 17.971
+        "synthetic_generation_seconds": 0.677,
+        "csv_parse_seconds": 0.237,
+        "dataset_import_seconds": 1.271,
+        "metrics_seconds": 5.171,
+        "diagnostics_seconds": 10.445,
+        "simulation_seconds": 21.852,
+        "html_export_seconds": 21.844
       },
-      "peak_rss_mib": 1345.3
+      "peak_rss_mib": 1345.6
     }
   ]
 }

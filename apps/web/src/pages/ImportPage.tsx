@@ -30,6 +30,7 @@ import { importApi } from "../api/imports";
 import { ApiClientError } from "../api/client";
 import { useNotifications } from "../components/notification-context";
 import { PageHeader } from "../components/PageHeader";
+import { isCloudflareDeploy } from "../config/runtime";
 import type {
   ConfirmResponse,
   DataType,
@@ -374,15 +375,25 @@ export function ImportPage() {
     <>
       <PageHeader
         title="数据导入"
-        description="逐步导入订单、仓库作业或物流轨迹。系统会先预览、映射和校验，只有确认后才形成可分析数据集。"
+        description={
+          isCloudflareDeploy
+            ? "在线版可直接加载公开合成示例；真实订单、仓库作业和物流轨迹不会上传到此站点。"
+            : "逐步导入订单、仓库作业或物流轨迹。系统会先预览、映射和校验，只有确认后才形成可分析数据集。"
+        }
       />
 
       <Alert
         className="prominent-alert"
         showIcon
         type="info"
-        message="文件仅在本机处理"
-        description="限制为 CSV/XLSX，单文件最大 10 MiB；不执行宏与公式。姓名、手机号、详细地址和身份证等字段只提示风险，预览会脱敏。"
+        message={
+          isCloudflareDeploy ? "在线版不接收真实文件" : "文件仅在本机处理"
+        }
+        description={
+          isCloudflareDeploy
+            ? "请使用下方的合成案例完成完整操作流程。真实业务数据请使用本地版或经授权的私有云部署。"
+            : "限制为 CSV/XLSX，单文件最大 10 MiB；不执行宏与公式。姓名、手机号、详细地址和身份证等字段只提示风险，预览会脱敏。"
+        }
       />
 
       <Card className="section-card import-wizard">
@@ -429,8 +440,18 @@ export function ImportPage() {
                 ))}
               </Radio.Group>
               <Flex gap="small" wrap>
-                <Button type="primary" onClick={() => setCurrent(1)}>
-                  下一步：选择文件
+                <Button
+                  type="primary"
+                  loading={isCloudflareDeploy && busy}
+                  onClick={() => {
+                    if (isCloudflareDeploy) {
+                      void handleSynthetic();
+                      return;
+                    }
+                    setCurrent(1);
+                  }}
+                >
+                  {isCloudflareDeploy ? "加载在线合成示例" : "下一步：选择文件"}
                 </Button>
                 <Button
                   icon={<SafetyCertificateOutlined />}

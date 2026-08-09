@@ -76,7 +76,10 @@ function accessibleProblems() {
   let failed = false;
   try {
     for (const viewport of viewports) {
-      const context = await browser.newContext({ viewport });
+      // Axe is injected only inside this isolated audit context. Production CSP
+      // stays strict; bypassing it here prevents the test harness from being
+      // blocked by the application policy it is meant to inspect.
+      const context = await browser.newContext({ viewport, bypassCSP: true });
       const page = await context.newPage();
       for (const route of routes) {
         const response = await page.goto(`${baseUrl}${route}`, { waitUntil: "networkidle", timeout: 30000 });

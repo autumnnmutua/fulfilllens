@@ -6,7 +6,7 @@ FulfillLens CN is a local-first, open-source fulfillment analytics tool for logi
 
 The project is designed to make every percentage, anomaly, and scenario traceable to fields, formulas, thresholds, samples, and order-level evidence instead of generating a merely plausible story.
 
-> Version status: `1.0.0-rc.1` release candidate preparation. The Cloudflare online preview uses static assets, a same-origin Worker API, and a native Workers AI binding; complete data analysis remains local or Docker based. Firefox/Safari and PDF still have release-gate work; see [Project status](#project-status-and-known-limitations).
+> Version status: `1.0.0-rc.2` passed the Stage 12 full local acceptance. The Cloudflare online demo provides deterministic synthetic cases, same-origin Worker analysis APIs, and a native Workers AI binding; real business-data analysis remains local or Docker based. Firefox/Safari and PDF are known non-blocking limitations; see [Project status](#project-status-and-known-limitations).
 
 ## Why FulfillLens CN
 
@@ -170,11 +170,11 @@ docker compose down --volumes
 
 The last command is irreversible. A separate GitHub Actions Docker smoke job builds, starts, health-checks, and removes the Compose stack and its CI volume; local results are recorded in the current release evidence.
 
-## Cloudflare online preview
+## Cloudflare online demo
 
-Online preview: <https://fulfilllens-cn.esthertreu3724.workers.dev>
+Online URL: <https://fulfilllens-cn.esthertreu3724.workers.dev>
 
-The preview validates the React shell, same-origin health/version endpoints, and a fixed synthetic Workers AI probe. It does not accept orders, warehouse events, or tracking events. Import, metrics, diagnostics, simulation, and reports still require the local or Docker edition. `wrangler.jsonc` binds Workers AI as `AI`; the Account ID and API token never enter browser assets or the repository.
+The online edition loads public deterministic synthetic cases and supports the synthetic import, metrics, dashboard, transparent diagnostics, order-level What-if recalculation, and report flows. It does not accept or retain real orders, warehouse events, tracking events, or personal data. User-created online scenarios live only for the current Worker runtime and are not durable business storage; real files, the full DuckDB/SQLite pipeline, and durable scenarios still require the local or Docker edition. `wrangler.jsonc` binds Workers AI as `AI`; the Account ID and API token never enter browser assets or the repository.
 
 ```powershell
 npm.cmd run build:cloudflare
@@ -251,25 +251,24 @@ FastAPI + Pydantic ── domain services and transparent rules
 - `docs`: product, metrics, architecture, risks, teaching, and release materials;
 - `tests`: backend, frontend, contract, end-to-end, security, and performance verification.
 
-See [Architecture](docs/ARCHITECTURE.md) and [ADRs](docs/adr/README.md). The Cloudflare preview now has a separate Worker adapter; the current FastAPI/DuckDB/SQLite backend still cannot be deployed unchanged. See the [Cloudflare deployment and feasibility notes](docs/CLOUDFLARE_DEPLOYMENT.md).
+See [Architecture](docs/ARCHITECTURE.md) and [ADRs](docs/adr/README.md). The Cloudflare online demo has a separate Worker adapter that only processes public synthetic data; the current FastAPI/DuckDB/SQLite backend still cannot be deployed unchanged. See the [Cloudflare deployment and feasibility notes](docs/CLOUDFLARE_DEPLOYMENT.md).
 
 ## Project status and known limitations
 
-Stages 0–11 are complete for checks available in the current environment. Stage 12 performs final clean-environment acceptance. Current evidence includes:
+Stages 0–12 are complete for this release-candidate scope, including full local acceptance. Current evidence includes:
 
-- 22 frontend, 5 Cloudflare Worker, and 218 backend/contract tests;
+- 22 frontend, 13 Cloudflare Worker, and 220 backend/contract tests;
 - 10,000/50,000-order performance benchmarks;
 - eight routes at 360/768/1440 with Chromium and axe;
 - npm/Python vulnerability audits and repository secret scans;
-- the [first GitHub Actions run](https://github.com/autumnnmutua/fulfilllens-cn/actions/runs/31246519865) passed both the quality and Docker smoke jobs;
+- [GitHub Actions](https://github.com/autumnnmutua/fulfilllens-cn/actions) includes quality and real Docker smoke jobs; the release tag is governed by the actual result for its commit;
 - the public remote repository and Private Vulnerability Reporting are enabled.
 
-Release items still to confirm:
+Non-blocking release-candidate limitations:
 
-- local Docker Desktop engine verification after the pending Windows restart (the CI container path has passed);
 - Firefox and Safari;
 - PDF Chinese fonts, pagination, and long tables;
-- full Stage 12 verification from a clean clone.
+- complete Cloudflare business-data persistence, identity/authorization, and asynchronous large-file workflows.
 
 Reports and benchmarks are evidence for a specific revision, dataset, and machine—not guarantees for every hardware or business dataset.
 
@@ -281,7 +280,7 @@ Reports and benchmarks are evidence for a specific revision, dataset, and machin
 - Stage 11: bilingual open-source docs, license, governance templates, and RC assets;
 - Stage 12: clean-environment acceptance and the v1.0 release decision.
 
-See the [Roadmap](docs/ROADMAP.md) and [v1.0.0-rc.1 draft release notes](docs/releases/v1.0.0-rc.1.md).
+See the [Roadmap](docs/ROADMAP.md), [final acceptance record](docs/RELEASE_ACCEPTANCE.md), and [v1.0.0-rc.2 release notes](docs/releases/v1.0.0-rc.2.md).
 
 ## Privacy, security, and disclaimer
 

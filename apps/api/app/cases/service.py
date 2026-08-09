@@ -62,6 +62,7 @@ class CaseService:
         )
 
     def load(self, case_id: CaseId) -> CaseLoadResponse:
+        metadata = self._metadata(case_id)
         generated = generate_case(CASE_CONFIGS[case_id])
         errors = validate_generated_case(generated)
         if errors:
@@ -73,26 +74,42 @@ class CaseService:
         orders_id = str(uuid4())
         warehouse_id = str(uuid4())
         tracking_id = str(uuid4())
-        self.store.register(
-            dataset_id=orders_id,
-            data_type=DataType.ORDERS,
-            task_id=f"case:{case_id.value}:orders:{orders_id}",
-            rows=generated.orders,
+        registrations = (
+            (
+                orders_id,
+                DataType.ORDERS,
+                f"case:{case_id.value}:orders:{orders_id}",
+                generated.orders,
+            ),
+            (
+                warehouse_id,
+                DataType.WAREHOUSE_EVENTS,
+                f"case:{case_id.value}:warehouse:{warehouse_id}",
+                generated.warehouse_events,
+            ),
+            (
+                tracking_id,
+                DataType.TRACKING_EVENTS,
+                f"case:{case_id.value}:tracking:{tracking_id}",
+                generated.tracking_events,
+            ),
         )
-        self.store.register(
-            dataset_id=warehouse_id,
-            data_type=DataType.WAREHOUSE_EVENTS,
-            task_id=f"case:{case_id.value}:warehouse:{warehouse_id}",
-            rows=generated.warehouse_events,
-        )
-        self.store.register(
-            dataset_id=tracking_id,
-            data_type=DataType.TRACKING_EVENTS,
-            task_id=f"case:{case_id.value}:tracking:{tracking_id}",
-            rows=generated.tracking_events,
-        )
+        registered_ids: list[str] = []
+        try:
+            for dataset_id, data_type, task_id, rows in registrations:
+                self.store.register(
+                    dataset_id=dataset_id,
+                    data_type=data_type,
+                    task_id=task_id,
+                    rows=rows,
+                )
+                registered_ids.append(dataset_id)
+        except Exception:
+            for dataset_id in reversed(registered_ids):
+                self.store.delete(dataset_id)
+            raise
         return CaseLoadResponse(
-            case=self._metadata(case_id),
+            case=metadata,
             datasets=DatasetSelection(
                 orders_dataset_id=orders_id,
                 warehouse_events_dataset_id=warehouse_id,

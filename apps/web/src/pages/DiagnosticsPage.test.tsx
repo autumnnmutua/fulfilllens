@@ -206,7 +206,7 @@ describe("异常诊断页面", () => {
           response({
             status: "ok",
             service: "fulfilllens-api",
-            version: "1.0.0-rc.1",
+            version: "1.0.0-rc.2",
           }),
         );
       }
@@ -214,7 +214,7 @@ describe("异常诊断页面", () => {
         return Promise.resolve(
           response({
             app_name: "FulfillLens CN",
-            app_version: "1.0.0-rc.1",
+            app_version: "1.0.0-rc.2",
             api_version: "v1",
             environment: "test",
             contract_versions: {},

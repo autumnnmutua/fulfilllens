@@ -76,7 +76,7 @@ X-FulfillLens-External-Call: confirm
 
 ## 部署到 Cloudflare 时
 
-当前实现是本机 REST 探针。真正部署为 Worker 后应优先配置 Workers AI `AI` binding，
-由 Worker 调用 `env.AI.run()`，而不是把 Account ID/API Token 传到浏览器。FastAPI、
-DuckDB、SQLite、本地临时文件和大文件路径还需要迁移验证，不能把连通探针等同于云部署完成。
+Cloudflare 在线演示已经使用 Workers AI `AI` binding，由 Worker 调用 `env.AI.run()`，
+Account ID/API Token 不进入浏览器。当前模型仍只执行固定合成连通探针，不会自动点击网页、
+计算指标或替代透明诊断；FastAPI、DuckDB、SQLite、真实文件和持久云数据路径仍需单独迁移验证。
 详见 [Cloudflare 部署与 Workers AI 可行性评估](CLOUDFLARE_DEPLOYMENT.md)。

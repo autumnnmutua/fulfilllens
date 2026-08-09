@@ -32,7 +32,8 @@
 
 ## 发布资料
 
-- [v1.0.0-rc.1 发布说明草案](releases/v1.0.0-rc.1.md)
+- [v1.0.0-rc.2 发布说明](releases/v1.0.0-rc.2.md)
+- [阶段 12 最终验收](RELEASE_ACCEPTANCE.md)
 - [截图与 GIF 拍摄清单](SCREENSHOTS.md)
 - 根目录中的 `CHANGELOG.md`、`SECURITY.md`、`CONTRIBUTING.md`、`CODE_OF_CONDUCT.md` 和 `LICENSE`
 

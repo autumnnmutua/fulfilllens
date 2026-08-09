@@ -118,11 +118,11 @@ export function AppShell({ children }: PropsWithChildren) {
           <nav aria-label="主导航">{menu}</nav>
           <div className="sider-footer">
             <Tag color="blue">
-              {isCloudflareDeploy ? "Cloudflare 在线预览" : "本地优先"}
+              {isCloudflareDeploy ? "Cloudflare 在线演示" : "本地优先"}
             </Tag>
             <Typography.Paragraph>
               {isCloudflareDeploy
-                ? "在线预览验证界面与 Workers AI；业务数据分析请使用本地或 Docker 完整版。"
+                ? "在线演示已开放合成案例、指标、诊断、情景模拟和报告；真实业务数据请使用本地或经授权的私有云版本。"
                 : "数据导入、履约指标、透明诊断、情景模拟、教学案例和安全报告已开放。"}
             </Typography.Paragraph>
           </div>
@@ -143,7 +143,7 @@ export function AppShell({ children }: PropsWithChildren) {
           ) : null}
           {!isDesktop ? <Brand /> : <span />}
           <Space>
-            <Tag color="blue">v1.0.0-rc.1</Tag>
+            <Tag color="blue">v1.0.0-rc.2</Tag>
           </Space>
         </Header>
 
@@ -154,8 +154,8 @@ export function AppShell({ children }: PropsWithChildren) {
                 className="prominent-alert"
                 type="info"
                 showIcon
-                message="Cloudflare 在线预览"
-                description="当前站点已使用原生 Workers AI 绑定；只允许用户确认后的固定合成连接探针。导入、指标、诊断、模拟和报告仍由本地或 Docker 完整版处理，业务数据不会上传到此预览。"
+                message="Cloudflare 在线合成演示"
+                description="当前站点通过同源 Worker 提供合成案例、指标、透明诊断、情景模拟和报告。Workers AI 只在你确认后发送固定连接探针；本站不接收或保存真实订单、仓库事件、物流轨迹或个人信息。"
               />
             ) : null}
             {children}

@@ -31,6 +31,7 @@ import { ApiClientError } from "../api/client";
 import { simulationApi } from "../api/simulation";
 import { useNotifications } from "../components/notification-context";
 import { PageHeader } from "../components/PageHeader";
+import { onlineDemoDatasetId } from "../config/runtime";
 import type { DatasetSelection } from "../types/metrics";
 import type {
   BaselineResponse,
@@ -62,7 +63,9 @@ function initialDataset(key: string): string {
     .get(`${key}_dataset_id`)
     ?.trim();
   return (
-    fromUrl || window.localStorage.getItem(`fulfilllens.dataset.${key}`) || ""
+    fromUrl ||
+    window.localStorage.getItem(`fulfilllens.dataset.${key}`) ||
+    onlineDemoDatasetId(key)
   );
 }
 
@@ -571,9 +574,10 @@ export function ScenariosPage() {
       });
       setScenarios((current) =>
         current.map((item) =>
-          item.scenario_id === updated.scenario_id ? updated : item,
+          item.scenario_id === selectedId ? updated : item,
         ),
       );
+      setSelectedId(updated.scenario_id);
       notifications.showSuccess("方案已保存", "参数和名称已写入本地方案配置。");
       return updated;
     } catch (error) {

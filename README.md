@@ -6,7 +6,7 @@ FulfillLens CN 是面向物流管理专业学生、教师和中小电商商家�
 
 项目的核心不是“自动讲一个听起来合理的故事”，而是让每个百分比、异常和模拟结果都能回到字段、公式、阈值、样本和具体订单证据。
 
-> 版本状态：`1.0.0-rc.1` 发布候选准备中。Cloudflare 在线预览使用静态资源、同源 Worker API 与原生 Workers AI 绑定；完整数据分析仍以本地或 Docker 为主。Firefox/Safari 和 PDF 仍有发布前验收项，详见[项目状态](#项目状态与已知限制)。
+> 版本状态：`1.0.0-rc.2` 已通过阶段 12 本机全量验收。Cloudflare 在线演示提供确定性合成案例、同源 Worker 分析 API 与原生 Workers AI 绑定；真实业务数据分析仍以本地或 Docker 为主。Firefox/Safari 和 PDF 是已知非阻断限制，详见[项目状态](#项目状态与已知限制)。
 
 ## 为什么使用 FulfillLens CN
 
@@ -170,11 +170,11 @@ docker compose down --volumes
 
 最后一个命令不可恢复。GitHub Actions 的独立 Docker smoke job 会实际构建、启动、检查健康状态并清理数据卷；本机结果以当前发布验收记录为准。
 
-## Cloudflare 在线预览
+## Cloudflare 在线演示
 
-在线预览：<https://fulfilllens-cn.esthertreu3724.workers.dev>
+在线地址：<https://fulfilllens-cn.esthertreu3724.workers.dev>
 
-在线预览仅验证 React 页面壳、同源健康/版本接口和 Workers AI 固定合成探针。它不会接收订单、仓库事件或物流轨迹，导入、指标、诊断、模拟和报告仍需本地或 Docker 完整版。部署配置在 `wrangler.jsonc`，AI 通过 `AI` binding 调用，Account ID 和 API Token 不进入浏览器或仓库。
+在线版默认加载公开、确定性的合成案例，可体验合成导入、指标、总览、透明诊断、订单级 What-if 复算和报告，不接收或保存真实订单、仓库事件、物流轨迹及个人信息。自建在线方案只保存在 Worker 当前运行期，不是持久业务存储；真实文件、DuckDB/SQLite 完整分析和长期方案保存仍使用本地或 Docker。部署配置在 `wrangler.jsonc`，AI 通过 `AI` binding 调用，Account ID 和 API Token 不进入浏览器或仓库。
 
 ```powershell
 npm.cmd run build:cloudflare
@@ -251,25 +251,24 @@ FastAPI + Pydantic ── 领域服务与透明规则
 - `docs`：产品、口径、架构、风险、教学和发布资料；
 - `tests`：后端、前端、契约、端到端、安全和性能验证。
 
-完整说明见[架构文档](docs/ARCHITECTURE.md)和[ADR](docs/adr/README.md)。Cloudflare 在线预览已建立独立 Worker 适配层；当前 FastAPI/DuckDB/SQLite 后端仍不能零修改部署，见[部署与可行性说明](docs/CLOUDFLARE_DEPLOYMENT.md)。
+完整说明见[架构文档](docs/ARCHITECTURE.md)和[ADR](docs/adr/README.md)。Cloudflare 在线演示已建立只处理公开合成数据的独立 Worker 适配层；当前 FastAPI/DuckDB/SQLite 后端仍不能零修改部署，见[部署与可行性说明](docs/CLOUDFLARE_DEPLOYMENT.md)。
 
 ## 项目状态与已知限制
 
-阶段 0–11 已完成可在当前环境执行的内容；阶段 12 将进行最终全量验收。当前证据：
+阶段 0–12 已完成当前候选版本范围内的实现与全量验收。当前证据：
 
-- 前端 22 项、Cloudflare Worker 5 项、后端与契约 218 项测试；
+- 前端 22 项、Cloudflare Worker 13 项、后端与契约 220 项测试；
 - 1 万/5 万订单性能基准；
 - 8 个路由 × 360/768/1440 Chromium + axe 检查；
 - npm/Python 漏洞审计和敏感信息扫描；
-- [GitHub Actions 首次运行](https://github.com/autumnnmutua/fulfilllens-cn/actions/runs/31246519865)的质量与 Docker smoke job 全部成功；
+- [GitHub Actions](https://github.com/autumnnmutua/fulfilllens-cn/actions)包含质量与真实 Docker smoke job；发布标签以对应提交的实际成功结果为准；
 - 公开远程仓库与 Private Vulnerability Reporting 已启用。
 
-仍需发布前确认：
+候选版本的非阻断限制：
 
-- 本机 Windows 重启后复验 Docker Desktop 引擎（CI 容器路径已通过）；
 - Firefox/Safari；
 - PDF 中文字体、分页和长表；
-- 干净克隆后的阶段 12 完整验收。
+- Cloudflare 完整业务数据持久化、身份权限和异步大文件链路。
 
 报告和基准是特定代码、数据和机器条件下的证据，不是对所有硬件或业务数据的保证。
 
@@ -281,7 +280,7 @@ FastAPI + Pydantic ── 领域服务与透明规则
 - 阶段 11：中英文开源文档、许可证、治理模板和 RC 资料；
 - 阶段 12：干净环境全量验收与 v1.0 发布判断。
 
-详见[路线图](docs/ROADMAP.md)和[v1.0.0-rc.1 发布说明草案](docs/releases/v1.0.0-rc.1.md)。
+详见[路线图](docs/ROADMAP.md)、[最终验收记录](docs/RELEASE_ACCEPTANCE.md)和[v1.0.0-rc.2 发布说明](docs/releases/v1.0.0-rc.2.md)。
 
 ## 隐私、安全与免责声明
 
