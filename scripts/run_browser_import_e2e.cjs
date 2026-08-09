@@ -17,6 +17,7 @@ const commandArguments = isWindows
   : ["--yes", "wrangler@4.120.0", "dev", "--local", "--port", port];
 const server = spawn(command, commandArguments, {
   cwd: repoRoot,
+  detached: !isWindows,
   env: process.env,
   stdio: ["ignore", "pipe", "pipe"],
   windowsHide: true,
@@ -40,10 +41,24 @@ async function stopServer() {
       windowsHide: true,
       stdio: "ignore",
     });
-  } else {
-    server.kill("SIGTERM");
+  } else if (server.pid) {
+    try {
+      process.kill(-server.pid, "SIGTERM");
+    } catch {
+      // The process group may already have completed.
+    }
   }
   await delay(250);
+  if (!isWindows && server.exitCode === null && server.pid) {
+    try {
+      process.kill(-server.pid, "SIGKILL");
+    } catch {
+      // The process group may have exited after SIGTERM.
+    }
+  }
+  server.stdout.destroy();
+  server.stderr.destroy();
+  server.unref();
 }
 
 (async () => {

@@ -138,6 +138,7 @@ Dashboard 维度订单数与总体对账；订单级不可计算状态没有进�
 | 高     | 映射变更后旧校验结果可能与任务顶部状态冲突                         | 最新校验成为唯一确认来源；变更后回到待映射          | 状态单元测试与 Chrome 返回修改/重校验                |
 | 中     | 新增前端导入层存在 IndexedDB 泛型与 `unknown` 默认字符串化         | 明确 IDB 请求泛型并集中安全标量转换                 | ESLint 0 warning、TypeScript 构建通过                |
 | 高     | Web Docker 构建未复制浏览器导入依赖的 `data/schemas`               | 镜像构建阶段复制只读 Schema 与共享字段目录          | 首次失败后修复；重建、健康检查和 40 组合 Chrome 通过 |
+| 中     | Linux CI 只终止 Wrangler 的 `npx` 父进程，浏览器步骤完成后不退出   | 使用独立 Unix 进程组，SIGTERM 后保留 SIGKILL 兜底   | Windows E2E 重跑；GitHub 相同提交链路完成后方可发布  |
 
 ## 11. 已知非阻断事项
 
