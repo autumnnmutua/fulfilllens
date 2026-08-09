@@ -116,31 +116,42 @@ async function inspectMappingLayout(page, width) {
     );
   }
   await selectInput.click();
-  const popup = page.locator(".mapping-target-popup:visible").last();
-  await popup.waitFor();
-  await popup.waitFor({ state: "visible" });
-  await page.waitForFunction((selector) => {
-    const matches = [...document.querySelectorAll(selector)].filter(
-      (element) => element.getClientRects().length > 0,
-    );
-    return (matches.at(-1)?.getBoundingClientRect().width ?? 0) > 0;
-  }, ".mapping-target-popup");
-  const popupBox = await popup.boundingBox();
-  if (!popupBox || popupBox.width < minimum) {
+  const popupHandle = await page.waitForFunction(
+    ({ popupSelector, inputSelector, minimumWidth }) => {
+      const expanded = [...document.querySelectorAll(inputSelector)].some(
+        (element) => element.getAttribute("aria-expanded") === "true",
+      );
+      const candidates = [...document.querySelectorAll(popupSelector)]
+        .map((popup) => {
+          const option = popup.querySelector(".ant-select-item-option-content");
+          const popupBox = popup.getBoundingClientRect();
+          const optionBox = option?.getBoundingClientRect();
+          return {
+            popupWidth: popupBox.width,
+            optionHeight: optionBox?.height ?? 0,
+            optionWidth: optionBox?.width ?? 0,
+          };
+        })
+        .sort((left, right) => right.popupWidth - left.popupWidth);
+      const shape = candidates[0];
+      return expanded && shape?.popupWidth >= minimumWidth ? shape : false;
+    },
+    {
+      inputSelector: '[aria-label$="映射目标"]',
+      popupSelector: ".mapping-target-popup",
+      minimumWidth: minimum,
+    },
+  );
+  const popupShape = await popupHandle.jsonValue();
+  await popupHandle.dispose();
+  if (popupShape.popupWidth < minimum) {
     throw new Error(
-      `Mapping dropdown is only ${popupBox?.width ?? 0}px wide at ${width}px`,
+      `Mapping dropdown is only ${popupShape.popupWidth}px wide at ${width}px`,
     );
   }
-  const itemShape = await popup
-    .locator(".ant-select-item-option-content")
-    .first()
-    .evaluate((element) => {
-      const box = element.getBoundingClientRect();
-      return { height: box.height, width: box.width };
-    });
-  if (itemShape.width < 180 || itemShape.height > 90) {
+  if (popupShape.optionWidth < 180 || popupShape.optionHeight > 90) {
     throw new Error(
-      `Mapping option text is abnormally compressed at ${width}px: ${JSON.stringify(itemShape)}`,
+      `Mapping option text is abnormally compressed at ${width}px: ${JSON.stringify(popupShape)}`,
     );
   }
   await page.keyboard.press("Escape");
