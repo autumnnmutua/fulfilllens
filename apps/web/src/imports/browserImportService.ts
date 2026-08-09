@@ -252,6 +252,7 @@ export const browserImportService = {
       record.task.data_type,
       record.parsedTable,
       payload.mapping,
+      payload.ignored_source_columns ?? [],
       payload.default_timezone,
       payload.project_status_mappings,
       record.parseResponse.sensitive_risks,

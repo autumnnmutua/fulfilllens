@@ -7,7 +7,7 @@ export function NotFoundPage() {
     <Result
       status="404"
       title="页面不存在"
-      subTitle="该地址不属于当前 FulfillLens CN 路由。"
+      subTitle="该地址不属于当前 FulfillLens 路由。"
       extra={
         <Button type="primary">
           <AppLink to="/">返回首页</AppLink>

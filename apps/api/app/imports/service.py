@@ -287,7 +287,12 @@ class ImportService:
             sheet_name=task.selected_sheet,
         )
         contract = get_contract(task.data_type)
-        mapping_errors = validate_mapping(request.mapping, table.headers, contract)
+        mapping_errors = validate_mapping(
+            request.mapping,
+            table.headers,
+            contract,
+            request.ignored_source_columns,
+        )
         if mapping_errors:
             raise AppError(
                 code="INVALID_FIELD_MAPPING",
@@ -323,6 +328,7 @@ class ImportService:
             table=table,
             contract=contract,
             mapping=request.mapping,
+            ignored_source_columns=request.ignored_source_columns,
             default_timezone=request.default_timezone,
             project_status_mappings=project_mappings,
             sensitive_risks=risks,
@@ -330,6 +336,7 @@ class ImportService:
         )
         self._save_validation_artifacts(task, artifacts)
         task.mapping = request.mapping
+        task.ignored_source_columns = request.ignored_source_columns
         task.default_timezone = request.default_timezone
         task.status = (
             ImportStatus.READY_TO_CONFIRM

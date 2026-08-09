@@ -167,7 +167,7 @@ export function SettingsPage() {
         description={
           isCloudflareDeploy
             ? "在线预览只在你勾选确认并点击测试后发送固定合成短句；不会读取或发送订单、仓库事件、物流轨迹或个人信息。"
-            : "默认关闭；连接探针只发送固定合成短句。FulfillLens CN 不会自动把订单、仓库事件、物流轨迹或个人信息发送给 Cloudflare。"
+            : "默认关闭；连接探针只发送固定合成短句。FulfillLens 不会自动把订单、仓库事件、物流轨迹或个人信息发送给 Cloudflare。"
         }
       />
 

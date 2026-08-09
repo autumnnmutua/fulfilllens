@@ -1,6 +1,6 @@
 # 机器可读数据契约
 
-本目录使用 JSON Schema Draft 2020-12 描述 FulfillLens CN 阶段 1 的三类标准化行记录：
+本目录使用 JSON Schema Draft 2020-12 描述 FulfillLens 阶段 1 的三类标准化行记录：
 
 - `order.schema.json`：订单表；
 - `warehouse_event.schema.json`：仓库事件表；

@@ -177,6 +177,50 @@ def test_project_status_mapping_can_be_applied_without_reupload(
     assert checked.json()["task"]["status"] == "ready_to_confirm"
 
 
+def test_ignored_optional_column_is_excluded_but_required_mapping_still_blocks(
+    client: TestClient,
+) -> None:
+    content = (
+        "订单编号,下单时间,订单数量,单位,订单状态,客服备注\n"
+        "ORD-IGN-1,2026-07-01T08:00:00+08:00,1,piece,已签收,无需分析\n"
+    ).encode()
+    task = client.post(
+        "/api/imports/upload",
+        data={"data_type": "orders"},
+        files={"file": ("ignored.csv", content, "text/csv")},
+    ).json()["task"]
+    parsed = client.post(f"/api/imports/{task['task_id']}/parse", json={}).json()
+    mapping = synthetic_mapping(parsed)
+    mapping["客服备注"] = None
+    checked = client.put(
+        f"/api/imports/{task['task_id']}/validation",
+        json={
+            "mapping": mapping,
+            "ignored_source_columns": ["客服备注"],
+            "default_timezone": "Asia/Shanghai",
+        },
+    )
+
+    assert checked.status_code == 200
+    payload = checked.json()
+    assert payload["report"]["can_confirm"] is True
+    assert payload["report"]["ignored_source_columns"] == ["客服备注"]
+    assert payload["report"]["unresolved_source_columns"] == []
+    assert "客服备注" not in payload["normalized_preview"][0]
+
+    mapping["订单编号"] = None
+    blocked = client.put(
+        f"/api/imports/{task['task_id']}/validation",
+        json={
+            "mapping": mapping,
+            "ignored_source_columns": ["订单编号", "客服备注"],
+            "default_timezone": "Asia/Shanghai",
+        },
+    )
+    assert blocked.status_code == 422
+    assert "order_id" in str(blocked.json())
+
+
 def test_template_download_and_cancellation(client: TestClient) -> None:
     template = client.get("/api/imports/templates/orders")
     assert template.status_code == 200

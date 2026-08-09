@@ -1,14 +1,14 @@
-# FulfillLens CN
+# FulfillLens
 
 [简体中文](README.md) · [Documentation](docs/README.md) · [10-minute quick experience](#10-minute-quick-experience) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)
 
-FulfillLens CN is a local-first, open-source fulfillment analytics tool for logistics students, instructors, and small or medium-sized e-commerce businesses. Users import order, warehouse-operation, and tracking CSV/XLSX files, then map fields, normalize statuses, calculate fulfillment metrics, inspect bottlenecks, run transparent anomaly rules, simulate What-if scenarios, and export reports.
+FulfillLens is a local-first, open-source fulfillment analytics tool for logistics students, instructors, and small or medium-sized e-commerce businesses. Users import order, warehouse-operation, and tracking CSV/XLSX files, then map fields, normalize statuses, calculate fulfillment metrics, inspect bottlenecks, run transparent anomaly rules, simulate What-if scenarios, and export reports.
 
 The project is designed to make every percentage, anomaly, and scenario traceable to fields, formulas, thresholds, samples, and order-level evidence instead of generating a merely plausible story.
 
-> Version status: `1.0.0-rc.4` enables user-selected CSV/XLSX imports in the Cloudflare edition. Raw files are parsed, mapped, normalized, and validated inside the browser and are not uploaded to the Worker; uncertain mappings require confirmation. Full online analytics for browser-owned datasets is not connected yet, so end-to-end analysis of business data remains local or Docker-first. See [Project status](#project-status-and-known-limitations).
+> Version status: `1.0.0-rc.5` unifies the public brand as FulfillLens and improves field-mapping readability and control. Low-confidence suggestions require confirmation; irrelevant source columns can be explicitly ignored and remain distinct from unresolved columns. Ignoring a source column never bypasses required standard fields. The Cloudflare edition still parses and validates custom CSV/XLSX files locally in the browser and does not upload raw files to the Worker. See [Project status](#project-status-and-known-limitations).
 
-## Why FulfillLens CN
+## Why FulfillLens
 
 - **Local first:** files are processed on the user's device by default, with no external database or paid carrier API required.
 - **Transparent definitions:** OT, IF, OTIF, P50, P90, and coverage expose field dependencies, numerator, denominator, and warnings.
@@ -27,7 +27,7 @@ You can experience the complete flow without screenshots. Start the project, ope
 
 | Module               | What users can do                                                                   | Important boundary                                                         |
 | -------------------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| Data import          | Convert non-template CSV/XLSX, detect data type/business aliases, map, and validate | Every suggestion exposes method/confidence; formulas are never executed    |
+| Data import          | Convert non-template CSV/XLSX, map or ignore source columns, and validate           | Ignored and unresolved differ; required fields cannot be bypassed          |
 | Status normalization | Keep raw/normalized status, source, confidence, and project mappings                | Unknown values remain available as `unmapped`                              |
 | Fulfillment metrics  | Calculate OT, IF, OTIF, duration, node, cancellation, return, anomaly, and coverage | Non-computable orders are not counted as success or failure                |
 | Dashboard            | Explore trends, distributions, nodes, dimensions, and paginated orders              | Charts show units, sample size, coverage, and text summaries               |
@@ -176,7 +176,9 @@ The last command is irreversible. A separate GitHub Actions Docker smoke job bui
 
 ## Cloudflare online demo
 
-Online URL: <https://fulfilllens-cn.esthertreu3724.workers.dev>
+Online URL: <https://fulfilllens.esthertreu3724.workers.dev>
+
+During the brand migration, the legacy `fulfilllens-cn.esthertreu3724.workers.dev` deployment is retained as a historical rollback entry. It does not replace the new primary URL above and should not be used in new documentation or bookmarks. A controlled redirect can be evaluated only after independent validation of the new address.
 
 The online edition loads public deterministic synthetic cases and supports metrics, dashboards, transparent diagnostics, order-level What-if recalculation, and reports. Its custom-file path performs extension/MIME/signature checks, CSV/XLSX parsing, field suggestions, status normalization, Schema validation, and quality checks in the browser. Raw files are not sent to Cloudflare; after confirmation, only normalized datasets remain in this browser's IndexedDB and can be deleted in Settings. The Worker upload endpoint rejects raw bodies to protect older clients from accidental uploads.
 
@@ -263,11 +265,11 @@ See [Architecture](docs/ARCHITECTURE.md) and [ADRs](docs/adr/README.md). The Clo
 
 Stages 0–12 are complete for this release-candidate scope, including full local acceptance. Current evidence includes:
 
-- 36 frontend, 14 Cloudflare Worker, and 227 backend/contract tests;
+- 37 frontend, 14 Cloudflare Worker, and 229 backend/contract tests;
 - 10,000/50,000-order performance benchmarks;
 - real import interaction at 360/390/430/1440 Chromium, plus site-wide 360/390/430/768/1440 audits;
 - npm/Python vulnerability audits and repository secret scans;
-- [GitHub Actions](https://github.com/autumnnmutua/fulfilllens-cn/actions) includes quality and real Docker smoke jobs; the release tag is governed by the actual result for its commit;
+- [GitHub Actions](https://github.com/autumnnmutua/fulfilllens/actions) includes quality and real Docker smoke jobs; the release tag is governed by the actual result for its commit;
 - the public remote repository and Private Vulnerability Reporting are enabled.
 
 Non-blocking release-candidate limitations:
@@ -287,7 +289,7 @@ Reports and benchmarks are evidence for a specific revision, dataset, and machin
 - Stage 11: bilingual open-source docs, license, governance templates, and RC assets;
 - Stage 12: clean-environment acceptance and the v1.0 release decision.
 
-See the [Roadmap](docs/ROADMAP.md), [final acceptance record](docs/RELEASE_ACCEPTANCE.md), [compatibility validation report](docs/COMPATIBILITY_VALIDATION.md), and [v1.0.0-rc.4 release notes](docs/releases/v1.0.0-rc.4.md).
+See the [Roadmap](docs/ROADMAP.md), [final acceptance record](docs/RELEASE_ACCEPTANCE.md), [compatibility validation report](docs/COMPATIBILITY_VALIDATION.md), and [v1.0.0-rc.5 release notes](docs/releases/v1.0.0-rc.5.md).
 
 ## Privacy, security, and disclaimer
 
@@ -328,6 +330,6 @@ Issues and PRs may contain only fully synthetic, redacted data. Changes to metri
 
 ## License
 
-FulfillLens CN is licensed under the [MIT License](LICENSE). Third-party dependencies retain their own licenses; MPL, CC, and Apache notices are documented in the [dependency license review](docs/DEPENDENCY_LICENSES.md).
+FulfillLens is licensed under the [MIT License](LICENSE). Third-party dependencies retain their own licenses; MPL, CC, and Apache notices are documented in the [dependency license review](docs/DEPENDENCY_LICENSES.md).
 
 For teaching or research citation, use [CITATION.cff](CITATION.cff).

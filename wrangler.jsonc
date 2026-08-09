@@ -1,5 +1,5 @@
 {
-  "name": "fulfilllens-cn",
+  "name": "fulfilllens",
   "main": "apps/cloudflare-worker/src/index.ts",
   "compatibility_date": "2026-08-08",
   "workers_dev": true,

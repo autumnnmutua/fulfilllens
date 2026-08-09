@@ -1,4 +1,4 @@
-# FulfillLens CN 状态体系
+# FulfillLens 状态体系
 
 - 文档状态：Draft for implementation
 - 状态版本：status-v1.0-draft

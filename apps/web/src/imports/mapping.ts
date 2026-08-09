@@ -230,6 +230,7 @@ export function validateMapping(
   mapping: Record<string, string | null>,
   sourceColumns: string[],
   contract: ImportContract,
+  ignoredSourceColumns: string[] = [],
 ): string[] {
   const errors: string[] = [];
   const sourceSet = new Set(sourceColumns);
@@ -239,9 +240,29 @@ export function validateMapping(
   if (unknownSources.length > 0) {
     errors.push(`映射包含未知源列：${unknownSources.sort().join(", ")}`);
   }
-  const targets = Object.values(mapping).filter(
-    (target): target is string => target !== null,
+  const ignored = new Set(ignoredSourceColumns);
+  const unknownIgnored = [...ignored].filter(
+    (source) => !sourceSet.has(source),
   );
+  if (unknownIgnored.length > 0) {
+    errors.push(`忽略列表包含未知源列：${unknownIgnored.sort().join(", ")}`);
+  }
+  const ignoredMapped = [...ignored].filter(
+    (source) => mapping[source] != null,
+  );
+  if (ignoredMapped.length > 0) {
+    errors.push(`源字段不能同时映射和忽略：${ignoredMapped.sort().join(", ")}`);
+  }
+  const unresolved = sourceColumns.filter(
+    (source) => !ignored.has(source) && mapping[source] == null,
+  );
+  if (unresolved.length > 0) {
+    errors.push(`存在未处理源字段：${unresolved.sort().join(", ")}`);
+  }
+  const targets = Object.entries(mapping)
+    .filter(([source]) => !ignored.has(source))
+    .map(([, target]) => target)
+    .filter((target): target is string => target !== null);
   const allowed = new Set(contract.fields.map((field) => field.field));
   const unknownTargets = [...new Set(targets)].filter(
     (target) => !allowed.has(target),

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://fulfilllens.cn/schemas/warehouse-event.schema.json",
-  "title": "FulfillLens CN 仓库事件行",
+  "title": "FulfillLens 仓库事件行",
   "type": "object",
   "additionalProperties": false,
   "required": [

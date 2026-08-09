@@ -114,7 +114,7 @@ export function HomePage() {
             在本机看清订单从创建到交付的每一步
           </Typography.Title>
           <Typography.Paragraph>
-            FulfillLens CN
+            FulfillLens
             面向物流管理教学和中小电商履约分析。用户数据默认留在本机，指标、异常和模拟结果必须能追溯到公式、字段或规则。
           </Typography.Paragraph>
           <Flex gap="middle" wrap>

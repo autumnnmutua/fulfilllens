@@ -144,6 +144,7 @@ class ParseResponse(BaseModel):
 
 class ValidationRequest(BaseModel):
     mapping: dict[str, str | None]
+    ignored_source_columns: list[str] = Field(default_factory=list)
     default_timezone: str | None = None
     project_status_mappings: dict[str, str] = Field(default_factory=dict)
     save_project_status_mappings: bool = True
@@ -184,6 +185,8 @@ class QualityReport(BaseModel):
     long_text_values: int
     unparseable_values: int
     exact_duplicate_rows: int
+    ignored_source_columns: list[str] = Field(default_factory=list)
+    unresolved_source_columns: list[str] = Field(default_factory=list)
     sensitive_risks: list[SensitiveRisk]
     status_normalizations: list[StatusNormalizationSummary]
     issues: list[QualityIssue]

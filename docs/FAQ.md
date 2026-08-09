@@ -1,6 +1,6 @@
 # 常见问题
 
-## 1. FulfillLens CN 适合谁？
+## 1. FulfillLens 适合谁？
 
 适合希望学习履约指标的物流管理学生和教师，以及需要离线分析订单、仓库和物流节点的中小电商商家。它强调口径、证据和可复现，不要求先会写 SQL 或 Python。
 
@@ -74,7 +74,7 @@ P90 时效越高通常表示长尾订单更慢，但需要结合样本量、时�
 
 ## 19. 可以直接部署到 Cloudflare 吗？
 
-受限在线预览已部署到 <https://fulfilllens-cn.esthertreu3724.workers.dev>：它提供前端页面壳、健康/版本接口和 Workers AI 固定合成探针，但不接收或保存业务数据。当前 FastAPI、DuckDB、SQLite、临时目录和进程内报告任务不能零修改部署；完整导入、指标、诊断、模拟和报告仍需本地或 Docker 版本。
+受限在线预览已部署到 <https://fulfilllens.esthertreu3724.workers.dev>：它提供前端页面壳、健康/版本接口和 Workers AI 固定合成探针，但不接收或保存业务数据。当前 FastAPI、DuckDB、SQLite、临时目录和进程内报告任务不能零修改部署；完整导入、指标、诊断、模拟和报告仍需本地或 Docker 版本。
 
 ## 20. 如何报告字段映射问题？
 

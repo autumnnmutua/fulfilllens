@@ -11,6 +11,8 @@ export interface BrowserDataset {
 }
 
 const memoryDatasets = new Map<string, BrowserDataset>();
+// Keep the legacy database name so the public rebrand does not orphan datasets
+// already stored in users' browsers.
 const DATABASE_NAME = "fulfilllens-cn-browser-data";
 const STORE_NAME = "datasets";
 

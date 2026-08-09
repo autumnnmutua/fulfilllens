@@ -153,14 +153,32 @@ def validate_mapping(
     mapping: dict[str, str | None],
     source_columns: list[str],
     contract: Contract,
+    ignored_source_columns: list[str] | None = None,
 ) -> list[str]:
     errors: list[str] = []
     source_set = set(source_columns)
+    ignored = set(ignored_source_columns or [])
     unknown_sources = sorted(set(mapping) - source_set)
     if unknown_sources:
         errors.append(f"映射包含未知源列：{', '.join(unknown_sources)}")
 
-    target_fields = [target for target in mapping.values() if target is not None]
+    unknown_ignored = sorted(ignored - source_set)
+    if unknown_ignored:
+        errors.append(f"忽略列表包含未知源列：{', '.join(unknown_ignored)}")
+
+    ignored_mapped = sorted(source for source in ignored if mapping.get(source) is not None)
+    if ignored_mapped:
+        errors.append(f"源字段不能同时映射和忽略：{', '.join(ignored_mapped)}")
+
+    unresolved = sorted(
+        source for source in source_columns if source not in ignored and mapping.get(source) is None
+    )
+    if unresolved:
+        errors.append(f"存在未处理源字段：{', '.join(unresolved)}")
+
+    target_fields = [
+        target for source, target in mapping.items() if source not in ignored and target is not None
+    ]
     allowed_targets = {field.field for field in contract.fields}
     unknown_targets = sorted(set(target_fields) - allowed_targets)
     if unknown_targets:

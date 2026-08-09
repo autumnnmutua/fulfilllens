@@ -152,6 +152,8 @@ export interface QualityReport {
   long_text_values: number;
   unparseable_values: number;
   exact_duplicate_rows: number;
+  ignored_source_columns: string[];
+  unresolved_source_columns: string[];
   sensitive_risks: SensitiveRisk[];
   status_normalizations: StatusNormalization[];
   issues: QualityIssue[];

@@ -6,6 +6,21 @@ const repoRoot = path.resolve(__dirname, "..");
 const port = process.env.FL_E2E_PORT || "8787";
 const baseUrl = `http://127.0.0.1:${port}`;
 const isWindows = process.platform === "win32";
+const build = spawnSync(
+  isWindows ? "cmd.exe" : "npm",
+  isWindows
+    ? ["/d", "/s", "/c", "npm.cmd run build:cloudflare"]
+    : ["run", "build:cloudflare"],
+  {
+    cwd: repoRoot,
+    stdio: "inherit",
+    windowsHide: true,
+  },
+);
+if (build.error) throw build.error;
+if (build.status !== 0) {
+  throw new Error(`Cloudflare web build failed with exit code ${build.status}`);
+}
 const command = isWindows ? "cmd.exe" : "npx";
 const commandArguments = isWindows
   ? [

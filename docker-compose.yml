@@ -1,3 +1,5 @@
+# Compatibility identifier: changing the Compose project name would hide existing
+# local named volumes after the public FulfillLens rebrand.
 name: fulfilllens-cn
 
 services:

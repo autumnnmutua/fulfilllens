@@ -22,14 +22,14 @@ REQUIRED_FILES = (
     "docs/TROUBLESHOOTING.md",
     "docs/DEPENDENCY_LICENSES.md",
     "docs/SCREENSHOTS.md",
-    "docs/releases/v1.0.0-rc.4.md",
+    "docs/releases/v1.0.0-rc.5.md",
     ".github/ISSUE_TEMPLATE/bug.yml",
     ".github/ISSUE_TEMPLATE/feature.yml",
     ".github/ISSUE_TEMPLATE/data-mapping.yml",
     ".github/pull_request_template.md",
 )
 REQUIRED_README_CN = (
-    "## 为什么使用 FulfillLens CN",
+    "## 为什么使用 FulfillLens",
     "## 截图与演示",
     "## 核心能力",
     "## 适用与不适用场景",
@@ -43,7 +43,7 @@ REQUIRED_README_CN = (
     "## 许可证",
 )
 REQUIRED_README_EN = (
-    "## Why FulfillLens CN",
+    "## Why FulfillLens",
     "## Screenshots and demo",
     "## Core capabilities",
     "## Suitable and unsuitable use cases",
@@ -178,7 +178,7 @@ def main() -> int:
     for heading in REQUIRED_README_EN:
         if heading not in readme_en:
             errors.append(f"README_EN.md missing section: {heading}")
-    for required_text in ("1.0.0-rc.4", "127.0.0.1:5173", "127.0.0.1:8000"):
+    for required_text in ("1.0.0-rc.5", "127.0.0.1:5173", "127.0.0.1:8000"):
         if required_text not in readme_cn or required_text not in readme_en:
             errors.append(f"bilingual README mismatch or missing value: {required_text}")
 
@@ -235,7 +235,7 @@ def main() -> int:
                 errors.append(f"{relative}: possible Chinese identity number")
 
     license_text = (ROOT / "LICENSE").read_text(encoding="utf-8")
-    if "MIT License" not in license_text or "FulfillLens CN contributors" not in license_text:
+    if "MIT License" not in license_text or "FulfillLens contributors" not in license_text:
         errors.append("LICENSE is not the expected MIT text")
 
     if errors:

@@ -22,7 +22,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title=settings.app_name,
         version=settings.app_version,
-        description="FulfillLens CN 本地优先履约分析 API",
+        description="FulfillLens 本地优先履约分析 API",
         responses={
             404: {
                 "model": ErrorResponse,

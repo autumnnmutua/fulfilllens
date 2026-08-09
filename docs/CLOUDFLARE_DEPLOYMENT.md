@@ -3,11 +3,14 @@
 - 更新日期：2026-08-09
 - 结论：在线版可用浏览器本地引擎导入自主 CSV/XLSX，并用独立 TypeScript Worker 提供公开合成分析；完整本地版不能原样迁移并继续依赖本机文件系统
 - 当前状态：已实现浏览器本地安全解析/转换/校验、静态资源、公开确定性合成案例、指标/诊断/订单级模拟/报告接口和 Workers AI 原生绑定
-- 在线地址：<https://fulfilllens-cn.esthertreu3724.workers.dev>
+- 在线地址：<https://fulfilllens.esthertreu3724.workers.dev>
+- 旧地址：`https://fulfilllens-cn.esthertreu3724.workers.dev` 在迁移验收期间保留为历史回退入口，不提前删除或覆盖
+
+公开品牌和 Worker 项目名从 `fulfilllens-cn` 迁移为 `fulfilllens`。新项目复用同一构建、环境绑定、安全头和生产分支，不迁移用户原始文件，因为在线自主导入本来就只在浏览器本地处理。只有新地址完成 CSV/XLSX、字段映射、忽略、核心路由、Console/Network 与 AI binding 验收后，才评估旧地址跳转；本版本不冒险删除可工作的旧站。
 
 ## 1. 结论
 
-FulfillLens CN 已具备“自主文件浏览器本地导入 + 公开合成数据云端分析”的 Cloudflare 在线版：
+FulfillLens 已具备“自主文件浏览器本地导入 + 公开合成数据云端分析”的 Cloudflare 在线版：
 
 ```text
 React/Vite 静态资源（Workers Static Assets）

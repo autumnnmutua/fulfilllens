@@ -19,7 +19,7 @@ from app.cases.models import CaseId  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="生成 FulfillLens CN 可复现教学案例")
+    parser = argparse.ArgumentParser(description="生成 FulfillLens 可复现教学案例")
     parser.add_argument(
         "--case",
         choices=[case_id.value for case_id in CaseId],

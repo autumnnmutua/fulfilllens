@@ -12,6 +12,7 @@ import type {
 
 export interface ValidationPayload {
   mapping: Record<string, string | null>;
+  ignored_source_columns?: string[];
   default_timezone: string | null;
   project_status_mappings: Record<string, string>;
 }

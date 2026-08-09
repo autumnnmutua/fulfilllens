@@ -1,4 +1,4 @@
-# FulfillLens CN 指标口径
+# FulfillLens 指标口径
 
 - 文档状态：阶段 4 已实现
 - 定义版本：metrics-v1.1.0

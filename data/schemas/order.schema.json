@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://fulfilllens.cn/schemas/order.schema.json",
-  "title": "FulfillLens CN 订单行",
+  "title": "FulfillLens 订单行",
   "type": "object",
   "additionalProperties": false,
   "required": [

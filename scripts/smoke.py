@@ -156,7 +156,7 @@ def request(url: str) -> tuple[int, bytes]:
         url,
         headers={
             "Accept": "application/json, text/html",
-            "User-Agent": "FulfillLens-CN-Smoke/1.0.0-rc.4",
+            "User-Agent": "FulfillLens-CN-Smoke/1.0.0-rc.5",
         },
     )
     with urlopen(http_request, timeout=3) as response:
@@ -324,20 +324,20 @@ def main() -> None:
 
             assert direct_health["status"] == "ok"
             assert proxy_health["status"] == "ok"
-            assert direct_version["app_version"] == "1.0.0-rc.4"
+            assert direct_version["app_version"] == "1.0.0-rc.5"
             assert proxy_version["api_version"] == "v1"
             assert len(compatibility_samples["samples"]) == 2
             assert home_status == 200
             assert compatibility_csv_status == 200
             assert compatibility_xlsx_status == 200
-            assert b"FulfillLens CN" in home_body
+            assert b"FulfillLens" in home_body
             assert import_route_status == 200
             assert analytics_route_status == 200
             assert diagnostics_route_status == 200
             assert scenarios_route_status == 200
             assert reports_route_status == 200
             assert cases_route_status == 200
-            assert b"FulfillLens CN" in cases_body
+            assert b"FulfillLens" in cases_body
             screenshots = capture_viewport_screenshots()
 
             print(

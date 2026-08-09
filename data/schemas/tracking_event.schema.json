@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://fulfilllens.cn/schemas/tracking-event.schema.json",
-  "title": "FulfillLens CN 物流轨迹事件行",
+  "title": "FulfillLens 物流轨迹事件行",
   "type": "object",
   "additionalProperties": false,
   "required": [

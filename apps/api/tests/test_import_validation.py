@@ -41,6 +41,7 @@ def test_quality_report_covers_required_error_categories(tmp_path: Path) -> None
         table=table,
         contract=get_contract(DataType.ORDERS),
         mapping=mapping,
+        ignored_source_columns=["姓名", "手机号"],
         default_timezone="Asia/Shanghai",
         project_status_mappings={},
         sensitive_risks=risks,
@@ -54,6 +55,7 @@ def test_quality_report_covers_required_error_categories(tmp_path: Path) -> None
     assert artifacts.report.invalid_times >= 1
     assert artifacts.report.time_order_conflicts >= 1
     assert artifacts.report.unknown_statuses == 1
+    assert artifacts.report.ignored_source_columns == ["姓名", "手机号"]
     assert {risk.source_column for risk in artifacts.report.sensitive_risks} == {
         "姓名",
         "手机号",

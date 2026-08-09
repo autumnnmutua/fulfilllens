@@ -1,6 +1,6 @@
 import { handleOnlineDemoApi } from "./online-demo";
 
-const APP_VERSION = "1.0.0-rc.4";
+const APP_VERSION = "1.0.0-rc.5";
 const API_VERSION = "v1";
 const MODEL = "@cf/meta/llama-3.1-8b-instruct-fast";
 const PROBE_SENTINEL = "FULFILLLENS_WORKERS_AI_OK";
@@ -134,7 +134,7 @@ async function apiResponse(
   }
   if (request.method === "GET" && url.pathname === "/api/version") {
     return jsonResponse({
-      app_name: "FulfillLens CN",
+      app_name: "FulfillLens",
       app_version: APP_VERSION,
       api_version: API_VERSION,
       environment: "cloudflare-online-demo",

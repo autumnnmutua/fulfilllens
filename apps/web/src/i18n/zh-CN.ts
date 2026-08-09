@@ -1,5 +1,5 @@
 export const zhCNMessages = {
-  appName: "FulfillLens CN",
+  appName: "FulfillLens",
   appTagline: "本地优先的履约分析工具",
   nav: {
     home: "首页",

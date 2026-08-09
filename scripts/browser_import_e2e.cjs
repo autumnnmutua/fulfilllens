@@ -33,6 +33,17 @@ function assertFixture(filePath) {
   }
 }
 
+async function assertPublicBrand(page) {
+  const title = await page.title();
+  const body = await page.locator("body").innerText();
+  if (title !== "FulfillLens") {
+    throw new Error(`Unexpected page title: ${title}`);
+  }
+  if (body.includes("FulfillLens CN")) {
+    throw new Error("Legacy public brand remains visible in the application");
+  }
+}
+
 async function chooseDataType(page, label) {
   await page.getByText(label, { exact: true }).click();
 }
@@ -52,12 +63,135 @@ async function parseSelectedFile(page, sheetName) {
     await page.getByText(sheetName, { exact: true }).last().click();
     await page.getByRole("button", { name: "解析并预览" }).click();
   }
-  await page.getByRole("heading", { name: "4. 数据预览" }).waitFor();
+  try {
+    await page.getByRole("heading", { name: "4. 数据预览" }).waitFor();
+  } catch (error) {
+    const pageText = (await page.locator("body").innerText()).slice(-3000);
+    throw new Error(
+      `Import preview did not become ready. Visible page text:\n${pageText}`,
+      { cause: error },
+    );
+  }
 }
 
-async function confirmImport(page) {
+function mappingRow(page, text) {
+  return page
+    .locator(".mapping-table tbody tr, .mapping-mobile-card")
+    .filter({ hasText: text })
+    .first();
+}
+
+async function inspectMappingLayout(page, width) {
+  const selectInput = page.locator('[aria-label$="映射目标"]').first();
+  const select = selectInput.locator(
+    "xpath=ancestor::*[contains(concat(' ', normalize-space(@class), ' '), ' ant-select ')][1]",
+  );
+  const selectBox = await select.boundingBox();
+  const layoutContext = await select.evaluate((element) => {
+    const widthOf = (candidate) =>
+      candidate?.getBoundingClientRect().width ?? null;
+    const control = element.closest(".mapping-target-control");
+    const controlStyle = control ? getComputedStyle(control) : null;
+    return {
+      control: widthOf(control),
+      field: widthOf(element.closest(".import-field")),
+      cardBody: widthOf(element.closest(".ant-card-body")),
+      controlStyle: controlStyle
+        ? {
+            boxSizing: controlStyle.boxSizing,
+            display: controlStyle.display,
+            gap: controlStyle.gap,
+            margin: controlStyle.margin,
+            maxWidth: controlStyle.maxWidth,
+            padding: controlStyle.padding,
+            width: controlStyle.width,
+          }
+        : null,
+    };
+  });
+  const minimum = width >= 768 ? 320 : 250;
+  if (!selectBox || selectBox.width < minimum) {
+    throw new Error(
+      `Mapping target select is only ${selectBox?.width ?? 0}px wide at ${width}px: ${JSON.stringify(layoutContext)}`,
+    );
+  }
+  await selectInput.click();
+  const popup = page.locator(".mapping-target-popup:visible").last();
+  await popup.waitFor();
+  await popup.waitFor({ state: "visible" });
+  await page.waitForFunction((selector) => {
+    const matches = [...document.querySelectorAll(selector)].filter(
+      (element) => element.getClientRects().length > 0,
+    );
+    return (matches.at(-1)?.getBoundingClientRect().width ?? 0) > 0;
+  }, ".mapping-target-popup");
+  const popupBox = await popup.boundingBox();
+  if (!popupBox || popupBox.width < minimum) {
+    throw new Error(
+      `Mapping dropdown is only ${popupBox?.width ?? 0}px wide at ${width}px`,
+    );
+  }
+  const itemShape = await popup
+    .locator(".ant-select-item-option-content")
+    .first()
+    .evaluate((element) => {
+      const box = element.getBoundingClientRect();
+      return { height: box.height, width: box.width };
+    });
+  if (itemShape.width < 180 || itemShape.height > 90) {
+    throw new Error(
+      `Mapping option text is abnormally compressed at ${width}px: ${JSON.stringify(itemShape)}`,
+    );
+  }
+  await page.keyboard.press("Escape");
+}
+
+async function ignoreSource(page, source) {
+  const row = mappingRow(page, source);
+  const ignoreButton = row.getByRole("button", { name: /^忽\s*略$/ });
+  if ((await ignoreButton.count()) === 0) {
+    const visibleRows = await page
+      .locator(".mapping-table tbody tr, .mapping-mobile-card")
+      .allTextContents();
+    throw new Error(
+      `Cannot find ignore action for ${source}: ${JSON.stringify(visibleRows)}`,
+    );
+  }
+  await ignoreButton.click();
+  await row.getByText("Ignored", { exact: true }).waitFor();
+  return row;
+}
+
+async function resolveMapping(page, options = {}) {
+  while ((await page.getByRole("button", { name: "确认建议" }).count()) > 0) {
+    await page.getByRole("button", { name: "确认建议" }).first().click();
+  }
+  if (options.ignoreSource) {
+    const row = await ignoreSource(page, options.ignoreSource);
+    await row.getByRole("button", { name: "取消忽略并重新映射" }).click();
+    await row.getByText("Unresolved", { exact: true }).waitFor();
+    await row.getByRole("button", { name: /^忽\s*略$/ }).click();
+    await row.getByText("Ignored", { exact: true }).waitFor();
+  }
+  while ((await page.getByText("Unresolved", { exact: true }).count()) > 0) {
+    const row = mappingRow(page, "Unresolved");
+    await row.getByRole("button", { name: /^忽\s*略$/ }).click();
+  }
+  await page.getByText(/还有 \d+ 个字段待处理/).waitFor({ state: "detached" });
+}
+
+async function openMapping(page, filePath, sheetName) {
+  await page.goto(`${baseUrl}/import`, { waitUntil: "networkidle" });
+  await assertPublicBrand(page);
+  await chooseDataType(page, "物流轨迹表");
+  await chooseCustomFile(page, filePath);
+  await parseSelectedFile(page, sheetName);
   await page.getByRole("button", { name: "下一步：字段映射" }).click();
   await page.getByRole("heading", { name: "5. 字段映射" }).waitFor();
+}
+
+async function confirmImport(page, options = {}) {
+  await resolveMapping(page, options);
   await page.getByRole("button", { name: "运行质量校验" }).click();
   await page.getByText("校验通过，可以确认导入", { exact: true }).waitFor();
   await page.getByRole("button", { name: "下一步：确认导入" }).click();
@@ -66,11 +200,10 @@ async function confirmImport(page) {
 }
 
 async function runImport(page, filePath, sheetName) {
-  await page.goto(`${baseUrl}/import`, { waitUntil: "networkidle" });
-  await chooseDataType(page, "物流轨迹表");
-  await chooseCustomFile(page, filePath);
-  await parseSelectedFile(page, sheetName);
-  await confirmImport(page);
+  await openMapping(page, filePath, sheetName);
+  await confirmImport(page, {
+    ignoreSource: sheetName ? undefined : "无关说明",
+  });
 }
 
 (async () => {
@@ -85,13 +218,13 @@ async function runImport(page, filePath, sheetName) {
   fs.writeFileSync(invalidFile, "%PDF-1.4 synthetic invalid upload\n", "utf8");
 
   try {
-    for (const width of [360, 390, 430]) {
+    for (const width of [360, 390, 430, 1366, 1440, 1920]) {
       const context = await browser.newContext({
         viewport: { width, height: 900 },
       });
       const page = await context.newPage();
-      await page.goto(`${baseUrl}/import`, { waitUntil: "networkidle" });
-      await page.getByRole("button", { name: "自主上传文件" }).waitFor();
+      await openMapping(page, csvPath);
+      await inspectMappingLayout(page, width);
       const overflow = await page.evaluate(
         () =>
           document.documentElement.scrollWidth >
@@ -100,7 +233,7 @@ async function runImport(page, filePath, sheetName) {
       if (overflow) {
         throw new Error(`Import page overflows horizontally at ${width}px`);
       }
-      records.push({ scenario: `mobile-${width}`, passed: true });
+      records.push({ scenario: `mapping-layout-${width}`, passed: true });
       await context.close();
     }
 
@@ -122,7 +255,39 @@ async function runImport(page, filePath, sheetName) {
     });
 
     await runImport(page, csvPath);
+    const persisted = await page.evaluate(
+      () =>
+        new Promise((resolve, reject) => {
+          const request = indexedDB.open("fulfilllens-cn-browser-data", 1);
+          request.onerror = () => reject(request.error);
+          request.onsuccess = () => {
+            const database = request.result;
+            const query = database
+              .transaction("datasets", "readonly")
+              .objectStore("datasets")
+              .getAll();
+            query.onerror = () => reject(query.error);
+            query.onsuccess = () => {
+              const latest = query.result.at(-1);
+              database.close();
+              resolve({
+                ignored: latest?.qualityReport?.ignored_source_columns ?? [],
+                rowKeys: Object.keys(latest?.rows?.[0] ?? {}),
+              });
+            };
+          };
+        }),
+    );
+    if (
+      !persisted.ignored.includes("无关说明") ||
+      persisted.rowKeys.includes("无关说明")
+    ) {
+      throw new Error(
+        `Ignored source leaked into dataset: ${JSON.stringify(persisted)}`,
+      );
+    }
     records.push({ scenario: "nonstandard-csv", passed: true });
+    records.push({ scenario: "ignored-field-excluded", passed: true });
     await page.reload({ waitUntil: "networkidle" });
     await page.goto(`${baseUrl}/settings`, { waitUntil: "networkidle" });
     await page.getByText("浏览器本地导入", { exact: false }).first().waitFor();
@@ -130,6 +295,19 @@ async function runImport(page, filePath, sheetName) {
 
     await runImport(page, xlsxPath, "物流轨迹");
     records.push({ scenario: "multi-sheet-xlsx", passed: true });
+
+    await openMapping(page, csvPath);
+    await resolveMapping(page, { ignoreSource: "无关说明" });
+    await ignoreSource(page, "订单号");
+    await page.getByRole("button", { name: "运行质量校验" }).click();
+    await page
+      .getByText("存在阻断错误，暂不能确认导入", { exact: true })
+      .waitFor();
+    await page
+      .getByText(/order_id/)
+      .first()
+      .waitFor();
+    records.push({ scenario: "required-field-ignore-blocked", passed: true });
 
     await page.goto(`${baseUrl}/import`, { waitUntil: "networkidle" });
     await chooseDataType(page, "物流轨迹表");

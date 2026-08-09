@@ -1,9 +1,9 @@
 {
-  "name": "fulfilllens-cn",
-  "version": "1.0.0-rc.4",
+  "name": "fulfilllens",
+  "version": "1.0.0-rc.5",
   "private": true,
   "license": "MIT",
-  "description": "FulfillLens CN 本地优先履约分析工具",
+  "description": "FulfillLens 本地优先履约分析工具",
   "packageManager": "npm@11.13.0",
   "engines": {
     "node": ">=22.12 <25",

@@ -143,7 +143,7 @@ const compatibilitySamples = [
     ],
     sha256: "4730a123d51e0747c50077147b6121ed7583bbb7f6eb5b53255e3becf828844f",
     privacy_statement:
-      "全部内容为 FulfillLens CN 为兼容性测试生成的合成数据，不含真实个人、企业、订单或运单信息。",
+      "全部内容为 FulfillLens 为兼容性测试生成的合成数据，不含真实个人、企业、订单或运单信息。",
   },
   {
     sample_id: "compatibility_logistics_xlsx",
@@ -166,7 +166,7 @@ const compatibilitySamples = [
     ],
     sha256: "05f2c1e56ba8fbae9266ce1389803c73e50f3b8c0c98cfcb0e3688d2ae05fddf",
     privacy_statement:
-      "全部内容为 FulfillLens CN 为兼容性测试生成的合成数据，不含真实个人、企业、订单或运单信息。",
+      "全部内容为 FulfillLens 为兼容性测试生成的合成数据，不含真实个人、企业、订单或运单信息。",
   },
 ] as const;
 
@@ -3579,6 +3579,8 @@ export async function handleOnlineDemoApi(
           long_text_values: 0,
           unparseable_values: 0,
           exact_duplicate_rows: 0,
+          ignored_source_columns: [],
+          unresolved_source_columns: [],
           sensitive_risks: [],
           status_normalizations:
             sampleId === null ? [] : sampleStatusNormalizations(sampleId),

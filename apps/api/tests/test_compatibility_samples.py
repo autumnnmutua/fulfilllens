@@ -40,16 +40,23 @@ def import_file(
     parsed_payload = parsed.json()
     assert parsed_payload["detected_data_type"] == data_type
     assert parsed_payload["detection_confidence"] >= 0.95
+    mapping = suggested_mapping(parsed_payload)
+    ignored_source_columns = sorted(source for source, target in mapping.items() if target is None)
     checked = client.put(
         f"/api/imports/{task['task_id']}/validation",
         json={
-            "mapping": suggested_mapping(parsed_payload),
+            "mapping": mapping,
+            "ignored_source_columns": ignored_source_columns,
             "default_timezone": "Asia/Shanghai",
         },
     )
     assert checked.status_code == 200, checked.text
     checked_payload = checked.json()
     assert checked_payload["report"]["can_confirm"] is True, checked.text
+    assert checked_payload["report"]["ignored_source_columns"] == ignored_source_columns
+    assert checked_payload["report"]["unresolved_source_columns"] == []
+    for row in checked_payload["normalized_preview"]:
+        assert not set(ignored_source_columns) & set(row)
     confirmed = client.post(f"/api/imports/{task['task_id']}/confirm")
     assert confirmed.status_code == 200, confirmed.text
     return confirmed.json()["dataset_id"], parsed_payload, checked_payload

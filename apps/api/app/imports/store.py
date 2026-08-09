@@ -39,6 +39,7 @@ class ImportTaskRecord(BaseModel):
     default_timezone: str | None = None
     message: str
     mapping: dict[str, str | None] = Field(default_factory=dict)
+    ignored_source_columns: list[str] = Field(default_factory=list)
     dataset_id: str | None = None
     warnings: list[str] = Field(default_factory=list)
 

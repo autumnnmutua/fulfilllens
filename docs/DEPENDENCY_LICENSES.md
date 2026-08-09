@@ -52,7 +52,7 @@
 | `caniuse-lite`                 | CC-BY-4.0  | 浏览器兼容数据集；保留归属与许可证元数据。                                 |
 | Apache ECharts / TypeScript 等 | Apache-2.0 | 与 MIT 组合兼容；再分发时保留版权、许可证及适用 NOTICE。                   |
 
-MPL/CC 项不是 AGPL/GPL，也没有触发将 FulfillLens CN 整体改为其他许可证的要求。若未来直接修改并分发 MPL 文件，必须按 MPL 对相应文件提供源码和声明。
+MPL/CC 项不是 AGPL/GPL，也没有触发将 FulfillLens 整体改为其他许可证的要求。若未来直接修改并分发 MPL 文件，必须按 MPL 对相应文件提供源码和声明。
 
 ## 未发现项
 

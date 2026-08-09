@@ -12,6 +12,7 @@ import {
   Col,
   Descriptions,
   Flex,
+  Grid,
   Input,
   Progress,
   Radio,
@@ -38,6 +39,7 @@ import type {
   CompatibilitySample,
   CompatibilitySampleCatalog,
   DataType,
+  FieldSuggestion,
   ImportTask,
   ParseResponse,
   QualityIssue,
@@ -168,6 +170,7 @@ function formatFileSize(bytes: number): string {
 
 export function ImportPage() {
   const notifications = useNotifications();
+  const screens = Grid.useBreakpoint();
   const nativeFileInput = useRef<HTMLInputElement>(null);
   const [current, setCurrent] = useState(0);
   const [dataType, setDataType] = useState<DataType>("orders");
@@ -177,6 +180,10 @@ export function ImportPage() {
   const [sheetName, setSheetName] = useState<string>();
   const [parsed, setParsed] = useState<ParseResponse | null>(null);
   const [mapping, setMapping] = useState<Record<string, string | null>>({});
+  const [ignoredSourceColumns, setIgnoredSourceColumns] = useState<string[]>(
+    [],
+  );
+  const [manualSourceColumns, setManualSourceColumns] = useState<string[]>([]);
   const [timezone, setTimezone] = useState("Asia/Shanghai");
   const [projectStatusMappings, setProjectStatusMappings] = useState<
     Record<string, string>
@@ -232,6 +239,34 @@ export function ImportPage() {
       (item) => item.normalized_status === "unmapped",
     ) ?? [];
 
+  const ignoredSourceSet = useMemo(
+    () => new Set(ignoredSourceColumns),
+    [ignoredSourceColumns],
+  );
+  const manualSourceSet = useMemo(
+    () => new Set(manualSourceColumns),
+    [manualSourceColumns],
+  );
+  const mappingSummary = useMemo(() => {
+    const result = { automatic: 0, ignored: 0, manual: 0, pending: 0 };
+    (parsed?.suggestions ?? []).forEach((suggestion) => {
+      const source = suggestion.source_column;
+      const target = mapping[source] ?? null;
+      if (ignoredSourceSet.has(source)) {
+        result.ignored += 1;
+      } else if (target === null) {
+        result.pending += 1;
+      } else if (manualSourceSet.has(source)) {
+        result.manual += 1;
+      } else if (suggestion.requires_confirmation) {
+        result.pending += 1;
+      } else {
+        result.automatic += 1;
+      }
+    });
+    return result;
+  }, [ignoredSourceSet, manualSourceSet, mapping, parsed]);
+
   function applyParsed(response: ParseResponse) {
     setTask(response.task);
     setParsed(response);
@@ -243,11 +278,68 @@ export function ImportPage() {
         ]),
       ),
     );
+    setIgnoredSourceColumns([]);
+    setManualSourceColumns([]);
     setPersistentError(null);
     setValidation(null);
     setConfirmed(null);
     setValidationStale(false);
     setCurrent(3);
+  }
+
+  function invalidateValidation(
+    message = "字段映射已修改，需要重新运行质量校验。",
+  ) {
+    setValidation(null);
+    setValidationStale(false);
+    setTask((previous) =>
+      previous === null
+        ? null
+        : {
+            ...previous,
+            message,
+            status: "awaiting_mapping",
+            status_label: "待映射",
+          },
+    );
+  }
+
+  function selectMappingTarget(source: string, target?: string) {
+    setMapping((previous) => ({ ...previous, [source]: target ?? null }));
+    setIgnoredSourceColumns((previous) =>
+      previous.filter((column) => column !== source),
+    );
+    setManualSourceColumns((previous) =>
+      target === undefined
+        ? previous.filter((column) => column !== source)
+        : [...new Set([...previous, source])],
+    );
+    invalidateValidation();
+  }
+
+  function ignoreSourceColumn(source: string) {
+    setMapping((previous) => ({ ...previous, [source]: null }));
+    setIgnoredSourceColumns((previous) => [...new Set([...previous, source])]);
+    setManualSourceColumns((previous) =>
+      previous.filter((column) => column !== source),
+    );
+    invalidateValidation("字段已明确忽略，需要重新运行质量校验。");
+  }
+
+  function confirmSuggestedMapping(source: string) {
+    setManualSourceColumns((previous) => [...new Set([...previous, source])]);
+    setIgnoredSourceColumns((previous) =>
+      previous.filter((column) => column !== source),
+    );
+    invalidateValidation("低置信度映射已人工确认，需要重新运行质量校验。");
+  }
+
+  function restoreSourceColumn(source: string) {
+    setIgnoredSourceColumns((previous) =>
+      previous.filter((column) => column !== source),
+    );
+    setMapping((previous) => ({ ...previous, [source]: null }));
+    invalidateValidation("已取消忽略，请为该源字段选择目标字段或重新忽略。");
   }
 
   function selectFile(selected: File | null) {
@@ -400,6 +492,7 @@ export function ImportPage() {
     const response = await runAction(() =>
       importApi.validate(task.task_id, {
         mapping,
+        ignored_source_columns: ignoredSourceColumns,
         default_timezone: timezone.trim() || null,
         project_status_mappings: projectStatusMappings,
       }),
@@ -449,10 +542,121 @@ export function ImportPage() {
     setConfirmed(null);
     setFile(null);
     setMapping({});
+    setIgnoredSourceColumns([]);
+    setManualSourceColumns([]);
     setProjectStatusMappings({});
     setValidationStale(false);
     setPersistentError(null);
     setCurrent(0);
+  }
+
+  function renderMappingTarget(suggestion: FieldSuggestion) {
+    const source = suggestion.source_column;
+    if (ignoredSourceSet.has(source)) {
+      return (
+        <Flex
+          className="mapping-ignored-control"
+          align="center"
+          gap="small"
+          wrap
+        >
+          <Tag color="default">已忽略</Tag>
+          <Button size="small" onClick={() => restoreSourceColumn(source)}>
+            取消忽略并重新映射
+          </Button>
+        </Flex>
+      );
+    }
+    return (
+      <Flex className="mapping-target-control" align="center" gap="small">
+        <Select
+          className="mapping-target-select"
+          aria-label={`${source} 映射目标`}
+          allowClear
+          showSearch
+          optionFilterProp="label"
+          popupMatchSelectWidth={screens.md === false ? true : 480}
+          classNames={{ popup: { root: "mapping-target-popup" } }}
+          value={mapping[source] ?? undefined}
+          options={(parsed?.fields ?? []).map((field) => ({
+            value: field.field,
+            label: `${field.label}（${field.field}）${field.required ? " *" : ""}`,
+          }))}
+          optionRender={(option) => {
+            const readableLabel =
+              typeof option.label === "string"
+                ? option.label
+                : typeof option.value === "string"
+                  ? option.value
+                  : typeof option.value === "number"
+                    ? `${option.value}`
+                    : "";
+            return <span title={readableLabel}>{readableLabel}</span>;
+          }}
+          onChange={(value: string | undefined) =>
+            selectMappingTarget(source, value)
+          }
+        />
+        {suggestion.requires_confirmation &&
+        mapping[source] != null &&
+        !manualSourceSet.has(source) ? (
+          <Button
+            className="mapping-confirm-button"
+            size="small"
+            onClick={() => confirmSuggestedMapping(source)}
+          >
+            确认建议
+          </Button>
+        ) : null}
+        <Button
+          className="mapping-ignore-button"
+          size="small"
+          onClick={() => ignoreSourceColumn(source)}
+        >
+          忽略
+        </Button>
+      </Flex>
+    );
+  }
+
+  function renderMappingConfidence(suggestion: FieldSuggestion) {
+    const source = suggestion.source_column;
+    if (ignoredSourceSet.has(source)) {
+      return <Typography.Text type="secondary">— 已忽略</Typography.Text>;
+    }
+    const target = mapping[source] ?? null;
+    if (target === null) {
+      return <Tag color="warning">待处理</Tag>;
+    }
+    if (manualSourceSet.has(source)) {
+      return <Typography.Text>— 人工确认</Typography.Text>;
+    }
+    return (
+      <Flex vertical gap={4}>
+        <Progress
+          percent={Math.round(suggestion.confidence * 100)}
+          size="small"
+          status={suggestion.confidence >= 0.86 ? "success" : "normal"}
+        />
+        {suggestion.requires_confirmation ? (
+          <Tag color="warning">需要人工确认</Tag>
+        ) : null}
+      </Flex>
+    );
+  }
+
+  function renderMappingMethod(suggestion: FieldSuggestion) {
+    const source = suggestion.source_column;
+    if (ignoredSourceSet.has(source)) {
+      return <Tag>Ignored</Tag>;
+    }
+    if ((mapping[source] ?? null) === null) {
+      return <Tag color="warning">Unresolved</Tag>;
+    }
+    if (manualSourceSet.has(source)) {
+      return <Tag color="purple">Manual</Tag>;
+    }
+    return <Tag color="blue">{suggestion.method}</Tag>;
   }
 
   const qualityIssueColumns = [
@@ -934,7 +1138,7 @@ export function ImportPage() {
                 showIcon
                 type="info"
                 message="自动匹配只是建议"
-                description="建议基于英文代码、中文别名和字段名相似度；请根据置信度复核。返回本页修改映射不需要重新上传。"
+                description="建议基于英文代码、中文别名和字段名相似度；请根据置信度复核。分析不需要的源字段应明确设为“忽略”，系统无法识别的字段会保持“待处理”。"
               />
               {parsed.unmapped_source_columns.length > 0 ? (
                 <Alert
@@ -956,100 +1160,107 @@ export function ImportPage() {
                   </ul>
                 }
               />
-              <Table
-                rowKey="source_column"
-                pagination={false}
-                scroll={{ x: 760 }}
-                dataSource={parsed.suggestions}
-                columns={[
-                  {
-                    title: "原字段",
-                    dataIndex: "source_column",
-                    key: "source_column",
-                    width: 180,
-                  },
-                  {
-                    title: "目标字段",
-                    key: "target",
-                    width: 280,
-                    render: (_, suggestion) => (
-                      <Select
-                        aria-label={`${suggestion.source_column} 映射目标`}
-                        allowClear
-                        showSearch
-                        optionFilterProp="label"
-                        value={mapping[suggestion.source_column] ?? undefined}
-                        options={parsed.fields.map((field) => ({
-                          value: field.field,
-                          label: `${field.label}（${field.field}）${field.required ? " *" : ""}`,
-                        }))}
-                        onChange={(value: string | undefined) => {
-                          setMapping((previous) => ({
-                            ...previous,
-                            [suggestion.source_column]: value ?? null,
-                          }));
-                          setValidation(null);
-                          setValidationStale(false);
-                          setTask((previous) =>
-                            previous === null
-                              ? null
-                              : {
-                                  ...previous,
-                                  message:
-                                    "字段映射已修改，需要重新运行质量校验。",
-                                  status: "awaiting_mapping",
-                                  status_label: "待映射",
-                                },
-                          );
-                        }}
-                      />
-                    ),
-                  },
-                  {
-                    title: "置信度",
-                    key: "confidence",
-                    width: 160,
-                    render: (_, suggestion) => {
-                      const manual =
-                        mapping[suggestion.source_column] !==
-                        suggestion.suggested_field;
-                      const confidence = manual ? 1 : suggestion.confidence;
-                      return (
-                        <Flex vertical gap={4}>
-                          <Progress
-                            percent={Math.round(confidence * 100)}
-                            size="small"
-                            status={confidence >= 0.86 ? "success" : "normal"}
-                          />
-                          {suggestion.requires_confirmation && !manual ? (
-                            <Tag color="warning">需要人工确认</Tag>
-                          ) : null}
-                        </Flex>
-                      );
+              <Row gutter={[12, 12]} aria-label="字段映射进度">
+                {[
+                  ["已自动映射", mappingSummary.automatic],
+                  ["已人工映射", mappingSummary.manual],
+                  ["已忽略", mappingSummary.ignored],
+                  ["待处理", mappingSummary.pending],
+                ].map(([title, value]) => (
+                  <Col xs={12} md={6} key={String(title)}>
+                    <Card size="small">
+                      <Statistic title={title} value={value} />
+                    </Card>
+                  </Col>
+                ))}
+              </Row>
+              {mappingSummary.pending > 0 ? (
+                <Alert
+                  showIcon
+                  type="warning"
+                  message={`还有 ${mappingSummary.pending} 个字段待处理`}
+                  description="请为字段选择目标、重新选择以确认低置信度建议，或明确忽略后再运行质量校验。"
+                />
+              ) : null}
+              {screens.md === false ? (
+                <Flex className="mapping-mobile-list" vertical gap="middle">
+                  {parsed.suggestions.map((suggestion) => (
+                    <Card
+                      className={
+                        ignoredSourceSet.has(suggestion.source_column)
+                          ? "mapping-mobile-card mapping-row-ignored"
+                          : "mapping-mobile-card"
+                      }
+                      key={suggestion.source_column}
+                      size="small"
+                      title={suggestion.source_column}
+                    >
+                      <Flex vertical gap="middle">
+                        <label className="import-field">
+                          <Typography.Text strong>目标字段</Typography.Text>
+                          {renderMappingTarget(suggestion)}
+                        </label>
+                        <Row gutter={[12, 12]}>
+                          <Col xs={14}>
+                            <Typography.Text strong>置信度</Typography.Text>
+                            <div className="mapping-mobile-meta">
+                              {renderMappingConfidence(suggestion)}
+                            </div>
+                          </Col>
+                          <Col xs={10}>
+                            <Typography.Text strong>匹配方式</Typography.Text>
+                            <div className="mapping-mobile-meta">
+                              {renderMappingMethod(suggestion)}
+                            </div>
+                          </Col>
+                        </Row>
+                      </Flex>
+                    </Card>
+                  ))}
+                </Flex>
+              ) : (
+                <Table
+                  className="mapping-table"
+                  rowClassName={(suggestion) =>
+                    ignoredSourceSet.has(suggestion.source_column)
+                      ? "mapping-row-ignored"
+                      : ""
+                  }
+                  rowKey="source_column"
+                  pagination={false}
+                  scroll={{ x: 1120 }}
+                  dataSource={parsed.suggestions}
+                  columns={[
+                    {
+                      title: "原字段",
+                      dataIndex: "source_column",
+                      key: "source_column",
+                      width: 210,
                     },
-                  },
-                  {
-                    title: "匹配方式",
-                    key: "method",
-                    width: 140,
-                    render: (_, suggestion) => (
-                      <Tag
-                        color={
-                          mapping[suggestion.source_column] !==
-                          suggestion.suggested_field
-                            ? "purple"
-                            : "blue"
-                        }
-                      >
-                        {mapping[suggestion.source_column] !==
-                        suggestion.suggested_field
-                          ? "Manual"
-                          : suggestion.method}
-                      </Tag>
-                    ),
-                  },
-                ]}
-              />
+                    {
+                      title: "目标字段",
+                      key: "target",
+                      width: 560,
+                      render: (_, suggestion) =>
+                        renderMappingTarget(suggestion),
+                    },
+                    {
+                      title: "置信度",
+                      key: "confidence",
+                      width: 200,
+                      render: (_, suggestion) =>
+                        renderMappingConfidence(suggestion),
+                    },
+                    {
+                      title: "匹配方式",
+                      key: "method",
+                      width: 150,
+                      render: (_, suggestion) =>
+                        renderMappingMethod(suggestion),
+                    },
+                  ]}
+                />
+              )}
               <label className="import-field">
                 <Typography.Text strong>无时区时间的默认时区</Typography.Text>
                 <Input
@@ -1068,6 +1279,7 @@ export function ImportPage() {
                 <Button
                   type="primary"
                   loading={busy}
+                  disabled={mappingSummary.pending > 0}
                   onClick={() => void handleValidate()}
                 >
                   运行质量校验
@@ -1107,6 +1319,14 @@ export function ImportPage() {
                   ["异常长文本", validation.report.long_text_values],
                   ["无法解析值", validation.report.unparseable_values],
                   ["完全重复行", validation.report.exact_duplicate_rows],
+                  [
+                    "已忽略字段",
+                    validation.report.ignored_source_columns.length,
+                  ],
+                  [
+                    "未处理字段",
+                    validation.report.unresolved_source_columns.length,
+                  ],
                 ].map(([title, value]) => (
                   <Col xs={12} md={8} xl={6} key={String(title)}>
                     <Card size="small">
@@ -1227,6 +1447,11 @@ export function ImportPage() {
                   </Descriptions.Item>
                   <Descriptions.Item label="错误行">
                     {validation.report.error_rows}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="已忽略字段">
+                    {validation.report.ignored_source_columns.length > 0
+                      ? validation.report.ignored_source_columns.join("、")
+                      : "无"}
                   </Descriptions.Item>
                   <Descriptions.Item label="默认时区">
                     {timezone || "未设置"}

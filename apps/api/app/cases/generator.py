@@ -612,7 +612,7 @@ def _xlsx_bytes(generated: GeneratedCase) -> bytes:
     if default_sheet is None:
         raise RuntimeError("新建工作簿缺少默认工作表")
     workbook.remove(default_sheet)
-    workbook.properties.creator = "FulfillLens CN synthetic case generator"
+    workbook.properties.creator = "FulfillLens synthetic case generator"
     fixed_time = datetime(2026, 1, 1, tzinfo=UTC).replace(tzinfo=None)
     workbook.properties.created = fixed_time
     workbook.properties.modified = fixed_time

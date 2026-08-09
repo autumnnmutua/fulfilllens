@@ -1,14 +1,14 @@
-# FulfillLens CN
+# FulfillLens
 
 [English](README_EN.md) · [文档索引](docs/README.md) · [10 分钟快速体验](#10-分钟快速体验) · [贡献](CONTRIBUTING.md) · [安全](SECURITY.md)
 
-FulfillLens CN 是面向物流管理专业学生、教师和中小电商商家的本地优先开源履约分析工具。用户导入订单、仓库作业和物流轨迹 CSV/XLSX 后，可以完成字段映射、状态标准化、指标计算、瓶颈分析、透明异常诊断、What-if 情景模拟和报告导出。
+FulfillLens 是面向物流管理专业学生、教师和中小电商商家的本地优先开源履约分析工具。用户导入订单、仓库作业和物流轨迹 CSV/XLSX 后，可以完成字段映射、状态标准化、指标计算、瓶颈分析、透明异常诊断、What-if 情景模拟和报告导出。
 
 项目的核心不是“自动讲一个听起来合理的故事”，而是让每个百分比、异常和模拟结果都能回到字段、公式、阈值、样本和具体订单证据。
 
-> 版本状态：`1.0.0-rc.4` 已在 Cloudflare 在线版开放自主 CSV/XLSX 导入。原始文件在浏览器内完成解析、字段建议、标准化与质量校验，不上传到 Worker；无法可靠判断的映射必须人工确认。在线自有数据的完整指标分析尚未接入 Worker，真实业务数据的端到端分析仍优先使用本地或 Docker。详见[项目状态](#项目状态与已知限制)。
+> 版本状态：`1.0.0-rc.5` 将公开品牌统一为 FulfillLens，并改进字段映射阅读与操作：低置信度建议需人工确认，分析无关列可明确忽略，未处理列与已忽略列分开统计。忽略不能绕过标准必填字段。Cloudflare 在线版仍在浏览器本地解析和校验自主 CSV/XLSX，原始文件不上传到 Worker。详见[项目状态](#项目状态与已知限制)。
 
-## 为什么使用 FulfillLens CN
+## 为什么使用 FulfillLens
 
 - **本地优先**：默认在用户设备上处理文件，不要求外部数据库或付费物流接口。
 - **口径透明**：OT、IF、OTIF、P50、P90、覆盖率等均展示字段依赖、分子、分母和警告。
@@ -27,7 +27,7 @@ FulfillLens CN 是面向物流管理专业学生、教师和中小电商商家�
 
 | 模块       | 用户可以完成什么                                        | 重要边界                               |
 | ---------- | ------------------------------------------------------- | -------------------------------------- |
-| 数据导入   | 导入非模板 CSV/XLSX、识别数据类型/业务别名、转换并校验  | 每条建议展示方法/置信度；不执行公式    |
+| 数据导入   | 导入非模板 CSV/XLSX、识别业务别名、映射/忽略源列并校验  | 忽略与未识别分开；必填字段不能被绕过   |
 | 状态标准化 | 保存原始状态、标准状态、来源和置信度，增加项目级映射    | 未知状态保留并标记 `unmapped`          |
 | 履约指标   | 查看 OT、IF、OTIF、时效、节点、取消、退回、异常和覆盖率 | 不可计算订单不混入成功/失败分母        |
 | 分析总览   | 趋势、分布、节点耗时、仓库/承运商/地区对比和订单明细    | 图表显示样本量、单位、覆盖率和文字摘要 |
@@ -176,7 +176,9 @@ docker compose down --volumes
 
 ## Cloudflare 在线演示
 
-在线地址：<https://fulfilllens-cn.esthertreu3724.workers.dev>
+在线地址：<https://fulfilllens.esthertreu3724.workers.dev>
+
+品牌迁移期间，旧地址 `fulfilllens-cn.esthertreu3724.workers.dev` 暂不删除，作为历史版本回退入口；它不会覆盖上方新地址，也不应作为新文档或书签的首选。新地址完成独立验收后再评估受控跳转。
 
 在线版默认加载公开、确定性的合成案例，可体验指标、总览、透明诊断、订单级 What-if 复算和报告。自主文件路径在浏览器本地完成扩展名/MIME/签名检查、CSV/XLSX 解析、字段建议、状态标准化、Schema 与质量校验；原始文件不发送到 Cloudflare，确认后只把标准化数据集保存在当前浏览器 IndexedDB，可在“设置”中删除。Worker 的原始上传接口主动拒绝请求，避免旧客户端误传文件。
 
@@ -263,11 +265,11 @@ FastAPI + Pydantic ── 领域服务与透明规则
 
 阶段 0–12 已完成当前候选版本范围内的实现与全量验收。当前证据：
 
-- 前端 36 项、Cloudflare Worker 14 项、后端与契约 227 项测试；
+- 前端 37 项、Cloudflare Worker 14 项、后端与契约 229 项测试；
 - 1 万/5 万订单性能基准；
 - 导入流程已在 360/390/430/1440 Chromium 真实操作；全站审计覆盖 360/390/430/768/1440；
 - npm/Python 漏洞审计和敏感信息扫描；
-- [GitHub Actions](https://github.com/autumnnmutua/fulfilllens-cn/actions)包含质量与真实 Docker smoke job；发布标签以对应提交的实际成功结果为准；
+- [GitHub Actions](https://github.com/autumnnmutua/fulfilllens/actions)包含质量与真实 Docker smoke job；发布标签以对应提交的实际成功结果为准；
 - 公开远程仓库与 Private Vulnerability Reporting 已启用。
 
 候选版本的非阻断限制：
@@ -287,7 +289,7 @@ FastAPI + Pydantic ── 领域服务与透明规则
 - 阶段 11：中英文开源文档、许可证、治理模板和 RC 资料；
 - 阶段 12：干净环境全量验收与 v1.0 发布判断。
 
-详见[路线图](docs/ROADMAP.md)、[最终验收记录](docs/RELEASE_ACCEPTANCE.md)、[兼容性验证报告](docs/COMPATIBILITY_VALIDATION.md)和[v1.0.0-rc.4 发布说明](docs/releases/v1.0.0-rc.4.md)。
+详见[路线图](docs/ROADMAP.md)、[最终验收记录](docs/RELEASE_ACCEPTANCE.md)、[兼容性验证报告](docs/COMPATIBILITY_VALIDATION.md)和[v1.0.0-rc.5 发布说明](docs/releases/v1.0.0-rc.5.md)。
 
 ## 隐私、安全与免责声明
 
@@ -328,6 +330,6 @@ Issue 和 PR 只能附完全合成且已脱敏的数据。指标、规则、Sche
 
 ## 许可证
 
-FulfillLens CN 使用 [MIT License](LICENSE)。第三方依赖保留各自许可证，审查结论和 MPL/CC/Apache 注意事项见[依赖许可证审查](docs/DEPENDENCY_LICENSES.md)。
+FulfillLens 使用 [MIT License](LICENSE)。第三方依赖保留各自许可证，审查结论和 MPL/CC/Apache 注意事项见[依赖许可证审查](docs/DEPENDENCY_LICENSES.md)。
 
 引用教学或研究使用时可使用 [CITATION.cff](CITATION.cff)。

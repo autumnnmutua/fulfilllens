@@ -385,6 +385,7 @@ export function validateBrowserImport(
   dataType: DataType,
   table: BrowserParsedTable,
   mapping: Record<string, string | null>,
+  ignoredSourceColumns: string[],
   defaultTimezone: string | null,
   projectMappings: Record<string, string>,
   sensitiveRisks: SensitiveRisk[],
@@ -407,7 +408,12 @@ export function validateBrowserImport(
     });
   };
 
-  validateMapping(mapping, table.headers, contract).forEach((message) =>
+  validateMapping(
+    mapping,
+    table.headers,
+    contract,
+    ignoredSourceColumns,
+  ).forEach((message) =>
     addIssue({
       code: "INVALID_FIELD_MAPPING",
       message,
@@ -441,9 +447,13 @@ export function validateBrowserImport(
     }
   });
 
+  const ignoredSources = new Set(ignoredSourceColumns);
   const targetToSource = new Map(
     Object.entries(mapping)
-      .filter((entry): entry is [string, string] => entry[1] !== null)
+      .filter(
+        (entry): entry is [string, string] =>
+          entry[1] !== null && !ignoredSources.has(entry[0]),
+      )
       .map(([source, target]) => [target, source]),
   );
   const nullCounts: Record<string, number> = {};
@@ -776,6 +786,12 @@ export function validateBrowserImport(
     duplicate_keys: duplicateKeys,
     error_rows: new Set([...errorRows, ...duplicateConflicts]).size,
     exact_duplicate_rows: excludedExact.size,
+    ignored_source_columns: [...ignoredSources].sort(),
+    unresolved_source_columns: table.headers
+      .filter(
+        (source) => !ignoredSources.has(source) && mapping[source] == null,
+      )
+      .sort(),
     invalid_times:
       codeCount("INVALID_TIME") +
       codeCount("TIMEZONE_REQUIRED") +

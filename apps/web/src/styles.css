@@ -985,6 +985,61 @@ a {
   background: #edf4f8;
 }
 
+.mapping-target-control,
+.mapping-ignored-control,
+.mapping-target-select {
+  width: 100%;
+  min-width: 0;
+}
+
+.mapping-target-select {
+  flex: 1 1 360px;
+}
+
+.mapping-ignore-button {
+  flex: 0 0 auto;
+}
+
+.mapping-confirm-button {
+  flex: 0 0 auto;
+}
+
+.mapping-target-popup {
+  max-width: calc(100vw - 32px);
+}
+
+.mapping-target-popup .ant-select-item-option-content {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.mapping-table .ant-table-cell {
+  vertical-align: top;
+}
+
+.mapping-row-ignored > td,
+.mapping-mobile-card.mapping-row-ignored {
+  background: #f8fafc !important;
+}
+
+.mapping-row-ignored .ant-typography,
+.mapping-row-ignored .ant-card-head-title {
+  color: #52616b;
+}
+
+.mapping-mobile-list,
+.mapping-mobile-card,
+.mapping-mobile-meta {
+  width: 100%;
+  min-width: 0;
+}
+
+.mapping-mobile-meta {
+  margin-top: 8px;
+}
+
 @media (max-width: 900px) {
   .hero {
     grid-template-columns: 1fr;
@@ -1059,6 +1114,23 @@ a {
     height: auto;
     min-height: 36px;
     white-space: normal;
+  }
+
+  .mapping-target-control {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  .mapping-target-select {
+    width: 100%;
+    flex: none;
+  }
+
+  .mapping-target-control .mapping-ignore-button,
+  .mapping-target-control .mapping-confirm-button,
+  .mapping-ignored-control .ant-btn {
+    width: 100%;
   }
 
   .hero-copy h1.ant-typography {

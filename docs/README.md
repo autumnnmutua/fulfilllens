@@ -33,6 +33,7 @@
 
 ## 发布资料
 
+- [v1.0.0-rc.5 发布说明](releases/v1.0.0-rc.5.md)
 - [v1.0.0-rc.4 发布说明](releases/v1.0.0-rc.4.md)
 - [v1.0.0-rc.3 发布说明](releases/v1.0.0-rc.3.md)
 - [阶段 12 最终验收](RELEASE_ACCEPTANCE.md)

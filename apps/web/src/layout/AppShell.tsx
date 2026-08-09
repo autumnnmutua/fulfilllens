@@ -75,12 +75,12 @@ const navigationItems: MenuProps["items"] = [
 
 function Brand() {
   return (
-    <div className="brand" aria-label="FulfillLens CN">
+    <div className="brand" aria-label="FulfillLens">
       <div className="brand-mark" aria-hidden="true">
         FL
       </div>
       <div>
-        <Typography.Text className="brand-name">FulfillLens CN</Typography.Text>
+        <Typography.Text className="brand-name">FulfillLens</Typography.Text>
         <Typography.Text className="brand-subtitle">
           履约分析工作台
         </Typography.Text>
@@ -145,7 +145,7 @@ export function AppShell({ children }: PropsWithChildren) {
           ) : null}
           {!isDesktop ? <Brand /> : <span />}
           <Space>
-            <Tag color="blue">v1.0.0-rc.4</Tag>
+            <Tag color="blue">v1.0.0-rc.5</Tag>
           </Space>
         </Header>
 

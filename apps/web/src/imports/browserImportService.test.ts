@@ -43,6 +43,16 @@ function mappingFrom(
   );
 }
 
+function ignoredFrom(
+  suggestions: Awaited<
+    ReturnType<typeof browserImportService.parse>
+  >["suggestions"],
+): string[] {
+  return suggestions
+    .filter((suggestion) => suggestion.suggested_field === null)
+    .map((suggestion) => suggestion.source_column);
+}
+
 describe("浏览器本地 CSV/XLSX 导入", () => {
   it("真实走完非标准物流轨迹 CSV 的解析、映射、校验与确认", async () => {
     const selected = fixture(
@@ -71,6 +81,7 @@ describe("浏览器本地 CSV/XLSX 导入", () => {
       uploaded.task.task_id,
       {
         default_timezone: "Asia/Shanghai",
+        ignored_source_columns: ignoredFrom(parsed.suggestions),
         mapping: mappingFrom(parsed.suggestions),
         project_status_mappings: {},
       },
@@ -82,6 +93,8 @@ describe("浏览器本地 CSV/XLSX 导入", () => {
       unknown_statuses: 0,
       valid_rows: 12,
     });
+    expect(validated.report.ignored_source_columns).toEqual(["无关说明"]);
+    expect(validated.report.unresolved_source_columns).toEqual([]);
     expect(validated.normalized_preview[0]).toMatchObject({
       event_code: "shipment_created",
       shipment_id: "SYN-WB-0001",
@@ -93,6 +106,7 @@ describe("浏览器本地 CSV/XLSX 导入", () => {
     expect(confirmed.imported_rows).toBe(12);
     const stored = await readBrowserDataset(confirmed.dataset_id);
     expect(stored?.rows).toHaveLength(12);
+    expect(stored?.rows[0]).not.toHaveProperty("无关说明");
   });
 
   it("以任意文件名读取多工作表非标准 XLSX 并保护前导零和 Excel 日期", async () => {
@@ -124,6 +138,7 @@ describe("浏览器本地 CSV/XLSX 导入", () => {
       uploaded.task.task_id,
       {
         default_timezone: "Asia/Shanghai",
+        ignored_source_columns: ignoredFrom(parsed.suggestions),
         mapping: mappingFrom(parsed.suggestions),
         project_status_mappings: {},
       },
@@ -226,6 +241,64 @@ describe("浏览器本地 CSV/XLSX 导入", () => {
     expect(
       missing.report.issues.some(
         (issue) => issue.code === "INVALID_FIELD_MAPPING",
+      ),
+    ).toBe(true);
+  });
+
+  it("明确区分 ignored 与 unresolved，且忽略唯一必填源字段不能绕过 Schema", async () => {
+    const selected = csvFile(
+      "轨迹记录ID,订单号,快递单号,操作时间,轨迹状态,carrier_id,客服备注\nTE-01,ORD-01,WB-01,2026-08-01 08:00,已揽件,CAR-01,无需分析\n",
+      "ignored-fields.csv",
+    );
+    const uploaded = await browserImportService.upload(
+      "tracking_events",
+      selected,
+    );
+    const parsed = await browserImportService.parse(uploaded.task.task_id, {});
+    const mapping = mappingFrom(parsed.suggestions);
+
+    const unresolved = await browserImportService.validate(
+      uploaded.task.task_id,
+      {
+        default_timezone: "Asia/Shanghai",
+        mapping,
+        project_status_mappings: {},
+      },
+    );
+    expect(unresolved.report.can_confirm).toBe(false);
+    expect(unresolved.report.unresolved_source_columns).toEqual(["客服备注"]);
+    expect(unresolved.report.ignored_source_columns).toEqual([]);
+
+    const ignored = await browserImportService.validate(uploaded.task.task_id, {
+      default_timezone: "Asia/Shanghai",
+      ignored_source_columns: ["客服备注"],
+      mapping,
+      project_status_mappings: {},
+    });
+    expect(ignored.report.can_confirm).toBe(true);
+    expect(ignored.report.ignored_source_columns).toEqual(["客服备注"]);
+    expect(ignored.normalized_preview[0]).not.toHaveProperty("客服备注");
+
+    const orderSource = parsed.suggestions.find(
+      (suggestion) => suggestion.suggested_field === "order_id",
+    )?.source_column;
+    expect(orderSource).toBe("订单号");
+    const withoutOrder = { ...mapping, [orderSource as string]: null };
+    const requiredIgnored = await browserImportService.validate(
+      uploaded.task.task_id,
+      {
+        default_timezone: "Asia/Shanghai",
+        ignored_source_columns: ["客服备注", orderSource as string],
+        mapping: withoutOrder,
+        project_status_mappings: {},
+      },
+    );
+    expect(requiredIgnored.report.can_confirm).toBe(false);
+    expect(
+      requiredIgnored.report.issues.some(
+        (issue) =>
+          issue.code === "INVALID_FIELD_MAPPING" &&
+          issue.message.includes("order_id"),
       ),
     ).toBe(true);
   });

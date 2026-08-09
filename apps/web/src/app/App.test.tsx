@@ -12,7 +12,7 @@ function jsonResponse(payload: unknown, status = 200): Response {
   });
 }
 
-describe("FulfillLens CN 应用壳", () => {
+describe("FulfillLens 应用壳", () => {
   beforeEach(() => {
     window.history.replaceState({}, "", "/");
     vi.stubGlobal(
@@ -29,7 +29,7 @@ describe("FulfillLens CN 应用壳", () => {
             jsonResponse({
               status: "ok",
               service: "fulfilllens-api",
-              version: "1.0.0-rc.4",
+              version: "1.0.0-rc.5",
             }),
           );
         }
@@ -37,8 +37,8 @@ describe("FulfillLens CN 应用壳", () => {
         if (url.endsWith("/api/version")) {
           return Promise.resolve(
             jsonResponse({
-              app_name: "FulfillLens CN",
-              app_version: "1.0.0-rc.4",
+              app_name: "FulfillLens",
+              app_version: "1.0.0-rc.5",
               api_version: "v1",
               environment: "test",
               contract_versions: {

@@ -1,4 +1,4 @@
-# FulfillLens CN Web
+# FulfillLens Web
 
 React、TypeScript 与 Vite 前端。当前已实现响应式导入向导、可筛选分析总览、透明诊断、订单事件下钻、What-if 方案模拟、教学案例、报告导出、本地数据清理和首次使用者指标解释。
 

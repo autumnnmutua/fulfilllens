@@ -10,6 +10,38 @@
 - 评估 Firefox/Safari 兼容性和可复现 PDF 中文渲染；
 - 评估 Cloudflare 上的完整后端迁移方案，同时保持本地优先和可解释数据边界。
 
+## [1.0.0-rc.5] - 2026-08-09
+
+### Added
+
+- 字段映射新增显式“忽略”状态、取消忽略与自动/人工/忽略/待处理进度汇总；
+- 浏览器与 FastAPI 质量报告新增 `ignored_source_columns` 和 `unresolved_source_columns`，保留用户决定与系统未知的语义差异；
+- 新增忽略无关列、忽略必填候选、最终标准数据排除、桌面/移动端布局和真实 CSV/XLSX 流程回归。
+
+### Changed
+
+- 项目公开品牌从 FulfillLens CN 更名为 FulfillLens；用户界面、包元数据、文档、GitHub 仓库和 Cloudflare 正式入口改用不含 `CN` 的名称；
+- 目标字段列扩展为主要工作区，桌面下拉菜单保持 480px 可读宽度，移动端改为全宽卡片布局；
+- `Manual`、`Similarity`、`Ignored`、`Unresolved` 与置信度展示按真实映射状态重新对齐。
+
+### Fixed
+
+- 修复目标字段 Select 未设置可用宽度导致下拉内容逐字纵向挤压的问题；
+- 修复“用户主动忽略”与“系统无法识别”都由空映射表示、进而产生状态冲突的问题；
+- 防止忽略唯一必填源字段绕过标准 Schema：缺失目标必填字段仍是阻断错误；
+- 被忽略列不进入标准行、指标、诊断、What-if、维度或报告数据集。
+- 修复浏览器导入验收可能复用普通本地构建产物、误把文件发送到 Worker 的构建模式竞态；验收脚本现在先强制生成 Cloudflare 浏览器本地处理版本。
+
+### Compatibility
+
+- 为避免现有浏览器数据丢失，IndexedDB 内部数据库名暂保留 `fulfilllens-cn-browser-data`；Docker Compose 内部项目名也暂保留，二者不属于公开品牌；
+- 历史 Release、CHANGELOG 和 Schema `$id` 中的旧名称/URI 仅作版本与契约兼容记录。
+
+### Known limitations
+
+- Cloudflare 浏览器自有数据仍未接入 Worker 指标、诊断、模拟和报告；完整分析继续使用本地/Docker 或公开合成案例路径；
+- Firefox/Safari 与 PDF 仍未进入本候选版本发布验收。
+
 ## [1.0.0-rc.4] - 2026-08-09
 
 ### Added

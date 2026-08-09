@@ -313,6 +313,7 @@ def validate_import(
     table: ParsedTable,
     contract: Contract,
     mapping: dict[str, str | None],
+    ignored_source_columns: list[str] | None = None,
     default_timezone: str | None,
     project_status_mappings: dict[str, str],
     sensitive_risks: list[SensitiveRisk],
@@ -323,7 +324,12 @@ def validate_import(
     for issue in table.issues:
         issue_from_parse(collector, issue, table.sheet_name)
 
-    target_to_source = {target: source for source, target in mapping.items() if target is not None}
+    ignored_sources = set(ignored_source_columns or [])
+    target_to_source = {
+        target: source
+        for source, target in mapping.items()
+        if target is not None and source not in ignored_sources
+    }
     validator = build_validator(contract)
     null_counts: Counter[str] = Counter()
     candidate_rows: list[tuple[int, dict[str, Any], StatusNormalization | None]] = []
@@ -598,6 +604,12 @@ def validate_import(
             + issue_codes["EXCEL_ERROR_CELL"]
         ),
         exact_duplicate_rows=len(excluded_exact_rows),
+        ignored_source_columns=sorted(ignored_sources),
+        unresolved_source_columns=sorted(
+            source
+            for source in table.headers
+            if source not in ignored_sources and mapping.get(source) is None
+        ),
         sensitive_risks=sensitive_risks,
         status_normalizations=summarize_statuses(status_normalizations),
         issues=collector.issues,

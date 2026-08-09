@@ -49,6 +49,34 @@ def test_raw_status_mapping_satisfies_derived_standard_status() -> None:
     assert errors == []
 
 
+def test_ignored_and_unresolved_sources_are_distinct_and_required_cannot_be_bypassed() -> None:
+    contract = get_contract(DataType.ORDERS)
+    sources = ["订单编号", "创建时间", "数量", "单位", "状态", "客服备注"]
+    mapping: dict[str, str | None] = {
+        "订单编号": "order_id",
+        "创建时间": "created_at",
+        "数量": "ordered_quantity",
+        "单位": "quantity_unit",
+        "状态": "raw_order_status",
+        "客服备注": None,
+    }
+
+    unresolved = validate_mapping(mapping, sources, contract)
+    assert any("存在未处理源字段：客服备注" in error for error in unresolved)
+
+    accepted = validate_mapping(mapping, sources, contract, ["客服备注"])
+    assert accepted == []
+
+    mapping["订单编号"] = None
+    required_ignored = validate_mapping(
+        mapping,
+        sources,
+        contract,
+        ["订单编号", "客服备注"],
+    )
+    assert any("缺少必填目标字段：order_id" in error for error in required_ignored)
+
+
 def test_camel_case_and_common_business_aliases_are_detected() -> None:
     columns = [
         "Order No",

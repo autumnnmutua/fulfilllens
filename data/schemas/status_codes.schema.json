@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://fulfilllens.cn/schemas/status-codes.schema.json",
-  "title": "FulfillLens CN 标准状态代码",
+  "title": "FulfillLens 标准状态代码",
   "description": "订单、仓库作业和物流轨迹的受控状态枚举。",
   "$defs": {
     "orderStatus": {

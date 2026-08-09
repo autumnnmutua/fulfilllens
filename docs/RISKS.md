@@ -1,4 +1,4 @@
-# FulfillLens CN 风险登记
+# FulfillLens 风险登记
 
 ## 使用方式
 

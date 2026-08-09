@@ -113,7 +113,7 @@ class CloudflareWorkersAIClient:
                 "Authorization": f"Bearer {self.api_token}",
                 "Accept": "application/json",
                 "Content-Type": "application/json",
-                "User-Agent": "FulfillLens-CN/1.0.0-rc.4 Workers-AI-Probe",
+                "User-Agent": "FulfillLens-CN/1.0.0-rc.5 Workers-AI-Probe",
             },
         )
         try:
