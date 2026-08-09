@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import io
 import json
 import os
@@ -14,7 +15,7 @@ from app.core.config import Settings
 from app.core.errors import AppError
 from app.datasets.store import DatasetStore
 from app.imports.contracts import PROJECT_ROOT, get_contract
-from app.imports.mapping import suggest_mappings, validate_mapping
+from app.imports.mapping import detect_data_types, suggest_mappings, validate_mapping
 from app.imports.parser import (
     ParsedTable,
     detect_csv_encoding,
@@ -36,6 +37,8 @@ from app.imports.store import ImportTaskRecord, ImportTaskStore
 from app.imports.synthetic import build_synthetic_csv
 from app.imports.validation import ValidationArtifacts, validate_import
 from app.schemas.imports import (
+    CompatibilitySample,
+    CompatibilitySampleCatalog,
     ConfirmResponse,
     DataType,
     ImportStatus,
@@ -49,6 +52,8 @@ from app.schemas.imports import (
 from app.schemas.system import ErrorDetail
 
 UPLOAD_CHUNK_BYTES = 1024 * 1024
+SAMPLE_DIR = PROJECT_ROOT / "data" / "samples"
+SAMPLE_CATALOG_PATH = SAMPLE_DIR / "compatibility_samples.json"
 
 
 class ImportService:
@@ -169,12 +174,26 @@ class ImportService:
             [row.values for row in table.rows],
         )
         suggestions = suggest_mappings(table.headers, get_contract(task.data_type))
+        data_type_candidates = detect_data_types(table.headers)
+        detected = data_type_candidates[0]
+        warnings = list(table.warnings)
+        if detected.data_type != task.data_type:
+            selected_label = next(
+                item.display_name
+                for item in data_type_candidates
+                if item.data_type == task.data_type
+            )
+            warnings.append(
+                f"字段结构更像{detected.display_name}（置信度 {detected.confidence:.0%}），"
+                f"当前仍按{selected_label}处理；"
+                "系统不会静默改变数据类型，请返回第一步复核。"
+            )
         task.mapping = {
             suggestion.source_column: suggestion.suggested_field for suggestion in suggestions
         }
         task.status = ImportStatus.AWAITING_MAPPING
         task.message = "预览已就绪，请确认字段映射和默认时区。"
-        task.warnings = table.warnings
+        task.warnings = warnings
         self.store.save(task)
 
         hidden_columns = sensitive_columns(risks)
@@ -201,8 +220,59 @@ class ImportService:
             total_rows=len(table.rows),
             suggestions=suggestions,
             sensitive_risks=risks,
-            warnings=table.warnings,
+            warnings=warnings,
+            detected_data_type=detected.data_type,
+            detection_confidence=detected.confidence,
+            data_type_candidates=data_type_candidates,
+            unmapped_source_columns=[
+                suggestion.source_column
+                for suggestion in suggestions
+                if suggestion.suggested_field is None
+            ],
+            conversion_notes=[
+                "源字段、原始值和行号保持可追溯；自动建议不会在确认前替代人工选择。",
+                "文本数字只在目标数量字段通过严格校验后转为数值，空值不会变成 0。",
+                "Excel 日期与常见日期文本转为带时区 ISO 8601；无时区值使用用户指定时区。",
+                "附加字段默认保持未映射并继续展示，不会为通过校验而删除或改写业务事实。",
+            ],
         )
+
+    def compatibility_samples(self) -> CompatibilitySampleCatalog:
+        if not SAMPLE_CATALOG_PATH.is_file():
+            raise AppError(
+                code="COMPATIBILITY_SAMPLE_CATALOG_NOT_FOUND",
+                message="兼容性示例目录不存在。",
+                status_code=404,
+            )
+        return CompatibilitySampleCatalog.model_validate_json(
+            SAMPLE_CATALOG_PATH.read_text(encoding="utf-8")
+        )
+
+    def compatibility_sample_path(self, sample_id: str) -> tuple[CompatibilitySample, Path]:
+        catalog = self.compatibility_samples()
+        sample = next((item for item in catalog.samples if item.sample_id == sample_id), None)
+        if sample is None:
+            raise AppError(
+                code="COMPATIBILITY_SAMPLE_NOT_FOUND",
+                message="兼容性示例不存在。",
+                status_code=404,
+            )
+        sample_root = SAMPLE_DIR.resolve()
+        path = (sample_root / sample.file_name).resolve()
+        if path.parent != sample_root or not path.is_file():
+            raise AppError(
+                code="COMPATIBILITY_SAMPLE_FILE_NOT_FOUND",
+                message="兼容性示例文件不存在或路径无效。",
+                status_code=404,
+            )
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        if digest != sample.sha256:
+            raise AppError(
+                code="COMPATIBILITY_SAMPLE_INTEGRITY_FAILED",
+                message="兼容性示例完整性校验失败。",
+                status_code=500,
+            )
+        return sample, path
 
     def validate(
         self,

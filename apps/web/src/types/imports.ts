@@ -56,6 +56,14 @@ export interface FieldSuggestion {
   candidates: FieldCandidate[];
 }
 
+export interface DataTypeCandidate {
+  data_type: DataType;
+  display_name: string;
+  confidence: number;
+  matched_fields: string[];
+  missing_required_fields: string[];
+}
+
 export interface SensitiveRisk {
   source_column: string;
   categories: string[];
@@ -78,6 +86,31 @@ export interface ParseResponse {
   suggestions: FieldSuggestion[];
   sensitive_risks: SensitiveRisk[];
   warnings: string[];
+  detected_data_type: DataType;
+  detection_confidence: number;
+  data_type_candidates: DataTypeCandidate[];
+  unmapped_source_columns: string[];
+  conversion_notes: string[];
+}
+
+export interface CompatibilitySample {
+  sample_id: string;
+  display_name: string;
+  file_name: string;
+  file_format: "csv" | "xlsx";
+  default_data_type: DataType;
+  default_sheet?: string | null;
+  sheet_names: string[];
+  row_counts: Record<string, number>;
+  purpose: string;
+  conversion_features: string[];
+  sha256: string;
+  privacy_statement: string;
+}
+
+export interface CompatibilitySampleCatalog {
+  samples: CompatibilitySample[];
+  privacy_statement: string;
 }
 
 export interface QualityIssue {

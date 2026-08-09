@@ -1,6 +1,6 @@
 {
   "name": "@fulfilllens/cloudflare-worker",
-  "version": "1.0.0-rc.2",
+  "version": "1.0.0-rc.3",
   "private": true,
   "license": "MIT",
   "type": "module",
@@ -9,6 +9,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "devDependencies": {
+    "@types/node": "24.13.3",
     "typescript": "5.9.3",
     "vitest": "4.1.10"
   }

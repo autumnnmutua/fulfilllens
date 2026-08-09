@@ -33,6 +33,7 @@ BUILTIN_SYNONYMS: dict[DataType, dict[str, str]] = {
         "已发货": "shipped",
         "已完成": "delivered",
         "已签收": "delivered",
+        "妥投": "delivered",
         "已取消": "cancelled",
         "交易关闭": "cancelled",
         "已退回": "returned",

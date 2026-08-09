@@ -156,7 +156,7 @@ def request(url: str) -> tuple[int, bytes]:
         url,
         headers={
             "Accept": "application/json, text/html",
-            "User-Agent": "FulfillLens-CN-Smoke/1.0.0-rc.2",
+            "User-Agent": "FulfillLens-CN-Smoke/1.0.0-rc.3",
         },
     )
     with urlopen(http_request, timeout=3) as response:
@@ -311,7 +311,10 @@ def main() -> None:
             direct_version = request_json(f"{API_BASE}/api/version")
             proxy_health = request_json(f"{WEB_BASE}/health")
             proxy_version = request_json(f"{WEB_BASE}/api/version")
+            compatibility_samples = request_json(f"{WEB_BASE}/api/imports/samples")
             home_status, home_body = request(f"{WEB_BASE}/")
+            compatibility_csv_status, _ = request(f"{WEB_BASE}/compatibility_demo_orders.csv")
+            compatibility_xlsx_status, _ = request(f"{WEB_BASE}/compatibility_demo_logistics.xlsx")
             import_route_status, _ = request(f"{WEB_BASE}/import")
             analytics_route_status, _ = request(f"{WEB_BASE}{dashboard_route()}")
             diagnostics_route_status, _ = request(f"{WEB_BASE}{diagnostics_route()}")
@@ -321,9 +324,12 @@ def main() -> None:
 
             assert direct_health["status"] == "ok"
             assert proxy_health["status"] == "ok"
-            assert direct_version["app_version"] == "1.0.0-rc.2"
+            assert direct_version["app_version"] == "1.0.0-rc.3"
             assert proxy_version["api_version"] == "v1"
+            assert len(compatibility_samples["samples"]) == 2
             assert home_status == 200
+            assert compatibility_csv_status == 200
+            assert compatibility_xlsx_status == 200
             assert b"FulfillLens CN" in home_body
             assert import_route_status == 200
             assert analytics_route_status == 200
@@ -341,6 +347,9 @@ def main() -> None:
                         "api_version": direct_version["app_version"],
                         "proxy_health": proxy_health["status"],
                         "proxy_api_version": proxy_version["api_version"],
+                        "compatibility_sample_count": len(compatibility_samples["samples"]),
+                        "compatibility_csv_status": compatibility_csv_status,
+                        "compatibility_xlsx_status": compatibility_xlsx_status,
                         "web_status": home_status,
                         "import_route_status": import_route_status,
                         "analytics_route_status": analytics_route_status,

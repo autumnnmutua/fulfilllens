@@ -24,7 +24,7 @@ import {
   Typography,
   Upload,
 } from "antd";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { importApi } from "../api/imports";
 import { ApiClientError } from "../api/client";
@@ -33,6 +33,8 @@ import { PageHeader } from "../components/PageHeader";
 import { isCloudflareDeploy } from "../config/runtime";
 import type {
   ConfirmResponse,
+  CompatibilitySample,
+  CompatibilitySampleCatalog,
   DataType,
   ImportTask,
   ParseResponse,
@@ -174,6 +176,26 @@ export function ImportPage() {
   const [confirmed, setConfirmed] = useState<ConfirmResponse | null>(null);
   const [busy, setBusy] = useState(false);
   const [persistentError, setPersistentError] = useState<string | null>(null);
+  const [sampleCatalog, setSampleCatalog] =
+    useState<CompatibilitySampleCatalog | null>(null);
+  const [sampleCatalogError, setSampleCatalogError] = useState<string | null>(
+    null,
+  );
+
+  useEffect(() => {
+    let active = true;
+    void importApi
+      .listSamples()
+      .then((response) => {
+        if (active) setSampleCatalog(response);
+      })
+      .catch((error: unknown) => {
+        if (active) setSampleCatalogError(errorMessage(error));
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const previewColumns = useMemo(
     () => [
@@ -279,6 +301,53 @@ export function ImportPage() {
     }
   }
 
+  async function handleCompatibilitySample(sample: CompatibilitySample) {
+    const response = await runAction(async () => {
+      const download = await fetch(importApi.sampleFileUrl(sample.sample_id));
+      if (!download.ok) {
+        throw new Error(`兼容性示例下载失败（HTTP ${download.status}）。`);
+      }
+      const selected = new File([await download.blob()], sample.file_name, {
+        type:
+          sample.file_format === "csv"
+            ? "text/csv"
+            : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const uploaded = await importApi.upload(
+        sample.default_data_type,
+        selected,
+      );
+      return { selected, uploaded };
+    });
+    if (response === null) return;
+    setDataType(sample.default_data_type);
+    setFile(response.selected);
+    setTask(response.uploaded.task);
+    setEncoding(response.uploaded.task.encoding ?? undefined);
+    setSheetName(sample.default_sheet ?? undefined);
+    setParsed(null);
+    setValidation(null);
+    setConfirmed(null);
+    if (response.uploaded.task.status === "awaiting_sheet") {
+      setCurrent(2);
+    } else if (response.uploaded.task.status === "awaiting_encoding") {
+      setCurrent(2);
+    } else {
+      const parsedResponse = await runAction(() =>
+        importApi.parse(response.uploaded.task.task_id, {
+          ...(response.uploaded.task.encoding
+            ? { encoding: response.uploaded.task.encoding }
+            : {}),
+        }),
+      );
+      if (parsedResponse !== null) applyParsed(parsedResponse);
+    }
+    notifications.showSuccess(
+      "兼容性示例已进入导入流程",
+      "它会经过与普通文件相同的解析、映射、校验和确认步骤。",
+    );
+  }
+
   async function handleValidate() {
     if (task === null) {
       return;
@@ -377,7 +446,7 @@ export function ImportPage() {
         title="数据导入"
         description={
           isCloudflareDeploy
-            ? "在线版可直接加载公开合成示例；真实订单、仓库作业和物流轨迹不会上传到此站点。"
+            ? "在线版可上传并转换本站两份公开合成兼容样例；真实订单、仓库作业和物流轨迹不会上传到此站点。"
             : "逐步导入订单、仓库作业或物流轨迹。系统会先预览、映射和校验，只有确认后才形成可分析数据集。"
         }
       />
@@ -387,14 +456,81 @@ export function ImportPage() {
         showIcon
         type="info"
         message={
-          isCloudflareDeploy ? "在线版不接收真实文件" : "文件仅在本机处理"
+          isCloudflareDeploy
+            ? "在线版仅接收本站公开合成样例"
+            : "文件仅在本机处理"
         }
         description={
           isCloudflareDeploy
-            ? "请使用下方的合成案例完成完整操作流程。真实业务数据请使用本地版或经授权的私有云部署。"
+            ? "可下载并重新上传下方两份合成兼容样例，完整检查字段转换。任意真实或未知文件会被拒绝；真实业务数据请使用本地版。"
             : "限制为 CSV/XLSX，单文件最大 10 MiB；不执行宏与公式。姓名、手机号、详细地址和身份证等字段只提示风险，预览会脱敏。"
         }
       />
+
+      <Card className="section-card" title="数据兼容性示例">
+        {sampleCatalogError !== null ? (
+          <Alert
+            type="error"
+            showIcon
+            message="兼容性示例暂时不可用"
+            description={sampleCatalogError}
+          />
+        ) : null}
+        {sampleCatalog !== null ? (
+          <>
+            <Alert
+              type="success"
+              showIcon
+              message="两份文件均为全新合成数据"
+              description={sampleCatalog.privacy_statement}
+            />
+            <Row gutter={[16, 16]} className="compatibility-sample-grid">
+              {sampleCatalog.samples.map((sample) => (
+                <Col xs={24} lg={12} key={sample.sample_id}>
+                  <Card size="small" title={sample.display_name}>
+                    <Typography.Paragraph>
+                      {sample.purpose}
+                    </Typography.Paragraph>
+                    <Flex gap="small" wrap>
+                      <Tag color="blue">{sample.file_format.toUpperCase()}</Tag>
+                      <Tag>
+                        {Object.values(sample.row_counts).reduce(
+                          (total, value) => total + value,
+                          0,
+                        )}{" "}
+                        条数据
+                      </Tag>
+                      {sample.sheet_names.length > 0 ? (
+                        <Tag>{sample.sheet_names.length} 个工作表</Tag>
+                      ) : null}
+                    </Flex>
+                    <ul className="case-list">
+                      {sample.conversion_features.map((feature) => (
+                        <li key={feature}>{feature}</li>
+                      ))}
+                    </ul>
+                    <Flex gap="small" wrap>
+                      <Button
+                        type="primary"
+                        loading={busy}
+                        onClick={() => void handleCompatibilitySample(sample)}
+                      >
+                        加载并进入导入流程
+                      </Button>
+                      <Button
+                        icon={<DownloadOutlined />}
+                        href={importApi.sampleFileUrl(sample.sample_id)}
+                      >
+                        下载原文件
+                      </Button>
+                    </Flex>
+                  </Card>
+                </Col>
+              ))}
+            </Row>
+          </>
+        ) : null}
+      </Card>
 
       <Card className="section-card import-wizard">
         <Steps
@@ -583,6 +719,21 @@ export function ImportPage() {
                     : "仍建议在导入前删除分析不需要的姓名、电话和详细地址。"
                 }
               />
+              <Alert
+                showIcon
+                type={
+                  parsed.detected_data_type === dataType ? "success" : "warning"
+                }
+                message={`数据类型识别：${
+                  parsed.data_type_candidates[0]?.display_name ??
+                  parsed.detected_data_type
+                }（${Math.round(parsed.detection_confidence * 100)}%）`}
+                description={
+                  parsed.detected_data_type === dataType
+                    ? "识别结果与当前选择一致；仍请结合业务含义复核。"
+                    : "识别结果与当前选择不同。系统没有静默改型，请返回第一步选择正确类型后重新上传。"
+                }
+              />
               {parsed.warnings.map((warning) => (
                 <Alert
                   key={warning}
@@ -635,6 +786,26 @@ export function ImportPage() {
                 message="自动匹配只是建议"
                 description="建议基于英文代码、中文别名和字段名相似度；请根据置信度复核。返回本页修改映射不需要重新上传。"
               />
+              {parsed.unmapped_source_columns.length > 0 ? (
+                <Alert
+                  showIcon
+                  type="info"
+                  message={`${parsed.unmapped_source_columns.length} 个附加字段未自动映射`}
+                  description={`这些列仍保留在预览中且不会静默删除：${parsed.unmapped_source_columns.join("、")}`}
+                />
+              ) : null}
+              <Alert
+                showIcon
+                type="info"
+                message="数据标准化规则"
+                description={
+                  <ul className="case-list">
+                    {parsed.conversion_notes.map((note) => (
+                      <li key={note}>{note}</li>
+                    ))}
+                  </ul>
+                }
+              />
               <Table
                 rowKey="source_column"
                 pagination={false}
@@ -642,13 +813,13 @@ export function ImportPage() {
                 dataSource={parsed.suggestions}
                 columns={[
                   {
-                    title: "源字段",
+                    title: "原字段",
                     dataIndex: "source_column",
                     key: "source_column",
                     width: 180,
                   },
                   {
-                    title: "映射到",
+                    title: "目标字段",
                     key: "target",
                     width: 280,
                     render: (_, suggestion) => (
@@ -685,7 +856,7 @@ export function ImportPage() {
                     ),
                   },
                   {
-                    title: "依据",
+                    title: "匹配方式",
                     dataIndex: "method",
                     key: "method",
                     width: 140,

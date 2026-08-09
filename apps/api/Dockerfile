@@ -16,6 +16,7 @@ RUN python -m pip install --upgrade pip \
 COPY apps/api/app ./apps/api/app
 COPY data/cases ./data/cases
 COPY data/rules ./data/rules
+COPY data/samples ./data/samples
 COPY data/schemas ./data/schemas
 COPY data/templates ./data/templates
 

@@ -49,6 +49,12 @@ COMMON_NAIVE_FORMATS = (
     "%Y/%m/%d %H:%M",
     "%Y-%m-%d",
     "%Y/%m/%d",
+    "%Y.%m.%d %H:%M:%S",
+    "%Y.%m.%d %H:%M",
+    "%Y.%m.%d",
+    "%Y年%m月%d日 %H:%M:%S",
+    "%Y年%m月%d日 %H:%M",
+    "%Y年%m月%d日",
 )
 THOUSANDS_PATTERN = re.compile(r"^[+-]?\d{1,3}(,\d{3})+(?:\.\d+)?$")
 

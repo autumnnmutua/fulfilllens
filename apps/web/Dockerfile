@@ -7,6 +7,7 @@ COPY apps/web/package.json ./apps/web/package.json
 RUN npm ci --workspace @fulfilllens/web --include-workspace-root
 
 COPY apps/web ./apps/web
+COPY data/samples ./data/samples
 RUN npm run build --workspace @fulfilllens/web
 
 FROM nginxinc/nginx-unprivileged:1.28-alpine

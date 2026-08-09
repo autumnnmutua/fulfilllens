@@ -1,6 +1,7 @@
 import { apiDownloadUrl, apiRequest } from "./client";
 import type {
   ConfirmResponse,
+  CompatibilitySampleCatalog,
   DataType,
   ImportTask,
   ParseResponse,
@@ -14,6 +15,10 @@ export interface ValidationPayload {
 }
 
 export const importApi = {
+  listSamples: () =>
+    apiRequest<CompatibilitySampleCatalog>("/api/imports/samples"),
+  sampleFileUrl: (sampleId: string) =>
+    apiDownloadUrl(`/api/imports/samples/${encodeURIComponent(sampleId)}/file`),
   upload: (dataType: DataType, file: File) => {
     const body = new FormData();
     body.append("data_type", dataType);

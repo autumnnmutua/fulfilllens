@@ -5,8 +5,8 @@ import unicodedata
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 
-from app.imports.contracts import FIELD_ALIASES, FIELD_LABELS, Contract
-from app.schemas.imports import FieldCandidate, FieldSuggestion
+from app.imports.contracts import FIELD_ALIASES, FIELD_LABELS, Contract, get_contract
+from app.schemas.imports import DataType, DataTypeCandidate, FieldCandidate, FieldSuggestion
 
 NON_WORD = re.compile(r"[\W_]+", re.UNICODE)
 
@@ -41,7 +41,7 @@ def score_source_column(source_column: str, contract: Contract) -> list[ScoredFi
         aliases = (FIELD_LABELS[field], *FIELD_ALIASES.get(field, ()))
         normalized_aliases = [normalize_field_name(alias) for alias in aliases]
         if source_normalized in normalized_aliases:
-            scores.append(ScoredField(field=field, confidence=0.95, method="中文别名精确匹配"))
+            scores.append(ScoredField(field=field, confidence=0.95, method="业务别名精确匹配"))
             continue
 
         similarity = max(
@@ -104,6 +104,49 @@ def suggest_mappings(source_columns: list[str], contract: Contract) -> list[Fiel
         suggestions[index].suggested_field = top.field
 
     return suggestions
+
+
+DATA_TYPE_LABELS: dict[DataType, str] = {
+    DataType.ORDERS: "订单表",
+    DataType.WAREHOUSE_EVENTS: "仓库事件表",
+    DataType.TRACKING_EVENTS: "物流轨迹表",
+}
+
+
+def detect_data_types(source_columns: list[str]) -> list[DataTypeCandidate]:
+    candidates: list[DataTypeCandidate] = []
+    for data_type in DataType:
+        contract = get_contract(data_type)
+        suggestions = suggest_mappings(source_columns, contract)
+        matched = {
+            suggestion.suggested_field
+            for suggestion in suggestions
+            if suggestion.suggested_field is not None
+        }
+        required = {field.field for field in contract.fields if field.required}
+        raw_status = contract.raw_status_field
+        normalized_status = contract.normalized_status_field
+        status_matched = raw_status in matched or normalized_status in matched
+        required.discard(raw_status)
+        required.discard(normalized_status)
+        required_groups = len(required) + 1
+        matched_required = len(required & matched) + int(status_matched)
+        required_coverage = matched_required / required_groups
+        breadth = min(1.0, len(matched) / max(required_groups, 1))
+        confidence = round(required_coverage * 0.8 + breadth * 0.2, 4)
+        missing = sorted(required - matched)
+        if not status_matched:
+            missing.append(raw_status)
+        candidates.append(
+            DataTypeCandidate(
+                data_type=data_type,
+                display_name=DATA_TYPE_LABELS[data_type],
+                confidence=confidence,
+                matched_fields=sorted(matched),
+                missing_required_fields=missing,
+            )
+        )
+    return sorted(candidates, key=lambda item: (-item.confidence, item.data_type.value))
 
 
 def validate_mapping(

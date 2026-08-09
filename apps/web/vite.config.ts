@@ -5,6 +5,7 @@ const apiProxyTarget =
   process.env.FL_API_PROXY_TARGET ?? "http://127.0.0.1:8000";
 
 export default defineConfig(({ mode }) => ({
+  publicDir: "../../data/samples",
   define: {
     "import.meta.env.VITE_DEPLOY_TARGET": JSON.stringify(
       mode === "cloudflare" ? "cloudflare" : "local",

@@ -6,7 +6,7 @@ FulfillLens CN is a local-first, open-source fulfillment analytics tool for logi
 
 The project is designed to make every percentage, anomaly, and scenario traceable to fields, formulas, thresholds, samples, and order-level evidence instead of generating a merely plausible story.
 
-> Version status: `1.0.0-rc.2` passed the Stage 12 full local acceptance. The Cloudflare online demo provides deterministic synthetic cases, same-origin Worker analysis APIs, and a native Workers AI binding; real business-data analysis remains local or Docker based. Firefox/Safari and PDF are known non-blocking limitations; see [Project status](#project-status-and-known-limitations).
+> Version status: `1.0.0-rc.3` improves conversion of real-world CSV/XLSX layouts and adds two reproducible compatibility samples. The Cloudflare demo accepts only those two digest-matched public synthetic samples and provides same-origin Worker analysis APIs plus a native Workers AI binding; real business-data analysis remains local or Docker based. Firefox/Safari and PDF are known non-blocking limitations; see [Project status](#project-status-and-known-limitations).
 
 ## Why FulfillLens CN
 
@@ -25,17 +25,17 @@ You can experience the complete flow without screenshots. Start the project, ope
 
 ## Core capabilities
 
-| Module               | What users can do                                                                   | Important boundary                                                           |
-| -------------------- | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| Data import          | Import CSV/XLSX, choose encoding/sheet, preview, map, and validate                  | Macros/formulas are never executed; uncertain encodings require confirmation |
-| Status normalization | Keep raw/normalized status, source, confidence, and project mappings                | Unknown values remain available as `unmapped`                                |
-| Fulfillment metrics  | Calculate OT, IF, OTIF, duration, node, cancellation, return, anomaly, and coverage | Non-computable orders are not counted as success or failure                  |
-| Dashboard            | Explore trends, distributions, nodes, dimensions, and paginated orders              | Charts show units, sample size, coverage, and text summaries                 |
-| Diagnostics          | Use eight transparent rule categories, severity, Pareto, variants, and evidence     | Possible causes are not proven causality                                     |
-| What-if              | Change warehouse time, pickup wait, carrier mix, or promise strategy                | Scenario estimates are not forecasts or guarantees                           |
-| Teaching cases       | Load three fully synthetic cases and follow guided exercises                        | No real person, company, address, or tracking number is used                 |
-| Reports              | Preview/export Markdown, self-contained HTML, and safe CSV                          | PDF has not met its release gate; sensitive fields are excluded by default   |
-| Local cleanup        | List and delete datasets, identifiable artifacts, scenarios, and report jobs        | Deletion is irreversible and requires confirmation                           |
+| Module               | What users can do                                                                   | Important boundary                                                         |
+| -------------------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Data import          | Convert non-template CSV/XLSX, detect data type/business aliases, map, and validate | Every suggestion exposes method/confidence; formulas are never executed    |
+| Status normalization | Keep raw/normalized status, source, confidence, and project mappings                | Unknown values remain available as `unmapped`                              |
+| Fulfillment metrics  | Calculate OT, IF, OTIF, duration, node, cancellation, return, anomaly, and coverage | Non-computable orders are not counted as success or failure                |
+| Dashboard            | Explore trends, distributions, nodes, dimensions, and paginated orders              | Charts show units, sample size, coverage, and text summaries               |
+| Diagnostics          | Use eight transparent rule categories, severity, Pareto, variants, and evidence     | Possible causes are not proven causality                                   |
+| What-if              | Change warehouse time, pickup wait, carrier mix, or promise strategy                | Scenario estimates are not forecasts or guarantees                         |
+| Teaching cases       | Load three fully synthetic cases and follow guided exercises                        | No real person, company, address, or tracking number is used               |
+| Reports              | Preview/export Markdown, self-contained HTML, and safe CSV                          | PDF has not met its release gate; sensitive fields are excluded by default |
+| Local cleanup        | List and delete datasets, identifiable artifacts, scenarios, and report jobs        | Deletion is irreversible and requires confirmation                         |
 
 ## Suitable and unsuitable use cases
 
@@ -116,6 +116,8 @@ To verify only the three core What-if scenarios, run the real demo script:
 python scripts/demo_simulation.py
 ```
 
+To focus on real-world compatibility conversion, open <http://127.0.0.1:5173/import> and choose “Non-standard order CSV auto-conversion sample” or “Non-standard logistics XLSX auto-conversion sample.” Both use the ordinary upload, sheet selection, mapping, Schema validation, and confirmation flow.
+
 ### 4. Follow the full path
 
 Open Dashboard → Diagnostics → What-if Scenarios → Reports. Read metric definitions, filter a carrier, open an anomalous order timeline, copy a scenario, and export the guided HTML report.
@@ -174,7 +176,7 @@ The last command is irreversible. A separate GitHub Actions Docker smoke job bui
 
 Online URL: <https://fulfilllens-cn.esthertreu3724.workers.dev>
 
-The online edition loads public deterministic synthetic cases and supports the synthetic import, metrics, dashboard, transparent diagnostics, order-level What-if recalculation, and report flows. It does not accept or retain real orders, warehouse events, tracking events, or personal data. User-created online scenarios live only for the current Worker runtime and are not durable business storage; real files, the full DuckDB/SQLite pipeline, and durable scenarios still require the local or Docker edition. `wrangler.jsonc` binds Workers AI as `AI`; the Account ID and API token never enter browser assets or the repository.
+The online edition loads public deterministic synthetic cases and supports metrics, dashboards, transparent diagnostics, order-level What-if recalculation, and reports. Its import page can upload and convert the two repository compatibility samples, but the Worker verifies their exact SHA-256 digests; unknown or real business files are rejected and not retained. User-created online scenarios live only for the current Worker runtime and are not durable business storage; real business files, the full DuckDB/SQLite pipeline, and durable scenarios still require the local or Docker edition. `wrangler.jsonc` binds Workers AI as `AI`; the Account ID and API token never enter browser assets or the repository.
 
 ```powershell
 npm.cmd run build:cloudflare
@@ -226,7 +228,7 @@ Three data types are supported:
 - `warehouse_events`: one row per warehouse event;
 - `tracking_events`: one row per tracking event.
 
-CSV and XLSX are supported. CSV handles UTF-8, UTF-8 BOM, GBK/GB18030, and other common Chinese encodings; an uncertain result requires user confirmation. Times are normalized to timezone-aware ISO 8601, and timezone-less inputs require a selected default timezone.
+CSV and XLSX are supported. CSV handles UTF-8, UTF-8 BOM, GBK/GB18030, and other common Chinese encodings; an uncertain result requires user confirmation. Fields may use Chinese, English, camelCase, snake_case, or registered business-system aliases, while the UI shows source, target, matching method, and confidence. XLSX supports multiple sheets, Excel dates, numeric/text numeric cells, blank rows, and additional columns. Times are normalized to timezone-aware ISO 8601, and timezone-less inputs require a selected default timezone.
 
 Templates live in `data/templates/`, and machine-readable schemas live in `data/schemas/`. See the [Data Dictionary](docs/DATA_DICTIONARY.md), [Status Taxonomy](docs/STATUS_TAXONOMY.md), and [Import Guide](docs/IMPORTING.md).
 
@@ -257,7 +259,7 @@ See [Architecture](docs/ARCHITECTURE.md) and [ADRs](docs/adr/README.md). The Clo
 
 Stages 0–12 are complete for this release-candidate scope, including full local acceptance. Current evidence includes:
 
-- 23 frontend, 13 Cloudflare Worker, and 220 backend/contract tests;
+- 24 frontend, 16 Cloudflare Worker, and 227 backend/contract tests;
 - 10,000/50,000-order performance benchmarks;
 - eight routes at 360/768/1440 with Chromium and axe;
 - npm/Python vulnerability audits and repository secret scans;
@@ -280,7 +282,7 @@ Reports and benchmarks are evidence for a specific revision, dataset, and machin
 - Stage 11: bilingual open-source docs, license, governance templates, and RC assets;
 - Stage 12: clean-environment acceptance and the v1.0 release decision.
 
-See the [Roadmap](docs/ROADMAP.md), [final acceptance record](docs/RELEASE_ACCEPTANCE.md), and [v1.0.0-rc.2 release notes](docs/releases/v1.0.0-rc.2.md).
+See the [Roadmap](docs/ROADMAP.md), [final acceptance record](docs/RELEASE_ACCEPTANCE.md), [compatibility validation report](docs/COMPATIBILITY_VALIDATION.md), and [v1.0.0-rc.3 release notes](docs/releases/v1.0.0-rc.3.md).
 
 ## Privacy, security, and disclaimer
 

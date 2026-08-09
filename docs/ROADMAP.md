@@ -112,7 +112,7 @@
 - 阶段成果：全流程复验、人工复算、最终缺陷修复、`docs/RELEASE_ACCEPTANCE.md` 和明确发布结论。
 - 验收重点：干净环境安装、三套案例端到端、全量质量命令、安全隐私和文档一致性；任何阻断项必须如实阻止发布。
 - 建议提交：`release: prepare fulfilllens-cn v1.0.0`
-- 当前状态：`1.0.0-rc.2` 已完成本机全量验收；最终发布以相同提交上的 GitHub Actions 成功结果为准。
+- 当前状态：`1.0.0-rc.3` 已完成 CSV/XLSX 兼容转换增强；最终发布以本机全量检查、Docker、Cloudflare 线上复验和相同提交上的 GitHub Actions 成功结果为准。
 
 ## 提交与回滚约定
 

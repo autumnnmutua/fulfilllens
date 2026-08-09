@@ -32,10 +32,10 @@ interface NodeDuration {
 interface DemoOrder {
   order_id: string;
   created_at: string;
-  promised_delivery_time: string;
+  promised_delivery_time: string | null;
   actual_delivery_time: string | null;
   ordered_quantity: number;
-  delivered_quantity: number;
+  delivered_quantity: number | null;
   quantity_unit: string;
   warehouse_id: string;
   carrier_id: string;
@@ -44,7 +44,7 @@ interface DemoOrder {
   order_status: string;
   fulfillment_duration_hours: number | null;
   on_time: boolean | null;
-  in_full: boolean;
+  in_full: boolean | null;
   anomaly_reasons: string[];
   node_durations: NodeDuration[];
 }
@@ -120,6 +120,55 @@ const warehouseValues = ["WH-SH", "WH-HZ", "WH-GZ"] as const;
 const carrierValues = ["Carrier-A", "Carrier-B", "Carrier-C"] as const;
 const regionValues = ["华东", "华南", "华北", "华中"] as const;
 const appStart = Date.UTC(2026, 5, 1, 0, 0, 0);
+const COMPATIBILITY_ORDERS_DATASET = "online-compatibility-orders-v1";
+const compatibilitySamples = [
+  {
+    sample_id: "compatibility_orders_csv",
+    display_name: "非标准订单 CSV 自动转换示例",
+    file_name: "compatibility_demo_orders.csv",
+    file_format: "csv",
+    default_data_type: "orders",
+    default_sheet: null,
+    sheet_names: [],
+    row_counts: { orders: 8 },
+    purpose:
+      "验证非模板字段、混合中英文表头、日期文本、文本数量、ID 前导零、可选空值和附加列的转换。",
+    conversion_features: [
+      "UTF-8 BOM",
+      "中文、英文、camelCase 与业务别名混合字段",
+      "字段顺序变化",
+      "ISO 8601、斜线和点号日期格式",
+      "文本数量与 ID 前导零",
+      "可选空值和无关字段",
+    ],
+    sha256: "4730a123d51e0747c50077147b6121ed7583bbb7f6eb5b53255e3becf828844f",
+    privacy_statement:
+      "全部内容为 FulfillLens CN 为兼容性测试生成的合成数据，不含真实个人、企业、订单或运单信息。",
+  },
+  {
+    sample_id: "compatibility_logistics_xlsx",
+    display_name: "非标准物流 XLSX 自动转换示例",
+    file_name: "compatibility_demo_logistics.xlsx",
+    file_format: "xlsx",
+    default_data_type: "tracking_events",
+    default_sheet: "物流轨迹",
+    sheet_names: ["订单数据", "仓库事件", "物流轨迹"],
+    row_counts: { orders: 6, warehouse_events: 36, tracking_events: 36 },
+    purpose:
+      "验证多工作表、Excel 日期、文本数字、状态别名、字段顺序变化、附加字段与可忽略空单元格。",
+    conversion_features: [
+      "订单、仓库事件和物流轨迹三个工作表",
+      "Excel 日期单元格",
+      "数字与文本数字混合",
+      "中文状态别名标准化",
+      "中文、英文和 camelCase 字段",
+      "附加字段与空白单元格",
+    ],
+    sha256: "05f2c1e56ba8fbae9266ce1389803c73e50f3b8c0c98cfcb0e3688d2ae05fddf",
+    privacy_statement:
+      "全部内容为 FulfillLens CN 为兼容性测试生成的合成数据，不含真实个人、企业、订单或运单信息。",
+  },
+] as const;
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value !== null
@@ -294,7 +343,172 @@ function buildOrders(variant: CaseVariant): DemoOrder[] {
   return orders;
 }
 
+function compatibilityOrderRows() {
+  return [
+    [
+      "0001001",
+      "2026-07-01T08:30:00+08:00",
+      "2026-07-04T18:00:00+08:00",
+      "2026-07-04T16:20:00+08:00",
+      2,
+      2,
+      "delivered",
+      "WH-SYN-EAST-01",
+      "CAR-SYN-A",
+      "CN-SYN-EAST",
+      "自营商城",
+    ],
+    [
+      "0001002",
+      "2026-07-01T09:15:00+08:00",
+      "2026-07-04T18:00:00+08:00",
+      "2026-07-04T20:10:00+08:00",
+      3,
+      3,
+      "delivered",
+      "WH-SYN-EAST-01",
+      "CAR-SYN-B",
+      "CN-SYN-NORTH",
+      "第三方平台",
+    ],
+    [
+      "0001003",
+      "2026-07-02T10:20:00+08:00",
+      "2026-07-05T18:00:00+08:00",
+      null,
+      1,
+      null,
+      "processing",
+      "WH-SYN-SOUTH-01",
+      "未知",
+      "CN-SYN-SOUTH",
+      "直播渠道",
+    ],
+    [
+      "0001004",
+      "2026-07-02T11:00:00+08:00",
+      null,
+      null,
+      4,
+      null,
+      "cancelled",
+      "WH-SYN-SOUTH-01",
+      "未知",
+      "CN-SYN-SOUTH",
+      "自营商城",
+    ],
+    [
+      "0001005",
+      "2026-07-03T07:50:00+08:00",
+      "2026-07-06T18:00:00+08:00",
+      "2026-07-06T15:30:00+08:00",
+      5,
+      4,
+      "delivered",
+      "WH-SYN-NORTH-01",
+      "CAR-SYN-C",
+      "CN-SYN-WEST",
+      "第三方平台",
+    ],
+    [
+      "0001006",
+      "2026-07-03T12:00:00+08:00",
+      "2026-07-06T18:00:00+08:00",
+      "2026-07-06T17:10:00+08:00",
+      1,
+      1,
+      "delivered",
+      "WH-SYN-NORTH-01",
+      "CAR-SYN-A",
+      "CN-SYN-EAST",
+      "自营商城",
+    ],
+    [
+      "0001007",
+      "2026-07-04T13:25:00+08:00",
+      "2026-07-07T18:00:00+08:00",
+      "2026-07-08T08:10:00+08:00",
+      2,
+      2,
+      "delivered",
+      "WH-SYN-EAST-01",
+      "CAR-SYN-C",
+      "CN-SYN-NORTH",
+      "直播渠道",
+    ],
+    [
+      "0001008",
+      "2026-07-05T06:40:00+08:00",
+      "2026-07-08T18:00:00+08:00",
+      "2026-07-08T11:45:00+08:00",
+      2,
+      2,
+      "returned",
+      "WH-SYN-SOUTH-01",
+      "CAR-SYN-B",
+      "CN-SYN-WEST",
+      "第三方平台",
+    ],
+  ] as const;
+}
+
+function buildCompatibilityOrders(): DemoOrder[] {
+  return compatibilityOrderRows().map((row, index) => {
+    const [
+      orderId,
+      created,
+      promised,
+      actual,
+      ordered,
+      delivered,
+      status,
+      warehouse,
+      carrier,
+      region,
+      channel,
+    ] = row;
+    const duration =
+      actual === null
+        ? null
+        : round((Date.parse(actual) - Date.parse(created)) / 3_600_000, 2);
+    const onTime =
+      actual === null || promised === null
+        ? null
+        : Date.parse(actual) <= Date.parse(promised);
+    const inFull = delivered === null ? null : delivered >= ordered;
+    const anomalyReasons: string[] = [];
+    if (onTime === false) anomalyReasons.push("late_delivery");
+    if (inFull === false) anomalyReasons.push("partial_delivery");
+    if (status === "returned") anomalyReasons.push("returned_order");
+    if (duration !== null && duration >= 82)
+      anomalyReasons.push("fulfillment_long_tail");
+    return {
+      order_id: orderId,
+      created_at: created,
+      promised_delivery_time: promised,
+      actual_delivery_time: actual,
+      ordered_quantity: ordered,
+      delivered_quantity: delivered,
+      quantity_unit: "piece",
+      warehouse_id: warehouse,
+      carrier_id: carrier,
+      destination_region: region,
+      sales_channel: channel,
+      order_status: status,
+      fulfillment_duration_hours: duration,
+      on_time: onTime,
+      in_full: inFull,
+      anomaly_reasons: anomalyReasons,
+      node_durations:
+        duration === null ? [] : buildNodeDurations(index, duration, created),
+    };
+  });
+}
+
 function ordersFor(selection: DatasetSelection): DemoOrder[] {
+  if (selection.orders_dataset_id === COMPATIBILITY_ORDERS_DATASET) {
+    return buildCompatibilityOrders();
+  }
   return buildOrders(variantFor(selection));
 }
 
@@ -314,13 +528,16 @@ function orderDetail(order: DemoOrder) {
           order.on_time ? "true" : "false",
           "按承诺送达时间与实际送达时间比较。 ",
         );
-  const inFull = decision(
-    order.in_full ? "true" : "false",
-    "按已交付数量与订购数量比较。 ",
-  );
+  const inFull =
+    order.in_full === null
+      ? decision("pending", "缺少交付数量，IF 暂不可计算。")
+      : decision(
+          order.in_full ? "true" : "false",
+          "按已交付数量与订购数量比较。 ",
+        );
   const otif =
-    order.on_time === null
-      ? decision("pending", "交付尚未完成，OTIF 等待实际送达时间。")
+    order.on_time === null || order.in_full === null
+      ? decision("pending", "缺少承诺、交付时间或交付数量，OTIF 暂不可计算。")
       : decision(
           order.on_time && order.in_full ? "true" : "false",
           "只有同时按时且足量交付才记为 OTIF。",
@@ -421,7 +638,9 @@ function metricsFor(orders: DemoOrder[]) {
     .map((order) => order.fulfillment_duration_hours)
     .filter((value): value is number => value !== null);
   const otif = orders.map((order) =>
-    order.on_time === null ? null : order.on_time && order.in_full,
+    order.on_time === null || order.in_full === null
+      ? null
+      : order.on_time && order.in_full,
   );
   return [
     metricResult(
@@ -1492,14 +1711,14 @@ function rebuildNodeTimeline(
 function refreshedOrder(
   order: DemoOrder,
   duration: number | null,
-  promisedDeliveryTime: string,
+  promisedDeliveryTime: string | null,
   nodeDurations: NodeDuration[],
   retainedReasons: string[],
 ): DemoOrder {
   const actualDeliveryTime =
     duration === null ? null : shiftIso(order.created_at, duration);
   const onTime =
-    actualDeliveryTime === null
+    actualDeliveryTime === null || promisedDeliveryTime === null
       ? null
       : Date.parse(actualDeliveryTime) <= Date.parse(promisedDeliveryTime);
   const reasons = retainedReasons.filter(
@@ -1663,8 +1882,11 @@ function applyScenarioToOrders(
       });
     }
     const extension = parameters.promise_strategy?.extension_hours ?? 0;
-    const promised = shiftIso(order.promised_delivery_time, extension);
-    if (extension > 0) {
+    const promised =
+      order.promised_delivery_time === null
+        ? null
+        : shiftIso(order.promised_delivery_time, extension);
+    if (extension > 0 && promised !== null) {
       adjustments.push({
         transform_type: "promise_strategy",
         order_id: order.order_id,
@@ -2049,9 +2271,31 @@ function importDataType(taskId: string): string {
   return "orders";
 }
 
-function importTask(dataType: string, status = "ready_to_confirm") {
+function compatibilitySample(sampleId: string) {
+  return (
+    compatibilitySamples.find((sample) => sample.sample_id === sampleId) ?? null
+  );
+}
+
+function sampleIdFromTask(taskId: string): string | null {
+  return (
+    compatibilitySamples.find((sample) => taskId.includes(sample.sample_id))
+      ?.sample_id ?? null
+  );
+}
+
+function importTask(
+  dataType: string,
+  status = "ready_to_confirm",
+  sampleId: string | null = null,
+  selectedSheet: string | null = null,
+) {
+  const sample = sampleId === null ? null : compatibilitySample(sampleId);
   return {
-    task_id: `online-demo-${dataType}`,
+    task_id:
+      sample === null
+        ? `online-demo-${dataType}`
+        : `online-${sample.sample_id}-${dataType}`,
     data_type: dataType,
     status,
     status_label:
@@ -2059,17 +2303,272 @@ function importTask(dataType: string, status = "ready_to_confirm") {
         ? "可分析"
         : status === "cancelled"
           ? "已取消"
-          : "可确认导入",
-    file_name: `online-demo-${dataType}.csv`,
-    file_format: "csv",
+          : status === "awaiting_sheet"
+            ? "待选择工作表"
+            : status === "parsing"
+              ? "解析中"
+              : status === "awaiting_mapping"
+                ? "待映射"
+                : "可确认导入",
+    file_name: sample?.file_name ?? `online-demo-${dataType}.csv`,
+    file_format: sample?.file_format ?? "csv",
     encoding: "utf-8",
     encoding_required: false,
     encoding_options: [],
-    sheets: [],
-    selected_sheet: null,
+    sheets: (sample?.sheet_names ?? []).map((name) => ({
+      name,
+      state: "visible",
+    })),
+    selected_sheet: selectedSheet,
     default_timezone: "Asia/Shanghai",
-    message: "在线版使用公开合成示例；不会上传或保存真实文件。",
-    can_reconfigure: false,
+    message:
+      sample === null
+        ? "在线版使用公开合成示例；不会上传或保存真实文件。"
+        : "已核验为本站公开合成兼容样例；文件不写入持久存储。",
+    can_reconfigure: status !== "analyzable" && status !== "cancelled",
+  };
+}
+
+const compatibilityOrderHeaders = [
+  "销售平台",
+  "Order No",
+  "创建时间",
+  "promisedDeliveryTime",
+  "实际送达时间",
+  "orderQty",
+  "已交付数量",
+  "unit",
+  "订单状态",
+  "仓库编码",
+  "物流公司",
+  "目的区域",
+  "无关备注",
+] as const;
+
+const compatibilityOrderSourceRows = [
+  [
+    "自营商城",
+    "0001001",
+    "2026/07/01 08:30",
+    "2026-07-04 18:00",
+    "2026-07-04T16:20:00+08:00",
+    "2",
+    "2",
+    "piece",
+    "已签收",
+    "WH-SYN-EAST-01",
+    "CAR-SYN-A",
+    "CN-SYN-EAST",
+    "首批兼容测试",
+  ],
+  [
+    "第三方平台",
+    "0001002",
+    "2026-07-01T09:15:00+08:00",
+    "2026/07/04 18:00",
+    "2026/07/04 20:10",
+    "3",
+    "3",
+    "piece",
+    "妥投",
+    "WH-SYN-EAST-01",
+    "CAR-SYN-B",
+    "CN-SYN-NORTH",
+    "晚到但数据有效",
+  ],
+  [
+    "直播渠道",
+    "0001003",
+    "2026-07-02 10:20",
+    "2026-07-05 18:00",
+    "",
+    "1",
+    "",
+    "piece",
+    "处理中",
+    "WH-SYN-SOUTH-01",
+    "",
+    "CN-SYN-SOUTH",
+    "可选字段留空",
+  ],
+] as const;
+
+const compatibilityOrderMapping: Record<string, string | null> = {
+  销售平台: "sales_channel",
+  "Order No": "order_id",
+  创建时间: "created_at",
+  promisedDeliveryTime: "promised_delivery_time",
+  实际送达时间: "actual_delivery_time",
+  orderQty: "ordered_quantity",
+  已交付数量: "delivered_quantity",
+  unit: "quantity_unit",
+  订单状态: "raw_order_status",
+  仓库编码: "warehouse_id",
+  物流公司: "carrier_id",
+  目的区域: "destination_region",
+  无关备注: null,
+};
+
+const compatibilityTrackingHeaders = [
+  "waybillNo",
+  "轨迹状态",
+  "扫描时间",
+  "订单编号",
+  "物流事件编号",
+  "carrierCode",
+  "网点代码",
+  "事件序号",
+  "附加备注",
+] as const;
+
+const compatibilityTrackingMapping: Record<string, string | null> = {
+  waybillNo: "shipment_id",
+  轨迹状态: "raw_status",
+  扫描时间: "event_time",
+  订单编号: "order_id",
+  物流事件编号: "tracking_event_id",
+  carrierCode: "carrier_id",
+  网点代码: "location_code",
+  事件序号: "sequence_number",
+  附加备注: null,
+};
+
+function compatibilityParseResponse(
+  sampleId: string,
+  dataType: string,
+  selectedSheet: string | null,
+) {
+  const ordersSample = sampleId === "compatibility_orders_csv";
+  const headers = ordersSample
+    ? compatibilityOrderHeaders
+    : compatibilityTrackingHeaders;
+  const mapping = ordersSample
+    ? compatibilityOrderMapping
+    : compatibilityTrackingMapping;
+  const previewRows = ordersSample
+    ? compatibilityOrderSourceRows.map((row, index) => ({
+        row_number: index + 2,
+        values: Object.fromEntries(
+          headers.map((header, offset) => [header, row[offset] ?? ""]),
+        ),
+      }))
+    : [
+        "已揽件",
+        "始发地已发出",
+        "运输中",
+        "到达目的城市",
+        "派送中",
+        "已签收",
+      ].map((status, index) => ({
+        row_number: index + 2,
+        values: {
+          waybillNo: "SHP-SYN-0001",
+          轨迹状态: status,
+          扫描时间: new Date(
+            Date.UTC(2026, 6, 10, 9 + index * 8),
+          ).toISOString(),
+          订单编号: "XLS-0001",
+          物流事件编号: `TRE-0001-${String(index + 1).padStart(2, "0")}`,
+          carrierCode: "CAR-SYN-A",
+          网点代码: index < 3 ? "HUB-SYN-ORIGIN" : "HUB-SYN-DEST",
+          事件序号: index + 1,
+          附加备注: index === 2 ? "普通在途节点" : "",
+        },
+      }));
+  const targetLabels: Record<string, string> = {
+    sales_channel: "销售渠道",
+    order_id: "订单标识",
+    created_at: "订单创建时间",
+    promised_delivery_time: "承诺交付时间",
+    actual_delivery_time: "实际交付时间",
+    ordered_quantity: "订购数量",
+    delivered_quantity: "累计交付数量",
+    quantity_unit: "数量单位",
+    raw_order_status: "原始订单状态",
+    warehouse_id: "仓库标识",
+    carrier_id: "承运商标识",
+    destination_region: "目的地区",
+    shipment_id: "运单标识",
+    raw_status: "原始状态",
+    event_time: "事件时间",
+    tracking_event_id: "轨迹事件标识",
+    location_code: "节点位置代码",
+    sequence_number: "源事件序号",
+  };
+  const targetFields = Array.from(
+    new Set(
+      Object.values(mapping).filter((value): value is string => value !== null),
+    ),
+  );
+  const totalRows = ordersSample ? 8 : 36;
+  return {
+    task: importTask(dataType, "awaiting_mapping", sampleId, selectedSheet),
+    fields: targetFields.map((field) => ({
+      field,
+      label: targetLabels[field] ?? field,
+      required: [
+        "order_id",
+        "created_at",
+        "ordered_quantity",
+        "quantity_unit",
+        "raw_order_status",
+        "tracking_event_id",
+        "shipment_id",
+        "event_time",
+        "raw_status",
+        "carrier_id",
+      ].includes(field),
+      value_type:
+        field.includes("time") || field.endsWith("_at")
+          ? "string/date-time"
+          : "string",
+      aliases: [],
+    })),
+    source_columns: [...headers],
+    preview_rows: previewRows,
+    total_rows: totalRows,
+    suggestions: headers.map((column) => ({
+      source_column: column,
+      suggested_field: mapping[column] ?? null,
+      confidence: mapping[column] === null ? 0.18 : 0.95,
+      method: mapping[column] === null ? "字段名相似度" : "业务别名精确匹配",
+      candidates:
+        mapping[column] === null
+          ? []
+          : [
+              {
+                field: mapping[column],
+                label: targetLabels[mapping[column] ?? ""] ?? mapping[column],
+                confidence: 0.95,
+                method: "业务别名精确匹配",
+              },
+            ],
+    })),
+    sensitive_risks: [],
+    warnings: ordersSample
+      ? []
+      : [
+          "识别到 Excel 日期单元格；已转为 ISO 8601，无时区部分使用 Asia/Shanghai 校验。",
+        ],
+    detected_data_type: ordersSample ? "orders" : "tracking_events",
+    detection_confidence: 1,
+    data_type_candidates: [
+      {
+        data_type: ordersSample ? "orders" : "tracking_events",
+        display_name: ordersSample ? "订单表" : "物流轨迹表",
+        confidence: 1,
+        matched_fields: targetFields,
+        missing_required_fields: [],
+      },
+    ],
+    unmapped_source_columns: headers.filter(
+      (column) => mapping[column] === null,
+    ),
+    conversion_notes: [
+      "源字段、原始值和行号保持可追溯；自动建议不会在确认前替代人工选择。",
+      "文本数字只在目标数量字段通过严格校验后转为数值，空值不会变成 0。",
+      "附加字段默认保持未映射并继续展示，不会为通过校验而删除或改写业务事实。",
+    ],
   };
 }
 
@@ -2120,6 +2619,26 @@ function importParseResponse(dataType: string) {
     warnings: [
       "在线版仅开放合成示例导入；真实订单请使用本地或经授权的私有云部署。",
     ],
+    detected_data_type: dataType,
+    detection_confidence: 1,
+    data_type_candidates: [
+      {
+        data_type: dataType,
+        display_name:
+          dataType === "orders"
+            ? "订单表"
+            : dataType === "warehouse_events"
+              ? "仓库事件表"
+              : "物流轨迹表",
+        confidence: 1,
+        matched_fields: sourceColumns,
+        missing_required_fields: [],
+      },
+    ],
+    unmapped_source_columns: [],
+    conversion_notes: [
+      "在线固定示例不包含真实业务数据；字段映射仍需用户确认。",
+    ],
   };
 }
 
@@ -2132,6 +2651,46 @@ async function requestPayload(
   } catch {
     return {};
   }
+}
+
+async function sha256Hex(value: ArrayBuffer): Promise<string> {
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", value));
+  return Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join(
+    "",
+  );
+}
+
+function sampleStatusNormalizations(sampleId: string) {
+  if (sampleId === "compatibility_orders_csv") {
+    return [
+      ["已签收", "delivered", 3],
+      ["妥投", "delivered", 1],
+      ["处理中", "processing", 1],
+      ["已取消", "cancelled", 1],
+      ["已完成", "delivered", 1],
+      ["已退回", "returned", 1],
+    ].map(([raw, normalized, occurrences]) => ({
+      raw_status: raw,
+      normalized_status: normalized,
+      mapping_source: "builtin_exact",
+      mapping_confidence: 0.98,
+      occurrences,
+    }));
+  }
+  return [
+    ["已揽件", "carrier_picked_up"],
+    ["始发地已发出", "origin_departed"],
+    ["运输中", "in_transit"],
+    ["到达目的城市", "arrived_at_destination_city"],
+    ["派送中", "out_for_delivery"],
+    ["已签收", "delivered"],
+  ].map(([raw, normalized]) => ({
+    raw_status: raw,
+    normalized_status: normalized,
+    mapping_source: "builtin_exact",
+    mapping_confidence: 0.98,
+    occurrences: 6,
+  }));
 }
 
 function importTemplate(dataType: string): Response {
@@ -2880,16 +3439,90 @@ export async function handleOnlineDemoApi(
     }
   }
 
+  if (method === "GET" && pathname === "/api/imports/samples") {
+    return helpers.json({
+      samples: compatibilitySamples,
+      privacy_statement:
+        "两份兼容性示例均为全新合成数据，只用于验证导入转换，不包含真实姓名、手机号、地址、身份证、快递单号或企业内部信息。",
+    });
+  }
+  const sampleFileMatch = pathname.match(
+    /^\/api\/imports\/samples\/([^/]+)\/file$/,
+  );
+  if (method === "GET" && sampleFileMatch) {
+    const sample = compatibilitySample(
+      decodeURIComponent(sampleFileMatch[1] ?? ""),
+    );
+    if (sample === null) {
+      return helpers.error(
+        "COMPATIBILITY_SAMPLE_NOT_FOUND",
+        "兼容性示例不存在。",
+        404,
+      );
+    }
+    return new Response(null, {
+      status: 302,
+      headers: {
+        "Cache-Control": "public, max-age=3600",
+        Location: new URL(`/${sample.file_name}`, url).toString(),
+      },
+    });
+  }
   if (method === "POST" && pathname === "/api/imports/synthetic") {
     const payload = await requestPayload(request);
     const dataType = stringValue(payload.data_type, "orders");
     return helpers.json(importParseResponse(dataType), 201);
   }
   if (method === "POST" && pathname === "/api/imports/upload") {
-    return helpers.error(
-      "ONLINE_DEMO_UPLOAD_NOT_ENABLED",
-      "为保护业务数据，当前在线版不接收真实文件；请加载合成案例或使用本地完整版本。",
-      403,
+    let form: FormData;
+    try {
+      form = await request.formData();
+    } catch {
+      return helpers.error(
+        "INVALID_MULTIPART_UPLOAD",
+        "上传请求不是有效的 multipart 表单。",
+        400,
+      );
+    }
+    const file = form.get("file");
+    const requestedDataType = stringValue(form.get("data_type"), "orders");
+    if (!(file instanceof File)) {
+      return helpers.error(
+        "IMPORT_FILE_REQUIRED",
+        "必须选择一个 CSV 或 XLSX 文件。",
+        422,
+      );
+    }
+    if (file.size > 2_000_000) {
+      return helpers.error(
+        "UPLOAD_TOO_LARGE",
+        "在线兼容样例上传上限为 2 MB。",
+        413,
+      );
+    }
+    const digest = await sha256Hex(await file.arrayBuffer());
+    const sample =
+      compatibilitySamples.find((item) => item.sha256 === digest) ?? null;
+    if (sample === null) {
+      return helpers.error(
+        "ONLINE_DEMO_SYNTHETIC_SAMPLE_ONLY",
+        "线上只接收本站两份公开合成兼容样例；未知或真实文件请在本地版处理。",
+        403,
+      );
+    }
+    const allowedDataTypes = ["orders", "warehouse_events", "tracking_events"];
+    if (!allowedDataTypes.includes(requestedDataType)) {
+      return helpers.error("INVALID_DATA_TYPE", "数据类型不受支持。", 422);
+    }
+    return helpers.json(
+      {
+        task: importTask(
+          requestedDataType,
+          sample.file_format === "xlsx" ? "awaiting_sheet" : "parsing",
+          sample.sample_id,
+        ),
+      },
+      201,
     );
   }
   const importTemplateMatch = pathname.match(
@@ -2904,14 +3537,89 @@ export async function handleOnlineDemoApi(
     const taskId = decodeURIComponent(importAction[1] ?? "online-demo-orders");
     const action = importAction[2];
     const dataType = importDataType(taskId);
-    if (method === "POST" && action === "parse")
+    const sampleId = sampleIdFromTask(taskId);
+    if (method === "POST" && action === "parse") {
+      if (sampleId !== null) {
+        const payload = await requestPayload(request);
+        const sample = compatibilitySample(sampleId);
+        const selectedSheet =
+          sample?.file_format === "xlsx"
+            ? stringValue(
+                payload.sheet_name,
+                sample.default_sheet ?? "物流轨迹",
+              )
+            : null;
+        if (
+          sample?.file_format === "xlsx" &&
+          (selectedSheet === null ||
+            !(sample.sheet_names as readonly string[]).includes(selectedSheet))
+        ) {
+          return helpers.error(
+            "WORKSHEET_NOT_FOUND",
+            "选择的工作表不存在。",
+            422,
+          );
+        }
+        return helpers.json(
+          compatibilityParseResponse(sampleId, dataType, selectedSheet),
+        );
+      }
       return helpers.json(importParseResponse(dataType));
+    }
     if (method === "PUT" && action === "validation") {
+      if (sampleId !== null) {
+        const payload = await requestPayload(request);
+        const mapping = asRecord(payload.mapping);
+        const values = new Set(
+          mapping === null
+            ? []
+            : Object.values(mapping).filter(
+                (value): value is string => typeof value === "string",
+              ),
+        );
+        const required =
+          sampleId === "compatibility_orders_csv"
+            ? [
+                "order_id",
+                "created_at",
+                "ordered_quantity",
+                "quantity_unit",
+                "raw_order_status",
+              ]
+            : [
+                "tracking_event_id",
+                "order_id",
+                "shipment_id",
+                "event_time",
+                "raw_status",
+                "carrier_id",
+              ];
+        const missing = required.filter((field) => !values.has(field));
+        if (missing.length > 0) {
+          return helpers.error(
+            "INVALID_FIELD_MAPPING",
+            `缺少必填目标字段：${missing.join(", ")}`,
+            422,
+          );
+        }
+      }
+      const sample = sampleId === null ? null : compatibilitySample(sampleId);
+      const totalRows =
+        sampleId === "compatibility_orders_csv"
+          ? 8
+          : sampleId === "compatibility_logistics_xlsx"
+            ? 36
+            : buildOrders("promotion").length;
       return helpers.json({
-        task: importTask(dataType),
+        task: importTask(
+          dataType,
+          "ready_to_confirm",
+          sampleId,
+          sample?.default_sheet ?? null,
+        ),
         report: {
-          total_rows: buildOrders("promotion").length,
-          valid_rows: buildOrders("promotion").length,
+          total_rows: totalRows,
+          valid_rows: totalRows,
           error_rows: 0,
           warning_rows: 0,
           null_counts: {},
@@ -2924,13 +3632,21 @@ export async function handleOnlineDemoApi(
           unparseable_values: 0,
           exact_duplicate_rows: 0,
           sensitive_risks: [],
-          status_normalizations: [],
+          status_normalizations:
+            sampleId === null ? [] : sampleStatusNormalizations(sampleId),
           issues: [],
           can_confirm: true,
         },
-        normalized_preview: importParseResponse(dataType).preview_rows.map(
-          (row) => row.values,
-        ),
+        normalized_preview:
+          sampleId === null
+            ? importParseResponse(dataType).preview_rows.map(
+                (row) => row.values,
+              )
+            : compatibilityParseResponse(
+                sampleId,
+                dataType,
+                sample?.default_sheet ?? null,
+              ).preview_rows.map((row) => row.values),
       });
     }
     if (method === "POST" && action === "confirm") {
@@ -2941,11 +3657,23 @@ export async function handleOnlineDemoApi(
           : dataType === "tracking_events"
             ? selection.tracking_events_dataset_id
             : selection.orders_dataset_id;
+      const compatibilityDatasetId =
+        sampleId === "compatibility_orders_csv"
+          ? COMPATIBILITY_ORDERS_DATASET
+          : sampleId === "compatibility_logistics_xlsx"
+            ? "online-compatibility-tracking-events-v1"
+            : datasetId;
+      const importedRows =
+        sampleId === "compatibility_orders_csv"
+          ? 8
+          : sampleId === "compatibility_logistics_xlsx"
+            ? 36
+            : buildOrders("promotion").length;
       return helpers.json({
-        task: importTask(dataType, "analyzable"),
-        dataset_id: datasetId,
-        imported_rows: buildOrders("promotion").length,
-        message: "已切换到在线合成数据集。",
+        task: importTask(dataType, "analyzable", sampleId),
+        dataset_id: compatibilityDatasetId,
+        imported_rows: importedRows,
+        message: "已切换到经完整性校验的在线合成数据集。",
       });
     }
     if (method === "GET" && action === "errors.csv") {
@@ -2954,7 +3682,7 @@ export async function handleOnlineDemoApi(
       });
     }
     if (method === "DELETE" && !action)
-      return helpers.json(importTask(dataType, "cancelled"));
+      return helpers.json(importTask(dataType, "cancelled", sampleId));
   }
   return null;
 }

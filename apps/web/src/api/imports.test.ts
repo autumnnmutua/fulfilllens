@@ -7,6 +7,33 @@ afterEach(() => {
 });
 
 describe("导入 API client", () => {
+  it("读取兼容性示例目录并生成安全下载地址", async () => {
+    const fetchMock = vi.fn<typeof fetch>(() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({
+            samples: [
+              {
+                sample_id: "compatibility_orders_csv",
+                display_name: "非标准订单 CSV 自动转换示例",
+              },
+            ],
+            privacy_statement: "全部为合成数据。",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(importApi.listSamples()).resolves.toMatchObject({
+      samples: [{ sample_id: "compatibility_orders_csv" }],
+    });
+    expect(importApi.sampleFileUrl("compatibility orders/测试")).toContain(
+      "/api/imports/samples/compatibility%20orders%2F%E6%B5%8B%E8%AF%95/file",
+    );
+  });
+
   it("上传使用 FormData 且不手动覆盖 multipart boundary", async () => {
     const fetchMock = vi.fn<typeof fetch>(() =>
       Promise.resolve(

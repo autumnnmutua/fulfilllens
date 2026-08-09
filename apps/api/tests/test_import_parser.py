@@ -52,3 +52,33 @@ def test_xlsx_sheet_listing_and_formula_non_execution(tmp_path: Path) -> None:
     assert table.rows[0].values["订购数量"] is None
     assert table.issues[0].code == "FORMULA_CELL_IGNORED"
     assert table.issues[0].raw_value == "[公式已忽略]"
+
+
+def test_csv_preserves_quoted_newlines_and_reports_blank_rows(tmp_path: Path) -> None:
+    path = tmp_path / "quoted.csv"
+    path.write_text(
+        '订单编号,备注\n"0001","第一行\n第二行"\n  ,  \n',
+        encoding="utf-8",
+    )
+
+    table = parse_csv(path, encoding="utf-8", settings=settings(tmp_path))
+
+    assert table.rows[0].values == {"订单编号": "0001", "备注": "第一行\n第二行"}
+    assert table.rows[0].row_number == 2
+    assert table.warnings == ["已跳过 1 个完全空白行。"]
+
+
+def test_xlsx_preserves_zero_padded_display_identifier(tmp_path: Path) -> None:
+    path = tmp_path / "zero-padded.xlsx"
+    workbook = Workbook()
+    worksheet = workbook.active
+    assert worksheet is not None
+    worksheet.append(["订单编号", "订单状态"])
+    worksheet.append([123, "已签收"])
+    worksheet["A2"].number_format = "000000"
+    workbook.save(path)
+
+    table = parse_xlsx(path, sheet_name=worksheet.title, settings=settings(tmp_path))
+
+    assert table.rows[0].values["订单编号"] == "000123"
+    assert any("保留前导零" in warning for warning in table.warnings)

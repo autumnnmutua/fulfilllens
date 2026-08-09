@@ -11,6 +11,7 @@
 ## 使用与分析
 
 - [数据导入、字段映射与质量校验](IMPORTING.md)
+- [CSV/XLSX 兼容性验证报告](COMPATIBILITY_VALIDATION.md)
 - [异常诊断规则与证据](DIAGNOSTICS.md)
 - [What-if 模拟算法与限制](SIMULATION.md)
 - [合成数据生成规范](SYNTHETIC_DATA.md)
@@ -32,7 +33,7 @@
 
 ## 发布资料
 
-- [v1.0.0-rc.2 发布说明](releases/v1.0.0-rc.2.md)
+- [v1.0.0-rc.3 发布说明](releases/v1.0.0-rc.3.md)
 - [阶段 12 最终验收](RELEASE_ACCEPTANCE.md)
 - [截图与 GIF 拍摄清单](SCREENSHOTS.md)
 - 根目录中的 `CHANGELOG.md`、`SECURITY.md`、`CONTRIBUTING.md`、`CODE_OF_CONDUCT.md` 和 `LICENSE`

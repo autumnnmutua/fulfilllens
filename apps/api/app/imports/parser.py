@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import csv
+import io
+import re
 import unicodedata
 from dataclasses import dataclass, field
 from datetime import date, datetime, time
@@ -19,6 +21,7 @@ from app.schemas.imports import SheetInfo
 SUPPORTED_ENCODINGS = ("utf-8-sig", "utf-8", "gb18030", "gbk")
 PREVIEW_ROWS = 20
 MAX_CSV_FIELD_BYTES = 1024 * 1024
+ZERO_PAD_NUMBER_FORMAT = re.compile(r"^0+$")
 
 
 @dataclass(frozen=True)
@@ -123,7 +126,7 @@ def parse_csv(path: Path, *, encoding: str, settings: Settings) -> ParsedTable:
     previous_limit = csv.field_size_limit()
     csv.field_size_limit(MAX_CSV_FIELD_BYTES)
     try:
-        rows = csv.reader(text.splitlines(), dialect=dialect)
+        rows = csv.reader(io.StringIO(text, newline=""), dialect=dialect)
         raw_headers = next(rows, None)
         if raw_headers is None:
             raise AppError(
@@ -142,6 +145,7 @@ def parse_csv(path: Path, *, encoding: str, settings: Settings) -> ParsedTable:
 
         parsed_rows: list[ParsedRow] = []
         issues: list[ParseIssue] = []
+        blank_rows = 0
         for row_number, values in enumerate(rows, start=2):
             if row_number - 1 > settings.max_import_rows:
                 raise AppError(
@@ -149,7 +153,8 @@ def parse_csv(path: Path, *, encoding: str, settings: Settings) -> ParsedTable:
                     message="文件行数超过当前导入上限。",
                     status_code=413,
                 )
-            if not values or all(value == "" for value in values):
+            if not values or all(not value.strip() for value in values):
+                blank_rows += 1
                 continue
             if len(values) != len(headers):
                 issues.append(
@@ -184,7 +189,14 @@ def parse_csv(path: Path, *, encoding: str, settings: Settings) -> ParsedTable:
             message="文件仅包含表头或空行。",
             status_code=422,
         )
-    return ParsedTable(headers=headers, rows=parsed_rows, sheet_name=None, issues=issues)
+    warnings = [f"已跳过 {blank_rows} 个完全空白行。"] if blank_rows else []
+    return ParsedTable(
+        headers=headers,
+        rows=parsed_rows,
+        sheet_name=None,
+        issues=issues,
+        warnings=warnings,
+    )
 
 
 def list_xlsx_sheets(path: Path, settings: Settings) -> list[SheetInfo]:
@@ -247,6 +259,13 @@ def serialize_excel_value(
         return value.isoformat(), None
     if isinstance(value, date):
         return datetime.combine(value, time.min).isoformat(), None
+    if (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and float(value).is_integer()
+        and ZERO_PAD_NUMBER_FORMAT.fullmatch(cell.number_format or "")
+    ):
+        return f"{int(value):0{len(cell.number_format)}d}", None
     return value, None
 
 
@@ -283,13 +302,15 @@ def parse_xlsx(
                 status_code=422,
             )
         worksheet = workbook[sheet_name]
-        if worksheet.max_row > settings.max_import_rows + 1:
+        declared_rows = worksheet.max_row
+        if declared_rows is not None and declared_rows > settings.max_import_rows + 1:
             raise AppError(
                 code="TOO_MANY_ROWS",
                 message="工作表声明的行数超过当前导入上限。",
                 status_code=413,
             )
-        if worksheet.max_column > settings.max_import_columns:
+        declared_columns = worksheet.max_column
+        if declared_columns is not None and declared_columns > settings.max_import_columns:
             raise AppError(
                 code="TOO_MANY_COLUMNS",
                 message="工作表列数超过安全上限。",
@@ -306,15 +327,41 @@ def parse_xlsx(
             )
         header_values = [serialize_excel_value(cell)[0] for cell in header_cells]
         headers = [normalize_header(value) if value is not None else "" for value in header_values]
+        if len(headers) > settings.max_import_columns:
+            raise AppError(
+                code="TOO_MANY_COLUMNS",
+                message="工作表列数超过安全上限。",
+                status_code=413,
+            )
         validate_headers(headers)
 
         parsed_rows: list[ParsedRow] = []
         issues: list[ParseIssue] = []
+        blank_rows = 0
+        excel_date_cells = 0
+        zero_padded_cells = 0
+        source_row_count = 0
         for cells in row_iterator:
+            source_row_count += 1
+            if source_row_count > settings.max_import_rows:
+                raise AppError(
+                    code="TOO_MANY_ROWS",
+                    message="工作表行数超过当前导入上限。",
+                    status_code=413,
+                )
             row_number = (cells[0].row or len(parsed_rows) + 2) if cells else len(parsed_rows) + 2
             values: list[Any] = []
             row_issues: list[ParseIssue] = []
             for index, cell in enumerate(cells[: len(headers)]):
+                if isinstance(cell.value, (date, datetime)):
+                    excel_date_cells += 1
+                if (
+                    isinstance(cell.value, (int, float))
+                    and not isinstance(cell.value, bool)
+                    and float(cell.value).is_integer()
+                    and ZERO_PAD_NUMBER_FORMAT.fullmatch(cell.number_format or "")
+                ):
+                    zero_padded_cells += 1
                 value, issue = serialize_excel_value(cell)
                 values.append(value)
                 if issue is not None:
@@ -330,6 +377,7 @@ def parse_xlsx(
                     )
             values.extend([None] * (len(headers) - len(values)))
             if all(value in {None, ""} for value in values):
+                blank_rows += 1
                 continue
             parsed_rows.append(
                 ParsedRow(
@@ -345,11 +393,20 @@ def parse_xlsx(
                 message="工作表仅包含表头或空行。",
                 status_code=422,
             )
-        warnings = (
-            ["当前工作表为隐藏状态；请确认它确实是要导入的数据。"]
-            if worksheet.sheet_state != "visible"
-            else []
-        )
+        warnings: list[str] = []
+        if worksheet.sheet_state != "visible":
+            warnings.append("当前工作表为隐藏状态；请确认它确实是要导入的数据。")
+        if blank_rows:
+            warnings.append(f"已跳过 {blank_rows} 个完全空白行。")
+        if excel_date_cells:
+            warnings.append(
+                f"识别到 {excel_date_cells} 个 Excel 日期单元格；已转为 ISO 8601，"
+                "无时区部分仍需使用用户指定时区校验。"
+            )
+        if zero_padded_cells:
+            warnings.append(
+                f"识别到 {zero_padded_cells} 个零填充数字单元格；按显示格式保留前导零。"
+            )
         return ParsedTable(
             headers=headers,
             rows=parsed_rows,

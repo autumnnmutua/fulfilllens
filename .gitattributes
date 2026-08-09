@@ -14,3 +14,6 @@
 *.docx binary
 *.xls binary
 *.xlsx binary
+
+# Compatibility fixture hashes are part of the public import contract.
+data/samples/compatibility_demo_orders.csv -text

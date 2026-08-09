@@ -97,6 +97,14 @@ class FieldSuggestion(BaseModel):
     candidates: list[FieldCandidate] = Field(default_factory=list)
 
 
+class DataTypeCandidate(BaseModel):
+    data_type: DataType
+    display_name: str
+    confidence: float = Field(ge=0, le=1)
+    matched_fields: list[str] = Field(default_factory=list)
+    missing_required_fields: list[str] = Field(default_factory=list)
+
+
 class FieldDefinition(BaseModel):
     field: str
     label: str
@@ -127,6 +135,11 @@ class ParseResponse(BaseModel):
     suggestions: list[FieldSuggestion]
     sensitive_risks: list[SensitiveRisk]
     warnings: list[str] = Field(default_factory=list)
+    detected_data_type: DataType
+    detection_confidence: float = Field(ge=0, le=1)
+    data_type_candidates: list[DataTypeCandidate] = Field(default_factory=list)
+    unmapped_source_columns: list[str] = Field(default_factory=list)
+    conversion_notes: list[str] = Field(default_factory=list)
 
 
 class ValidationRequest(BaseModel):
@@ -192,3 +205,23 @@ class ConfirmResponse(BaseModel):
 
 class SyntheticImportRequest(BaseModel):
     data_type: DataType
+
+
+class CompatibilitySample(BaseModel):
+    sample_id: str
+    display_name: str
+    file_name: str
+    file_format: FileFormat
+    default_data_type: DataType
+    default_sheet: str | None = None
+    sheet_names: list[str] = Field(default_factory=list)
+    row_counts: dict[str, int]
+    purpose: str
+    conversion_features: list[str]
+    sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    privacy_statement: str
+
+
+class CompatibilitySampleCatalog(BaseModel):
+    samples: list[CompatibilitySample]
+    privacy_statement: str

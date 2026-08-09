@@ -1,6 +1,6 @@
 # Cloudflare 部署与 Workers AI 可行性评估
 
-- 更新日期：2026-08-08
+- 更新日期：2026-08-09
 - 结论：在线合成演示可用独立 TypeScript Worker 适配层部署；完整本地版不能原样迁移并继续依赖本机文件系统
 - 当前状态：已实现静态资源、公开确定性合成案例、指标/诊断/订单级模拟/报告接口和 Workers AI 原生绑定
 - 在线地址：<https://fulfilllens-cn.esthertreu3724.workers.dev>
@@ -16,7 +16,7 @@ TypeScript Worker ── 确定性合成案例 → 指标/诊断/订单级模拟
         └────────── 原生 AI binding → Workers AI 固定合成探针
 ```
 
-在线适配层只生成公开、固定规则的合成数据，不接收真实文件，不把运行期 Map 宣传成持久存储。指标使用 Type-7 分位数；What-if 先变换合成订单/节点副本再调用同一指标函数。当前 FastAPI、DuckDB、SQLite 和临时目录仍面向本机持久文件；Cloudflare Python Workers、DuckDB/Python 二进制包、内存和 CPU 限制需要单独验证。“合成在线演示 + AI 原生绑定”已实现，“当前后端零修改部署”仍不可验收。
+在线适配层只处理公开、固定规则的合成数据。它允许上传仓库发布的两份兼容性样例，但会先按 SHA-256 精确核验并拒绝任何未知或真实文件；请求体不会写入持久存储。运行期 Map 也不宣传成持久存储。指标使用 Type-7 分位数；What-if 先变换合成订单/节点副本再调用同一指标函数。当前 FastAPI、DuckDB、SQLite 和临时目录仍面向本机持久文件；Cloudflare Python Workers、DuckDB/Python 二进制包、内存和 CPU 限制需要单独验证。“合成在线演示 + AI 原生绑定”已实现，“当前后端零修改部署”仍不可验收。
 
 ## 1.1 当前在线演示契约
 
@@ -24,14 +24,15 @@ TypeScript Worker ── 确定性合成案例 → 指标/诊断/订单级模拟
 | --------------------------------------------- | --------------------------------------------------------------- |
 | `/` 及前端路由                                | 返回 React SPA，并附 CSP、禁止嵌入、权限策略等安全响应头        |
 | `/health`、`/api/version`                     | 返回 Worker 健康和 `cloudflare-online-demo` 版本契约            |
-| `/api/cases`、`/api/imports/synthetic`        | 只返回公开合成案例/预览；真实上传接口明确拒绝                   |
+| `/api/cases`、`/api/imports/synthetic`        | 返回公开合成案例或预览                                          |
+| `/api/imports/samples`、`/api/imports/upload` | 仅列出/接收两份发布样例；按摘要拒绝未知或真实文件               |
 | `/api/metrics/*`、`/api/dashboard/*`          | 对确定性合成订单计算指标、筛选、明细和安全 CSV                  |
 | `/api/diagnostics/*`                          | 对合成数据执行透明规则并返回事实、判断、谨慎原因和证据          |
 | `/api/simulations/*`                          | 在合成订单/节点副本上变换并复算；运行期自建方案不保证跨实例持久 |
 | `/api/reports/*`                              | 预览和小型合成报告；运行期任务不等同于持久云报告系统            |
 | `/api/integrations/workers-ai/status`         | 只返回绑定状态、模型标识和数据策略，不返回凭据                  |
 | `/api/integrations/workers-ai/probe`          | 必须有显式确认请求头，只发送固定合成短句                        |
-| `/api/imports/upload` 与未实现的其他 `/api/*` | 拒绝真实上传或返回标准 404，不用合成结果冒充用户真实数据        |
+| 未实现的其他 `/api/*`                         | 返回标准 404，不用合成结果冒充用户真实数据                      |
 
 配置源是根目录 `wrangler.jsonc`，Worker 位于 `apps/cloudflare-worker/`。浏览器只调用同源接口；云端推理通过 `env.AI.run()`，不需要把 REST Token 或 Account ID 注入前端。
 
@@ -118,7 +119,7 @@ Workers AI 支持 function calling；Cloudflare Agents 也提供 Browser 工具�
 
 ## 7. 当前限制与发布判定
 
-- 在线演示不接收业务数据，因此不需要 D1/R2 真实数据保留与删除策略；完整云模式仍被这些策略阻断；
+- 在线演示只接收两份摘要匹配的公开合成样例，不接收业务数据，因此不需要 D1/R2 真实数据保留与删除策略；完整云模式仍被这些策略阻断；
 - Python Workers/Containers 不是当前演示依赖，FastAPI、DuckDB 和 SQLite 仍只在本地/Docker 运行；
 - 在线自建方案和报告任务只处于 Worker 运行期，不保证跨实例持久；大文件异步、费用上限、身份与访问控制未实现，不能宣传成完整 SaaS；
 - 阶段 9 的进程内报告任务不能直接作为 Worker 云实现，完整云模式仍需 Queues/Workflows、D1/R2 与访问控制；
@@ -133,4 +134,4 @@ npm.cmd run test:cloudflare
 npm.cmd run deploy:cloudflare
 ```
 
-部署进程可使用 Wrangler 本机 OAuth，或在 CI 进程环境中提供 `CLOUDFLARE_API_TOKEN` 与 `CLOUDFLARE_ACCOUNT_ID`；不得把真实值写入仓库。验收至少请求 `/`、`/health`、`/api/version`、合成案例、指标、诊断、模拟、报告和 AI 状态接口，并以显式确认头调用一次固定合成探针。回滚使用 Wrangler 的部署版本历史；回滚前后都要重新执行浏览器和 API 冒烟。已经出现在聊天或终端历史的 API Token 应立即轮换。
+部署进程可使用 Wrangler 本机 OAuth，或在 CI 进程环境中提供 `CLOUDFLARE_API_TOKEN` 与 `CLOUDFLARE_ACCOUNT_ID`；不得把真实值写入仓库。验收至少请求 `/`、`/health`、`/api/version`、兼容样例目录与静态文件，并把两份文件真实 multipart 上传到在线转换流程；另外检查合成案例、指标、诊断、模拟、报告和 AI 状态接口，并以显式确认头调用一次固定合成探针。回滚使用 Wrangler 的部署版本历史；回滚前后都要重新执行浏览器和 API 冒烟。已经出现在聊天或终端历史的 API Token 应立即轮换。

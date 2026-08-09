@@ -29,7 +29,7 @@ describe("FulfillLens CN 应用壳", () => {
             jsonResponse({
               status: "ok",
               service: "fulfilllens-api",
-              version: "1.0.0-rc.2",
+              version: "1.0.0-rc.3",
             }),
           );
         }
@@ -38,7 +38,7 @@ describe("FulfillLens CN 应用壳", () => {
           return Promise.resolve(
             jsonResponse({
               app_name: "FulfillLens CN",
-              app_version: "1.0.0-rc.2",
+              app_version: "1.0.0-rc.3",
               api_version: "v1",
               environment: "test",
               contract_versions: {
@@ -62,6 +62,48 @@ describe("FulfillLens CN 应用壳", () => {
               model: "@cf/meta/llama-3.1-8b-instruct-fast",
               external_data_policy:
                 "仅允许显式合成探针；不会自动发送导入数据或个人信息。",
+            }),
+          );
+        }
+
+        if (url.endsWith("/api/imports/samples")) {
+          return Promise.resolve(
+            jsonResponse({
+              privacy_statement: "两份文件均为全新合成数据。",
+              samples: [
+                {
+                  sample_id: "compatibility_orders_csv",
+                  display_name: "非标准订单 CSV 自动转换示例",
+                  file_name: "compatibility_demo_orders.csv",
+                  file_format: "csv",
+                  default_data_type: "orders",
+                  default_sheet: null,
+                  sheet_names: [],
+                  row_counts: { orders: 8 },
+                  purpose: "验证混合字段自动转换。",
+                  conversion_features: ["中文与英文业务别名"],
+                  sha256: "a".repeat(64),
+                  privacy_statement: "完全合成。",
+                },
+                {
+                  sample_id: "compatibility_logistics_xlsx",
+                  display_name: "非标准物流 XLSX 自动转换示例",
+                  file_name: "compatibility_demo_logistics.xlsx",
+                  file_format: "xlsx",
+                  default_data_type: "tracking_events",
+                  default_sheet: "物流轨迹",
+                  sheet_names: ["订单数据", "仓库事件", "物流轨迹"],
+                  row_counts: {
+                    orders: 6,
+                    warehouse_events: 36,
+                    tracking_events: 36,
+                  },
+                  purpose: "验证多工作表和 Excel 日期。",
+                  conversion_features: ["多工作表", "Excel 日期"],
+                  sha256: "b".repeat(64),
+                  privacy_statement: "完全合成。",
+                },
+              ],
             }),
           );
         }
@@ -110,6 +152,13 @@ describe("FulfillLens CN 应用壳", () => {
     ).toBeVisible();
     expect(screen.getByText("1. 选择数据类型")).toBeVisible();
     expect(screen.getByText("一键导入合成样例")).toBeVisible();
+    expect(
+      await screen.findByText("非标准订单 CSV 自动转换示例"),
+    ).toBeVisible();
+    expect(screen.getByText("非标准物流 XLSX 自动转换示例")).toBeVisible();
+    expect(
+      screen.getAllByRole("button", { name: "加载并进入导入流程" }),
+    ).toHaveLength(2);
     expect(screen.queryByText("开发中")).not.toBeInTheDocument();
   });
 

@@ -6,6 +6,7 @@ from fastapi.responses import FileResponse
 from app.core.config import Settings, get_settings
 from app.imports.service import ImportService
 from app.schemas.imports import (
+    CompatibilitySampleCatalog,
     ConfirmResponse,
     DataType,
     ImportTaskResponse,
@@ -24,6 +25,35 @@ def get_import_service(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> ImportService:
     return ImportService(settings)
+
+
+@router.get(
+    "/samples",
+    response_model=CompatibilitySampleCatalog,
+    summary="列出完全合成的兼容性导入示例",
+)
+async def list_compatibility_samples(
+    service: Annotated[ImportService, Depends(get_import_service)],
+) -> CompatibilitySampleCatalog:
+    return service.compatibility_samples()
+
+
+@router.get(
+    "/samples/{sample_id}/file",
+    response_class=FileResponse,
+    summary="下载完全合成的兼容性导入示例",
+)
+async def download_compatibility_sample(
+    sample_id: str,
+    service: Annotated[ImportService, Depends(get_import_service)],
+) -> FileResponse:
+    sample, path = service.compatibility_sample_path(sample_id)
+    media_type = (
+        "text/csv; charset=utf-8"
+        if sample.file_format.value == "csv"
+        else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    return FileResponse(path, media_type=media_type, filename=sample.file_name)
 
 
 @router.post(
