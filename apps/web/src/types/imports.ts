@@ -1,4 +1,7 @@
 export type DataType = "orders" | "warehouse_events" | "tracking_events";
+export type DataTypeSelection = "auto" | DataType;
+export type MappingConfidenceLevel = "high" | "medium" | "low";
+export type ImportDateOrder = "DMY" | "MDY";
 
 export type ImportStatus =
   | "pending_upload"
@@ -49,6 +52,19 @@ export interface FieldCandidate {
   label: string;
   confidence: number;
   method: string;
+  evidence?: FieldEvidence[];
+}
+
+export interface FieldEvidence {
+  code:
+    | "header"
+    | "alias"
+    | "value_profile"
+    | "cardinality"
+    | "relationship"
+    | "schema_prior";
+  label: string;
+  strength: "high" | "medium" | "low";
 }
 
 export interface FieldSuggestion {
@@ -57,6 +73,9 @@ export interface FieldSuggestion {
   confidence: number;
   method: string;
   requires_confirmation?: boolean;
+  confidence_level?: MappingConfidenceLevel;
+  auxiliary_purpose?: string | null;
+  auto_applied?: boolean;
   candidates: FieldCandidate[];
 }
 
@@ -92,6 +111,14 @@ export interface ParseResponse {
   warnings: string[];
   detected_data_type: DataType;
   detection_confidence: number;
+  schema_selection_mode?: "auto" | "manual";
+  selected_data_type?: DataType;
+  type_mismatch_warning?: string | null;
+  date_order_inference?: {
+    ambiguous: boolean;
+    evidence: string[];
+    order: ImportDateOrder | null;
+  };
   data_type_candidates: DataTypeCandidate[];
   unmapped_source_columns: string[];
   conversion_notes: string[];

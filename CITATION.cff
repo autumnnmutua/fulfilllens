@@ -5,7 +5,7 @@ title: "FulfillLens"
 abstract: "面向物流教学与中小电商商家的本地优先、可解释履约分析工具。"
 authors:
   - name: "FulfillLens contributors"
-version: "1.0.0"
+version: "1.0.1"
 license: MIT
 keywords:
   - logistics

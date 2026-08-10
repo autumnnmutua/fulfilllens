@@ -31,11 +31,11 @@ describe("设置页本地数据清理", () => {
           "http://localhost",
         ).pathname;
         if (path === "/health")
-          return json({ status: "ok", service: "api", version: "1.0.0" });
+          return json({ status: "ok", service: "api", version: "1.0.1" });
         if (path === "/api/version")
           return json({
             app_name: "FulfillLens",
-            app_version: "1.0.0",
+            app_version: "1.0.1",
             api_version: "v1",
             environment: "test",
             contract_versions: {},

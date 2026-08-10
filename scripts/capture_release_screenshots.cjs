@@ -54,23 +54,36 @@ async function assertNoLegacyBrand(page) {
 
   try {
     await page.goto(`${baseUrl}/import`, { waitUntil: "networkidle" });
-    await page.getByText("物流轨迹表", { exact: true }).click();
+    await page.getByText("自动识别（推荐）", { exact: true }).waitFor();
     const chooserPromise = page.waitForEvent("filechooser");
     await page.getByRole("button", { name: "自主上传文件" }).click();
     await (await chooserPromise).setFiles(fixture);
     await page.getByRole("button", { name: "浏览器本地读取并检查" }).click();
     await page.getByRole("heading", { name: "4. 数据预览" }).waitFor();
     await page.getByRole("button", { name: "下一步：字段映射" }).click();
-    const mappingHeading = page.getByRole("heading", { name: "5. 字段映射" });
+    const mappingHeading = page.getByRole("heading", { name: "5. 快速导入" });
     await mappingHeading.waitFor();
+    const recommended = page.getByRole("button", {
+      name: /全部采用推荐映射（[1-9]\d*）/,
+    });
+    if ((await recommended.count()) > 0 && (await recommended.isEnabled())) {
+      await recommended.click();
+    }
     const bulkIgnore = page.getByRole("button", {
-      name: /一键忽略可忽略项（\d+）/,
+      name: /一键忽略非必要字段（[1-9]\d*）/,
     });
     await bulkIgnore.waitFor();
     await bulkIgnore.scrollIntoViewIfNeeded();
+    await bulkIgnore.click();
+    await page
+      .getByText("字段已准备好，可以开始分析", { exact: true })
+      .waitFor();
+    await mappingHeading.scrollIntoViewIfNeeded();
     await screenshotViewport(page, "import-mapping.png");
 
-    await page.goto(`${baseUrl}/analytics`, { waitUntil: "networkidle" });
+    await page.getByRole("button", { name: "开始分析" }).click();
+    await page.getByRole("heading", { name: "分析总览" }).waitFor();
+
     const contextHeading = page.getByRole("heading", {
       name: "当前分析上下文",
     });
@@ -96,16 +109,21 @@ async function assertNoLegacyBrand(page) {
     );
     await screenshotViewport(page, "executive-brief.png");
 
+    // Diagnostics and What-if require the linked order data supplied by a
+    // deterministic teaching case. The browser-local tracking screenshot and
+    // recommendations above remain evidence for the custom-file path.
+    await page.goto(`${baseUrl}/cases`, { waitUntil: "networkidle" });
+    await page.getByRole("button", { name: /一键载入.*促销爆单/ }).click();
+    await page.getByRole("button", { name: "确认载入案例" }).click();
+    await page.getByText(/已成为当前分析上下文/).waitFor();
+
     await page.goto(`${baseUrl}/diagnostics`, { waitUntil: "networkidle" });
     await page.getByText("当前诊断上下文", { exact: true }).waitFor();
-    const timelineButton = page
-      .getByRole("button", { name: "查看时间线" })
-      .first();
-    await timelineButton.waitFor();
-    await timelineButton.click();
-    const orderDiagnosis = page.getByRole("heading", { name: "订单诊断" });
-    await orderDiagnosis.waitFor();
-    await orderDiagnosis.scrollIntoViewIfNeeded();
+    const evidenceSection = page.getByText("诊断结果与可追溯证据", {
+      exact: true,
+    });
+    await evidenceSection.waitFor();
+    await evidenceSection.scrollIntoViewIfNeeded();
     await screenshotViewport(page, "diagnostics-trace.png");
 
     await page.goto(`${baseUrl}/scenarios`, { waitUntil: "networkidle" });

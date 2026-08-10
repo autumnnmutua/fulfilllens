@@ -89,6 +89,30 @@ function average(values: number[]): number | null {
     : values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
+function trackingSpanHours(detail: OrderMetricDetail): number | null {
+  const values = detail.node_durations.map((item) => item.duration_hours);
+  return values.length === 0
+    ? null
+    : values.reduce((sum, value) => sum + value, 0);
+}
+
+function durationValues(
+  details: OrderMetricDetail[],
+  orderDatasetPresent: boolean,
+): number[] {
+  return details
+    .map((item) =>
+      orderDatasetPresent
+        ? item.fulfillment_duration_hours
+        : trackingSpanHours(item),
+    )
+    .filter((value): value is number => value !== null);
+}
+
+function analysisDate(detail: OrderMetricDetail): string | null {
+  return detail.created_at ?? detail.node_durations[0]?.start_time ?? null;
+}
+
 function decision(
   value: boolean | null,
   reason: string,
@@ -386,9 +410,7 @@ function metricsFor(
           ],
     );
   };
-  const durations = eligible
-    .map((item) => item.fulfillment_duration_hours)
-    .filter((value): value is number => value !== null);
+  const durations = durationValues(eligible, orderDatasetPresent);
   const durationMetric = (code: string, label: string, value: number | null) =>
     metric(
       code,
@@ -399,9 +421,15 @@ function metricsFor(
       durations.length || null,
       eligible.length,
       durations.length
-        ? []
+        ? orderDatasetPresent
+          ? []
+          : [
+              "该时效按同一业务单/运单的首末物流事件计算，不等于订单创建至交付的完整履约时长。",
+            ]
         : [
-            "订单履约总时长需要订单创建时间和实际交付时间；不会用轨迹首条时间替代。",
+            orderDatasetPresent
+              ? "订单履约总时长需要订单创建时间和实际交付时间。"
+              : "至少需要同一业务单/运单的两个有效时间事件才能计算首末轨迹时效。",
           ],
     );
   const cancelled = details.filter(
@@ -445,17 +473,17 @@ function metricsFor(
     rate("otif_rate", "按时足量交付率（OTIF）", "otif"),
     durationMetric(
       "fulfillment_duration_mean_hours",
-      "平均履约时长",
+      orderDatasetPresent ? "平均履约时长" : "平均首末轨迹时效",
       average(durations),
     ),
     durationMetric(
       "fulfillment_duration_median_hours",
-      "P50 履约时长",
+      orderDatasetPresent ? "P50 履约时长" : "P50 首末轨迹时效",
       quantile(durations, 0.5),
     ),
     durationMetric(
       "fulfillment_duration_p90_hours",
-      "P90 履约时长",
+      orderDatasetPresent ? "P90 履约时长" : "P90 首末轨迹时效",
       quantile(durations, 0.9),
     ),
     metric(
@@ -502,7 +530,7 @@ function filterDetails(
   filters: DashboardFilters,
 ): OrderMetricDetail[] {
   return details.filter((item) => {
-    const date = item.created_at?.slice(0, 10) ?? null;
+    const date = analysisDate(item)?.slice(0, 10) ?? null;
     return (
       (!filters.start_date || (date !== null && date >= filters.start_date)) &&
       (!filters.end_date || (date !== null && date <= filters.end_date)) &&
@@ -597,7 +625,7 @@ export const browserLocalAnalyticsService = {
     const filtered = filterDetails(data.details, filters);
     const metrics = metricsFor(filtered, data.orderDatasetPresent);
     const dates = filtered
-      .map((item) => item.created_at?.slice(0, 10))
+      .map((item) => analysisDate(item)?.slice(0, 10))
       .filter((value): value is string => Boolean(value))
       .sort();
     const dimensionKey = (detail: OrderMetricDetail) => detail[view.dimension];
@@ -615,15 +643,13 @@ export const browserLocalAnalyticsService = {
       const delta = sortMetric(left) - sortMetric(right);
       return view.breakdownSortDirection === "asc" ? delta : -delta;
     });
-    const durations = filtered
-      .map((item) => item.fulfillment_duration_hours)
-      .filter((value): value is number => value !== null);
+    const durations = durationValues(filtered, data.orderDatasetPresent);
     const mean = average(durations);
     const median = quantile(durations, 0.5);
     const p90 = quantile(durations, 0.9);
     const trend = groupedMetrics(
       filtered,
-      (detail) => detail.created_at?.slice(0, 10) ?? "日期未知",
+      (detail) => analysisDate(detail)?.slice(0, 10) ?? "日期未知",
       data.orderDatasetPresent,
     );
     const coverageMetric = metrics.find(
@@ -635,7 +661,7 @@ export const browserLocalAnalyticsService = {
           {
             code: "ORDER_DATA_REQUIRED",
             message:
-              "当前浏览器数据只有事件表；OT、IF、OTIF 与履约总时长均保持不可计算。",
+              "当前只有事件表：首末轨迹时效、节点耗时、状态与异常可以分析；OT、IF、OTIF 仍保持不可计算。",
           },
         ];
     return {
@@ -673,7 +699,9 @@ export const browserLocalAnalyticsService = {
       },
       distribution: {
         datasets: selection,
-        metric_code: "fulfillment_duration_hours",
+        metric_code: data.orderDatasetPresent
+          ? "fulfillment_duration_hours"
+          : "tracking_span_hours",
         unit: "hour",
         sample_size: durations.length,
         minimum: durations.length ? Math.min(...durations) : null,
@@ -685,7 +713,11 @@ export const browserLocalAnalyticsService = {
         bins: [],
         warnings: durations.length
           ? []
-          : ["当前数据不足以计算订单履约时长分布。"],
+          : [
+              data.orderDatasetPresent
+                ? "当前数据不足以计算订单履约时长分布。"
+                : "当前数据不足以计算首末轨迹时效分布。",
+            ],
         definition_version: BROWSER_METRICS_VERSION,
       },
       distribution_coverage: coverageMetric?.value ?? null,

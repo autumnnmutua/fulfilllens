@@ -29,7 +29,7 @@ describe("FulfillLens 应用壳", () => {
             jsonResponse({
               status: "ok",
               service: "fulfilllens-api",
-              version: "1.0.0",
+              version: "1.0.1",
             }),
           );
         }
@@ -38,7 +38,7 @@ describe("FulfillLens 应用壳", () => {
           return Promise.resolve(
             jsonResponse({
               app_name: "FulfillLens",
-              app_version: "1.0.0",
+              app_version: "1.0.1",
               api_version: "v1",
               environment: "test",
               contract_versions: {
@@ -151,6 +151,9 @@ describe("FulfillLens 应用壳", () => {
       }),
     ).toBeVisible();
     expect(screen.getByText("1. 选择数据类型")).toBeVisible();
+    expect(
+      screen.getByRole("radio", { name: /自动识别（推荐）/ }),
+    ).toBeChecked();
     expect(screen.getByText("一键导入合成样例")).toBeVisible();
     expect(screen.getByRole("button", { name: /自主上传文件/ })).toBeVisible();
     expect(

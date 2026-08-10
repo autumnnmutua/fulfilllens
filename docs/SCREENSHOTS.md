@@ -1,6 +1,6 @@
 # 截图与 GIF 拍摄清单
 
-以下截图由 `scripts/capture_release_screenshots.cjs` 从 Cloudflare 模式生产构建自动拍摄，全部使用固定合成数据。2026-08-10 已逐张检查分辨率、关键文案、隐私和文件大小；GIF 仍为可选资产。
+以下截图由 `scripts/capture_release_screenshots.cjs` 从 v1.0.1 Cloudflare 模式生产构建自动拍摄，全部使用固定合成数据。2026-08-10 已逐张检查分辨率、关键文案、隐私和文件大小；GIF 仍为可选资产。
 
 ## 统一准备
 
@@ -15,7 +15,7 @@
 
 | 素材     | 文件                                      | 可见证据                                            | 状态             |
 | -------- | ----------------------------------------- | --------------------------------------------------- | ---------------- |
-| 导入向导 | `docs/media/import-mapping.png`           | 本地隐私规则、映射统计、一键忽略、置信度和长字段    | 已拍摄并人工检查 |
+| 导入向导 | `docs/media/import-mapping.png`           | 自动识别、快速导入、准备度、一键忽略结果和本地隐私  | 已拍摄并人工检查 |
 | 分析总览 | `docs/media/dashboard-overview.png`       | 合成上下文、OT/IF/OTIF、P50/P90、覆盖率和解释       | 已拍摄并人工检查 |
 | 异常追溯 | `docs/media/diagnostics-trace.png`        | 规则、严重度、订单判断和原始标准状态事件时间线      | 已拍摄并人工检查 |
 | 模拟对比 | `docs/media/scenario-comparison.png`      | 情景估算声明、基线/方案、覆盖率、影响订单和模型假设 | 已拍摄并人工检查 |

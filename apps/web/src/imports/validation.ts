@@ -1,5 +1,10 @@
 import { getImportContract, type ImportContract } from "./contracts";
 import { suggestMappings, validateMapping } from "./mapping";
+import {
+  inferDateOrder,
+  parseImportDateValue,
+  type DateOrder,
+} from "./dateParser";
 import type { BrowserParsedTable } from "./parser";
 import { scalarText } from "./scalar";
 import statusKeywordRulesJson from "../../../../data/schemas/status_keyword_rules.json";
@@ -178,263 +183,12 @@ function parseNumber(value: unknown, integer: boolean): number {
   return parsed;
 }
 
-interface DateParts {
-  day: number;
-  hour: number;
-  minute: number;
-  month: number;
-  second: number;
-  year: number;
-}
-
-function parseNaiveDate(value: string): DateParts | null {
-  const normalized = value
-    .normalize("NFKC")
-    .trim()
-    .replace(/[年/.]/g, "-")
-    .replace(/月/g, "-")
-    .replace(/日/g, " ")
-    .replace(/\s+/g, " ");
-  const yearFirst = normalized.match(
-    /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?)?$/,
-  );
-  if (yearFirst) {
-    return {
-      day: Number(yearFirst[3]),
-      hour: Number(yearFirst[4] ?? 0),
-      minute: Number(yearFirst[5] ?? 0),
-      month: Number(yearFirst[2]),
-      second: Number(yearFirst[6] ?? 0),
-      year: Number(yearFirst[1]),
-    };
-  }
-  const monthFirst = value
-    .normalize("NFKC")
-    .trim()
-    .match(
-      /^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([AP])M$/i,
-    );
-  if (monthFirst) {
-    const hour12 = Number(monthFirst[4]);
-    const afternoon = monthFirst[7]?.toUpperCase() === "P";
-    return {
-      day: Number(monthFirst[2]),
-      hour: (hour12 % 12) + (afternoon ? 12 : 0),
-      minute: Number(monthFirst[5]),
-      month: Number(monthFirst[1]),
-      second: Number(monthFirst[6] ?? 0),
-      year: Number(monthFirst[3]),
-    };
-  }
-  const dayFirst = value
-    .normalize("NFKC")
-    .trim()
-    .match(/^(\d{1,2})-(\d{1,2})-(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
-  if (!dayFirst) return null;
-  return {
-    day: Number(dayFirst[1]),
-    hour: Number(dayFirst[4]),
-    minute: Number(dayFirst[5]),
-    month: Number(dayFirst[2]),
-    second: Number(dayFirst[6] ?? 0),
-    year: Number(dayFirst[3]),
-  };
-}
-
-const englishMonths = new Map(
-  [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-  ].map((month, index) => [month.toLowerCase(), index + 1]),
-);
-
-function parseExplicitEnglishDate(value: string): string | null {
-  const match = value
-    .normalize("NFKC")
-    .trim()
-    .match(
-      /^(?:[A-Za-z]{3}\s+)?([A-Za-z]{3})\s+(\d{1,2})\s+(\d{4})\s+(\d{2}):(\d{2}):(\d{2})\s+GMT([+-])(\d{2})(\d{2})(?:\s+\([^)]*\))?$/,
-    );
-  if (!match) return null;
-  const month = englishMonths.get((match[1] ?? "").toLowerCase());
-  if (!month) return null;
-  const parts: DateParts = {
-    day: Number(match[2]),
-    hour: Number(match[4]),
-    minute: Number(match[5]),
-    month,
-    second: Number(match[6]),
-    year: Number(match[3]),
-  };
-  const probe = new Date(partsUtc(parts));
-  if (
-    probe.getUTCFullYear() !== parts.year ||
-    probe.getUTCMonth() + 1 !== parts.month ||
-    probe.getUTCDate() !== parts.day ||
-    probe.getUTCHours() !== parts.hour ||
-    probe.getUTCMinutes() !== parts.minute ||
-    probe.getUTCSeconds() !== parts.second
-  ) {
-    return null;
-  }
-  return `${parts.year}-${pad(parts.month)}-${pad(parts.day)}T${pad(parts.hour)}:${pad(parts.minute)}:${pad(parts.second)}${match[7]}${match[8]}:${match[9]}`;
-}
-
-function zoneParts(date: Date, timeZone: string): DateParts {
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    day: "2-digit",
-    hour: "2-digit",
-    hourCycle: "h23",
-    minute: "2-digit",
-    month: "2-digit",
-    second: "2-digit",
-    timeZone,
-    year: "numeric",
-  });
-  const parts = Object.fromEntries(
-    formatter
-      .formatToParts(date)
-      .filter((part) => part.type !== "literal")
-      .map((part) => [part.type, Number(part.value)]),
-  );
-  return {
-    day: parts.day ?? 0,
-    hour: parts.hour ?? 0,
-    minute: parts.minute ?? 0,
-    month: parts.month ?? 0,
-    second: parts.second ?? 0,
-    year: parts.year ?? 0,
-  };
-}
-
-function partsUtc(parts: DateParts): number {
-  return Date.UTC(
-    parts.year,
-    parts.month - 1,
-    parts.day,
-    parts.hour,
-    parts.minute,
-    parts.second,
-  );
-}
-
-function sameParts(left: DateParts, right: DateParts): boolean {
-  return Object.keys(left).every(
-    (key) => left[key as keyof DateParts] === right[key as keyof DateParts],
-  );
-}
-
-function pad(value: number): string {
-  return String(value).padStart(2, "0");
-}
-
-function attachTimezone(parts: DateParts, timeZone: string | null): string {
-  if (!timeZone) {
-    throw new ValueError(
-      "TIMEZONE_REQUIRED",
-      "时间不含时区，必须指定默认 IANA 时区。",
-      "选择例如 Asia/Shanghai 后重新校验。",
-    );
-  }
-  try {
-    new Intl.DateTimeFormat("en", { timeZone }).format(new Date());
-  } catch {
-    throw new ValueError(
-      "INVALID_TIMEZONE",
-      "默认时区不是可用的 IANA 时区。",
-      "选择例如 Asia/Shanghai。",
-    );
-  }
-  const target = partsUtc(parts);
-  let instant = target;
-  for (let iteration = 0; iteration < 3; iteration += 1) {
-    const rendered = partsUtc(zoneParts(new Date(instant), timeZone));
-    instant -= rendered - target;
-  }
-  if (!sameParts(zoneParts(new Date(instant), timeZone), parts)) {
-    throw new ValueError(
-      "NONEXISTENT_LOCAL_TIME",
-      "该本地时间在所选时区中不存在。",
-      "使用带明确 UTC 偏移的 ISO 8601 时间。",
-    );
-  }
-  const alternatives = [instant - 3_600_000, instant + 3_600_000].filter(
-    (candidate) => sameParts(zoneParts(new Date(candidate), timeZone), parts),
-  );
-  if (alternatives.length > 0) {
-    throw new ValueError(
-      "AMBIGUOUS_LOCAL_TIME",
-      "该本地时间在夏令时回拨时出现两次。",
-      "使用带明确 UTC 偏移的 ISO 8601 时间。",
-    );
-  }
-  const offsetMinutes = Math.round((target - instant) / 60_000);
-  const sign = offsetMinutes >= 0 ? "+" : "-";
-  const absolute = Math.abs(offsetMinutes);
-  return `${parts.year}-${pad(parts.month)}-${pad(parts.day)}T${pad(parts.hour)}:${pad(parts.minute)}:${pad(parts.second)}${sign}${pad(Math.floor(absolute / 60))}:${pad(absolute % 60)}`;
-}
-
 export function parseImportDate(
   value: unknown,
   timeZone: string | null,
+  fileOrder: DateOrder | null = null,
 ): string {
-  const text = scalarText(value).normalize("NFKC").trim();
-  const explicitEnglish = parseExplicitEnglishDate(text);
-  if (explicitEnglish) return explicitEnglish;
-  if (/(Z|[+-]\d{2}:?\d{2})$/i.test(text)) {
-    const normalizedOffset = text.replace(/([+-]\d{2})(\d{2})$/, "$1:$2");
-    const timestamp = Date.parse(normalizedOffset);
-    if (!Number.isFinite(timestamp)) {
-      throw new ValueError(
-        "INVALID_TIME",
-        "无法解析时间。",
-        "使用有效的带时区 ISO 8601 时间。",
-      );
-    }
-    const isoParts = normalizedOffset.match(
-      /^(\d{4}-\d{2}-\d{2})[ T](\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/i,
-    );
-    if (isoParts) {
-      const offset =
-        isoParts[5]?.toUpperCase() === "Z" ? "+00:00" : isoParts[5];
-      return `${isoParts[1]}T${isoParts[2]}:${isoParts[3]}:${isoParts[4] ?? "00"}${offset}`;
-    }
-    return new Date(timestamp).toISOString();
-  }
-  const parts = parseNaiveDate(text);
-  if (!parts) {
-    throw new ValueError(
-      "INVALID_TIME",
-      "无法解析时间。",
-      "使用 ISO 8601 或 YYYY-MM-DD HH:mm:ss 等明确格式。",
-    );
-  }
-  const probe = new Date(partsUtc(parts));
-  if (
-    probe.getUTCFullYear() !== parts.year ||
-    probe.getUTCMonth() + 1 !== parts.month ||
-    probe.getUTCDate() !== parts.day ||
-    probe.getUTCHours() !== parts.hour ||
-    probe.getUTCMinutes() !== parts.minute ||
-    probe.getUTCSeconds() !== parts.second
-  ) {
-    throw new ValueError(
-      "INVALID_TIME",
-      "日期或时间数值无效。",
-      "检查月份、日期和时间范围。",
-    );
-  }
-  return attachTimezone(parts, timeZone);
+  return parseImportDateValue(value, timeZone, fileOrder).iso;
 }
 
 function normalizeStatus(
@@ -537,14 +291,6 @@ function normalizeExceptionCode(value: unknown): {
   return { code, warning: !knownExceptionCodes.has(code) };
 }
 
-function normalizeAuxiliaryHeader(value: string): string {
-  return value
-    .normalize("NFKC")
-    .toLocaleLowerCase("zh-CN")
-    .replace(/[（(][^()（）]*[）)]/g, "")
-    .replace(/[^\p{L}\p{N}]/gu, "");
-}
-
 function generatedTrackingEventId(
   record: Record<string, unknown>,
   rowNumber: number,
@@ -586,6 +332,7 @@ export function validateBrowserImport(
   defaultTimezone: string | null,
   projectMappings: Record<string, string>,
   sensitiveRisks: SensitiveRisk[],
+  requestedDateOrder: DateOrder | null = null,
 ): ValidationArtifacts {
   const contract = getImportContract(dataType);
   const issues: QualityIssue[] = [];
@@ -634,6 +381,40 @@ export function validateBrowserImport(
     contract,
     table.rows,
   );
+  const auxiliarySources = Object.fromEntries(
+    mappingSuggestions.flatMap((suggestion) =>
+      suggestion.auxiliary_purpose &&
+      !ignoredSources.has(suggestion.source_column)
+        ? [[suggestion.auxiliary_purpose, suggestion.source_column]]
+        : [],
+    ),
+  );
+  const inferredAuxiliaryColumns = Object.values(auxiliarySources);
+  const mappedDateSources = activeMappings
+    .filter(([, target]) => dateFields.has(target))
+    .map(([source]) => source);
+  const dateOrderInference = inferDateOrder(
+    table.rows.flatMap((row) =>
+      mappedDateSources.map((source) => row.values[source]),
+    ),
+  );
+  const effectiveDateOrder = requestedDateOrder ?? dateOrderInference.order;
+  const dateOrderBlocked =
+    requestedDateOrder === null && dateOrderInference.ambiguous;
+  if (dateOrderBlocked) {
+    addIssue({
+      code: "DATE_ORDER_REQUIRED",
+      message: "该文件存在日期顺序歧义，需要一次性确认整份文件的日期规则。",
+      raw_value: null,
+      severity: "error",
+      cause:
+        dateOrderInference.evidence.join("；") ||
+        "部分斜杠日期的日和月都不大于 12。",
+      impact: "在确认前，系统不会按浏览器区域设置猜测事件时间。",
+      suggestion: "选择“日/月/年”或“月/日/年”后重新校验；无需逐行处理。",
+      target_field: "event_time",
+    });
+  }
   const candidateSource = (target: string): string | null => {
     const candidate = mappingSuggestions
       .flatMap((suggestion) =>
@@ -671,7 +452,13 @@ export function validateBrowserImport(
     });
   });
 
-  validateMapping(mapping, table.headers, contract, ignoredSourceColumns)
+  validateMapping(
+    mapping,
+    table.headers,
+    contract,
+    ignoredSourceColumns,
+    inferredAuxiliaryColumns,
+  )
     .filter((message) => !message.startsWith("缺少必填目标字段："))
     .forEach((message) =>
       addIssue({
@@ -716,15 +503,6 @@ export function validateBrowserImport(
           entry[1] !== null && !ignoredSources.has(entry[0]),
       )
       .map(([source, target]) => [target, source]),
-  );
-  const auxiliarySources = Object.fromEntries(
-    Object.entries(contract.auxiliaryAliases).flatMap(([purpose, aliases]) => {
-      const normalizedAliases = new Set(aliases.map(normalizeAuxiliaryHeader));
-      const source = table.headers.find((header) =>
-        normalizedAliases.has(normalizeAuxiliaryHeader(header)),
-      );
-      return source ? [[purpose, source]] : [];
-    }),
   );
   const deriveTrackingEventId =
     dataType === "tracking_events" && !targetToSource.has("tracking_event_id");
@@ -795,9 +573,29 @@ export function validateBrowserImport(
         return;
       }
       try {
-        if (dateFields.has(definition.field))
-          record[definition.field] = parseImportDate(value, defaultTimezone);
-        else if (numberFields.has(definition.field))
+        if (dateFields.has(definition.field)) {
+          if (dateOrderBlocked) return;
+          const parsedDate = parseImportDateValue(
+            value,
+            defaultTimezone,
+            effectiveDateOrder,
+          );
+          record[definition.field] = parsedDate.iso;
+          if (parsedDate.precision === "date") {
+            addIssue({
+              code: "DATE_ONLY_PRECISION",
+              message: "该值只有日期精度，已保留为日期，不会静默补成午夜。",
+              raw_value: scalarText(value),
+              row_number: sourceRow.row_number,
+              severity: "warning",
+              sheet: table.sheetName,
+              source_column: source ?? null,
+              suggestion:
+                "需要小时级分析时，请补充真实发生时间；否则仅用于日期级统计。",
+              target_field: definition.field,
+            });
+          }
+        } else if (numberFields.has(definition.field))
           record[definition.field] = parseNumber(value, false);
         else if (integerFields.has(definition.field))
           record[definition.field] = parseNumber(value, true);
@@ -1114,22 +912,29 @@ export function validateBrowserImport(
     ignored_source_columns: [...ignoredSources].sort(),
     unresolved_source_columns: table.headers
       .filter(
-        (source) => !ignoredSources.has(source) && mapping[source] == null,
+        (source) =>
+          !ignoredSources.has(source) &&
+          !inferredAuxiliaryColumns.includes(source) &&
+          mapping[source] == null,
       )
       .sort(),
     field_resolutions: [
       ...table.headers.map((source): FieldResolution => ({
         reason: ignoredSources.has(source)
           ? "用户已明确排除该源字段，后续标准数据与分析不会包含它。"
-          : mapping[source] == null
-            ? "系统尚未确定该源字段的业务含义。"
-            : `该源字段写入标准字段 ${mapping[source]}。`,
+          : inferredAuxiliaryColumns.includes(source)
+            ? "系统将该列作为状态、签收或异常识别的辅助证据，不直接写入标准字段。"
+            : mapping[source] == null
+              ? "系统尚未确定该源字段的业务含义。"
+              : `该源字段写入标准字段 ${mapping[source]}。`,
         source_column: source,
         status: ignoredSources.has(source)
           ? "ignored"
-          : mapping[source] == null
-            ? "unresolved"
-            : "mapped",
+          : inferredAuxiliaryColumns.includes(source)
+            ? "inferred"
+            : mapping[source] == null
+              ? "unresolved"
+              : "mapped",
         target_field: mapping[source] ?? null,
       })),
       ...(deriveTrackingEventId

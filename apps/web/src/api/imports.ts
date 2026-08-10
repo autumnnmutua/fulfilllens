@@ -5,6 +5,7 @@ import type {
   ConfirmResponse,
   CompatibilitySampleCatalog,
   DataType,
+  DataTypeSelection,
   ImportTask,
   ParseResponse,
   ValidationResponse,
@@ -15,6 +16,7 @@ export interface ValidationPayload {
   ignored_source_columns?: string[];
   default_timezone: string | null;
   project_status_mappings: Record<string, string>;
+  date_order?: "DMY" | "MDY" | null;
 }
 
 export const importApi = {
@@ -22,8 +24,8 @@ export const importApi = {
     apiRequest<CompatibilitySampleCatalog>("/api/imports/samples"),
   sampleFileUrl: (sampleId: string) =>
     apiDownloadUrl(`/api/imports/samples/${encodeURIComponent(sampleId)}/file`),
-  upload: (dataType: DataType, file: File) => {
-    if (isCloudflareDeploy) {
+  upload: (dataType: DataTypeSelection, file: File) => {
+    if (isCloudflareDeploy || dataType === "auto") {
       return browserImportService.upload(dataType, file);
     }
     const body = new FormData();
@@ -41,7 +43,11 @@ export const importApi = {
     }),
   parse: (
     taskId: string,
-    payload: { encoding?: string; sheet_name?: string },
+    payload: {
+      data_type?: DataType;
+      encoding?: string;
+      sheet_name?: string;
+    },
   ) => {
     if (browserImportService.isTask(taskId)) {
       return browserImportService.parse(taskId, payload);

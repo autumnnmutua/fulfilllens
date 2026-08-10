@@ -25,19 +25,22 @@ const GUIDANCE: Record<string, MetricGuidance> = {
     requiresContext: true,
   },
   fulfillment_duration_mean_hours: {
-    explanation: "从订单创建到实际交付的平均耗时。",
+    explanation:
+      "有订单表时为创建至交付耗时；只有轨迹表时为同一业务单/运单首末事件时效。",
     direction: "在服务承诺一致时通常越低越快。",
     caution: "易受少量极慢订单影响，要和 P50、P90 一起看。",
     requiresContext: true,
   },
   fulfillment_duration_median_hours: {
-    explanation: "一半可计算订单的耗时不超过此值。",
+    explanation:
+      "一半可计算对象的耗时不超过此值；具体口径以当前卡片名称和警告为准。",
     direction: "在可比条件下通常越低越好。",
     caution: "不代表最慢订单，也不能替代 P90。",
     requiresContext: false,
   },
   fulfillment_duration_p90_hours: {
-    explanation: "90% 可计算订单的耗时不超过此值，用来观察长尾。",
+    explanation:
+      "90% 可计算对象的耗时不超过此值，用来观察长尾；轨迹单表时不等同于完整订单履约时长。",
     direction: "在可比条件下通常越低越好。",
     caution: "小样本、低覆盖或业务结构不同时不能直接排名。",
     requiresContext: true,

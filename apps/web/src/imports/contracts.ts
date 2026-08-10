@@ -107,9 +107,9 @@ export function getImportContract(dataType: DataType): ImportContract {
 }
 
 export const dataTypeLabels: Record<DataType, string> = {
-  orders: "订单表",
-  tracking_events: "物流轨迹表",
-  warehouse_events: "仓库事件表",
+  orders: "订单数据",
+  tracking_events: "物流轨迹数据",
+  warehouse_events: "仓库作业数据",
 };
 
 export const supportedDataTypes: DataType[] = [

@@ -33,6 +33,7 @@
 
 ## 发布资料
 
+- [v1.0.1 新手导入优化发布说明](releases/v1.0.1.md)
 - [v1.0.0 正式版发布说明](releases/v1.0.0.md)
 - [v1.0.0-rc.5 发布说明](releases/v1.0.0-rc.5.md)
 - [v1.0.0-rc.4 发布说明](releases/v1.0.0-rc.4.md)

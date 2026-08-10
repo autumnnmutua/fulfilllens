@@ -6,7 +6,7 @@ FulfillLens is a local-first, open-source fulfillment analytics tool for logisti
 
 The project is designed to make every percentage, anomaly, and scenario traceable to fields, formulas, thresholds, samples, and order-level evidence instead of generating a merely plausible story.
 
-> Version status: `1.0.0` is the first stable FulfillLens release. Suggestions combine normalized headers, a shared business alias catalog, and limited value profiling. Users can apply high-confidence recommendations and conservatively ignore non-analytical columns in bulk; required and plausible critical candidates remain protected. The Cloudflare edition parses custom CSV/XLSX files locally in the browser, runs metrics and diagnostics locally after confirmation, and generates deterministic action recommendations without uploading raw files to the Worker. See [Project status](#project-status-and-known-limitations).
+> Current stable version: `1.0.1`. Custom upload defaults to Auto-detect (recommended). The engine combines headers, value profiles, column relationships, and the selected data contract: high-confidence fields apply automatically, medium-confidence suggestions use one grouped confirmation, and optional columns use one safe bulk-ignore action. The Cloudflare edition parses and analyses custom CSV/XLSX files in the browser without uploading raw files or normalized rows to the Worker. See [Project status](#project-status-and-known-limitations).
 
 ## Why FulfillLens
 
@@ -133,7 +133,7 @@ python scripts/demo_simulation.py
 
 To focus on real-world compatibility conversion, open <http://127.0.0.1:5173/import> and choose “Non-standard order CSV auto-conversion sample” or “Non-standard logistics XLSX auto-conversion sample.” Both use the ordinary upload, sheet selection, mapping, Schema validation, and confirmation flow.
 
-To import your own file, select Orders, Warehouse Events, or Tracking Events, then choose “Upload your own file.” The existing seven-step wizard opens the system picker; step 2 also supports click or drag-and-drop for `.csv` and `.xlsx` only.
+To import your own file, keep the default Auto-detect (recommended) option and choose “Upload your own file.” The engine identifies Orders, Warehouse Operations, or Tracking Data from headers, value patterns, and repetition relationships. High-confidence mappings are automatic; a normal first-time user needs at most one “Apply all recommendations” action, one “Ignore optional fields” action, and “Start analysis.” The complete mapping table remains available under Advanced field settings.
 
 ### 4. Follow the full path
 
@@ -249,7 +249,7 @@ Three data types are supported:
 - `warehouse_events`: one row per warehouse event;
 - `tracking_events`: one row per tracking event.
 
-CSV and XLSX are supported. CSV handles UTF-8, UTF-8 BOM, GBK/GB18030, CRLF/LF, quoted fields, embedded commas, and blank lines; uncertain encoding requires user confirmation. Fields may use Chinese, English, camelCase, snake_case, or registered business-system aliases. The UI exposes source, target, Exact/Alias/Normalized/Similarity/Manual method, confidence, and confirmation status. XLSX supports multiple sheets, Excel dates, numeric/text numeric cells, blank rows, and extra columns; formulas, macros, scripts, and external links are not executed. Times are normalized to timezone-aware ISO 8601, and timezone-less inputs require a selected default timezone. Conversion only normalizes representation—it does not invent, delete, or alter business facts and does not claim to support every Excel workbook.
+CSV and XLSX are supported. CSV handles UTF-8, UTF-8 BOM, GBK/GB18030, CRLF/LF, quoted fields, embedded commas, and blank lines; uncertain encoding requires user confirmation. Mapping evidence combines normalized headers, aliases, value profiles, uniqueness/repetition, and the selected schema. XLSX supports multiple sheets, Excel dates, numeric/text numeric cells, blank rows, and extra columns; formulas, macros, scripts, and external links are not executed. Date parsing is locale-independent, supports Chinese and English month forms plus explicit offsets, and infers day/month order once for the whole file; unresolved ambiguity asks one file-level question. Date-only values retain date precision instead of being silently coerced to midnight. Conversion only normalizes representation—it does not invent, delete, or alter business facts and does not claim to support every Excel workbook.
 
 Templates live in `data/templates/`, and machine-readable schemas live in `data/schemas/`. See the [Data Dictionary](docs/DATA_DICTIONARY.md), [Status Taxonomy](docs/STATUS_TAXONOMY.md), and [Import Guide](docs/IMPORTING.md).
 
@@ -278,9 +278,9 @@ See [Architecture](docs/ARCHITECTURE.md) and [ADRs](docs/adr/README.md). The Clo
 
 ## Project status and known limitations
 
-Stages 0–12 are complete for the v1.0.0 scope, including local, Docker, and production acceptance. Current evidence includes:
+Stages 0–12, the v1.0.0 stable release, and the v1.0.1 beginner-import improvements are complete. Current evidence includes:
 
-- 50 frontend, 14 Cloudflare Worker, and 234 backend/contract tests;
+- 64 frontend, 14 Cloudflare Worker, and 234 backend/contract tests;
 - 10,000/50,000-order performance benchmarks;
 - real import interaction at 360/390/430/1440 Chromium, plus site-wide 360/390/430/768/1440 audits;
 - npm/Python vulnerability audits and repository secret scans;
@@ -304,7 +304,7 @@ Reports and benchmarks are evidence for a specific revision, dataset, and machin
 - Stage 11: bilingual open-source docs, license, governance templates, and RC assets;
 - Stage 12: clean-environment acceptance and the v1.0 release decision.
 
-See the [Roadmap](docs/ROADMAP.md), [final acceptance record](docs/RELEASE_ACCEPTANCE.md), [compatibility validation report](docs/COMPATIBILITY_VALIDATION.md), and [v1.0.0 release notes](docs/releases/v1.0.0.md).
+See the [Roadmap](docs/ROADMAP.md), [final acceptance record](docs/RELEASE_ACCEPTANCE.md), [compatibility validation report](docs/COMPATIBILITY_VALIDATION.md), [v1.0.0 release notes](docs/releases/v1.0.0.md), and [v1.0.1 release notes](docs/releases/v1.0.1.md).
 
 ## Privacy, security, and disclaimer
 

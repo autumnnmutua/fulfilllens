@@ -1,6 +1,6 @@
 {
   "name": "fulfilllens",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "license": "MIT",
   "description": "FulfillLens 本地优先履约分析工具",

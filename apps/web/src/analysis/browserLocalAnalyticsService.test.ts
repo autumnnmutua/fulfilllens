@@ -102,6 +102,21 @@ describe("浏览器本地分析", () => {
       expect(item?.denominator).toBeNull();
       expect(item?.warnings.join(" ")).toContain("数据不足");
     }
+    const mean = overview.metrics.find(
+      (metric) => metric.code === "fulfillment_duration_mean_hours",
+    );
+    const p50 = overview.metrics.find(
+      (metric) => metric.code === "fulfillment_duration_median_hours",
+    );
+    const p90 = overview.metrics.find(
+      (metric) => metric.code === "fulfillment_duration_p90_hours",
+    );
+    expect(mean).toMatchObject({ display_name: "平均首末轨迹时效", value: 28 });
+    expect(p50).toMatchObject({ display_name: "P50 首末轨迹时效", value: 28 });
+    expect(p90).toMatchObject({ display_name: "P90 首末轨迹时效", value: 28 });
+    expect(mean?.warnings.join(" ")).toContain(
+      "不等于订单创建至交付的完整履约时长",
+    );
     const bundle = buildClientRecommendations(overview);
     expect(bundle.facts.some((fact) => fact.fact_id === "data:coverage")).toBe(
       true,

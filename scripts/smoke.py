@@ -324,7 +324,7 @@ def main() -> None:
 
             assert direct_health["status"] == "ok"
             assert proxy_health["status"] == "ok"
-            assert direct_version["app_version"] == "1.0.0"
+            assert direct_version["app_version"] == "1.0.1"
             assert proxy_version["api_version"] == "v1"
             assert len(compatibility_samples["samples"]) == 2
             assert home_status == 200

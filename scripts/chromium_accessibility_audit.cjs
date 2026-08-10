@@ -6,7 +6,21 @@ const playwrightModule = process.env.FL_PLAYWRIGHT_MODULE || "playwright";
 const { chromium } = require(playwrightModule);
 
 const baseUrl = process.env.FL_WEB_URL || "http://127.0.0.1:5173";
-const executablePath = process.env.FL_CHROMIUM_PATH || undefined;
+const browserCandidates = [
+  process.env.FL_CHROMIUM_PATH,
+  process.platform === "win32"
+    ? "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+    : undefined,
+  process.platform === "win32"
+    ? "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"
+    : undefined,
+  process.platform === "win32"
+    ? "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe"
+    : undefined,
+].filter(Boolean);
+const executablePath = browserCandidates.find((candidate) =>
+  fs.existsSync(candidate),
+);
 const outputPath =
   process.env.FL_AUDIT_OUTPUT || "docs/chromium-audit-results.json";
 const auditCaseId = process.env.FL_AUDIT_CASE_ID || "";
@@ -122,7 +136,10 @@ function accessibleProblems() {
     }
   }
 
-  const browser = await chromium.launch({ headless: true, executablePath });
+  const launchOptions = executablePath
+    ? { headless: true, executablePath }
+    : { headless: true };
+  const browser = await chromium.launch(launchOptions);
   const results = [];
   let failed = false;
   try {

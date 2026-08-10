@@ -16,11 +16,13 @@ import {
   type WorkbookInspection,
 } from "./parser";
 import { scalarText } from "./scalar";
+import { inferDateOrder } from "./dateParser";
 import { saveBrowserDataset } from "./browserDatasetStore";
 import { validateBrowserImport, type ValidationArtifacts } from "./validation";
 import type {
   ConfirmResponse,
   DataType,
+  DataTypeSelection,
   ImportStatus,
   ImportTask,
   ParseResponse,
@@ -35,12 +37,13 @@ interface BrowserTaskRecord {
   parseResponse?: ParseResponse;
   parsedTable?: BrowserParsedTable;
   task: ImportTask;
+  schemaSelection: DataTypeSelection;
 }
 
 const taskStore = new Map<string, BrowserTaskRecord>();
 const errorsUrlStore = new Map<string, string>();
 
-function taskId(dataType: DataType): string {
+function taskId(dataType: DataTypeSelection): string {
   const id =
     typeof crypto.randomUUID === "function"
       ? crypto.randomUUID()
@@ -113,7 +116,10 @@ export const browserImportService = {
     return id.startsWith("browser-import-");
   },
 
-  async upload(dataType: DataType, file: File): Promise<{ task: ImportTask }> {
+  async upload(
+    dataType: DataTypeSelection,
+    file: File,
+  ): Promise<{ task: ImportTask }> {
     const format = validateFileBasics(file);
     await validateFileSignature(file, format);
     const id = taskId(dataType);
@@ -135,9 +141,11 @@ export const browserImportService = {
         status = "awaiting_sheet";
       }
     }
+    const concreteDataType: DataType =
+      dataType === "auto" ? "orders" : dataType;
     const task: ImportTask = {
       can_reconfigure: true,
-      data_type: dataType,
+      data_type: concreteDataType,
       default_timezone: "Asia/Shanghai",
       encoding,
       encoding_options: encodingOptions,
@@ -160,15 +168,20 @@ export const browserImportService = {
       status_label: statusLabel(status),
       task_id: id,
     };
-    taskStore.set(id, { file, inspection, task });
+    taskStore.set(id, { file, inspection, schemaSelection: dataType, task });
     return { task };
   },
 
   async parse(
     id: string,
-    payload: { encoding?: string; sheet_name?: string },
+    payload: {
+      data_type?: DataType;
+      encoding?: string;
+      sheet_name?: string;
+    },
   ): Promise<ParseResponse> {
     const record = requireRecord(id);
+    if (payload.data_type) record.schemaSelection = payload.data_type;
     if (!record.file) {
       throw new BrowserImportError(
         "IMPORT_FILE_CLEARED",
@@ -203,21 +216,59 @@ export const browserImportService = {
       table = parseWorkbookSheet(inspection, selectedSheet);
       record.task = { ...record.task, selected_sheet: selectedSheet };
     }
-    const contract = getImportContract(record.task.data_type);
-    const suggestions = suggestMappings(table.headers, contract, table.rows);
     const candidates = detectDataTypes(table.headers, table.rows);
-    const sensitiveRisks = detectSensitiveRisks(table.headers, table.rows);
     const top = candidates[0];
+    const selectedDataType =
+      record.schemaSelection === "auto"
+        ? (top?.data_type ?? "orders")
+        : record.schemaSelection;
+    record.task = { ...record.task, data_type: selectedDataType };
+    const contract = getImportContract(selectedDataType);
+    const suggestions = suggestMappings(table.headers, contract, table.rows);
+    const sensitiveRisks = detectSensitiveRisks(table.headers, table.rows);
+    const dateSources = suggestions
+      .filter((suggestion) =>
+        suggestion.candidates.some(
+          (candidate) =>
+            candidate.field.endsWith("_time") ||
+            candidate.field === "created_at",
+        ),
+      )
+      .map((suggestion) => suggestion.source_column);
+    const dateOrderInference = inferDateOrder(
+      table.rows.flatMap((row) =>
+        dateSources.map((source) => row.values[source]),
+      ),
+    );
+    const mismatch =
+      record.schemaSelection !== "auto" &&
+      top !== undefined &&
+      top.data_type !== selectedDataType &&
+      top.confidence >= 0.75 &&
+      top.confidence -
+        (candidates.find(
+          (candidate) => candidate.data_type === selectedDataType,
+        )?.confidence ?? 0) >=
+        0.12
+        ? `这份文件更像${top.display_name}，建议切换后重新解析。`
+        : null;
     record.task = withStatus(
       record.task,
       "awaiting_mapping",
-      "解析和数据类型识别已在浏览器本地完成；请复核字段映射。",
+      record.schemaSelection === "auto"
+        ? `已自动识别为${top?.display_name ?? "业务数据"}，高置信度字段已自动应用。`
+        : "已按用户选择的数据类型解析；高置信度字段已自动应用。",
     );
     const response: ParseResponse = {
       conversion_notes: conversionNotes(record.task.file_format),
       data_type_candidates: candidates,
       detected_data_type: top?.data_type ?? record.task.data_type,
       detection_confidence: top?.confidence ?? 0,
+      schema_selection_mode:
+        record.schemaSelection === "auto" ? "auto" : "manual",
+      selected_data_type: selectedDataType,
+      type_mismatch_warning: mismatch,
+      date_order_inference: dateOrderInference,
       fields: contract.fields,
       preview_rows: table.rows.slice(0, 20),
       sensitive_risks: sensitiveRisks,
@@ -226,7 +277,11 @@ export const browserImportService = {
       task: record.task,
       total_rows: table.rows.length,
       unmapped_source_columns: suggestions
-        .filter((suggestion) => suggestion.suggested_field === null)
+        .filter(
+          (suggestion) =>
+            suggestion.suggested_field === null &&
+            suggestion.auxiliary_purpose === null,
+        )
         .map((suggestion) => suggestion.source_column),
       warnings: table.warnings,
     };
@@ -256,6 +311,7 @@ export const browserImportService = {
       payload.default_timezone,
       payload.project_status_mappings,
       record.parseResponse.sensitive_risks,
+      payload.date_order ?? null,
     );
     record.artifacts = artifacts;
     record.task = withStatus(

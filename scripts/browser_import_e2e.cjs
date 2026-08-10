@@ -19,6 +19,10 @@ const xlsxPath = path.join(
   "samples",
   "compatibility_demo_logistics.xlsx",
 );
+const manualCsvPaths = [
+  process.env.FL_MANUAL_CSV_1,
+  process.env.FL_MANUAL_CSV_2,
+].filter(Boolean);
 const executablePath =
   process.env.FL_CHROMIUM_PATH ||
   [
@@ -46,6 +50,15 @@ async function assertPublicBrand(page) {
 
 async function chooseDataType(page, label) {
   await page.getByText(label, { exact: true }).click();
+}
+
+async function expandAdvancedFields(page) {
+  const advanced = page.getByText(/高级字段设置（\d+ 个源字段）/);
+  const table = page.locator(".mapping-table, .mapping-mobile-list");
+  if ((await table.count()) === 0 || !(await table.first().isVisible())) {
+    await advanced.click();
+    await table.first().waitFor();
+  }
 }
 
 async function chooseCustomFile(page, filePath) {
@@ -82,6 +95,7 @@ function mappingRow(page, text) {
 }
 
 async function inspectMappingLayout(page, width) {
+  await expandAdvancedFields(page);
   const selectInput = page.locator('[aria-label$="映射目标"]').first();
   const select = selectInput.locator(
     "xpath=ancestor::*[contains(concat(' ', normalize-space(@class), ' '), ' ant-select ')][1]",
@@ -109,7 +123,9 @@ async function inspectMappingLayout(page, width) {
         : null,
     };
   });
-  const minimum = width >= 768 ? 320 : 250;
+  // At 360 px the card's usable content width is 262 px; 220 px keeps the
+  // control near full width after the intentional card and control padding.
+  const minimum = width >= 768 ? 320 : 220;
   if (!selectBox || selectBox.width < minimum) {
     throw new Error(
       `Mapping target select is only ${selectBox?.width ?? 0}px wide at ${width}px: ${JSON.stringify(layoutContext)}`,
@@ -158,6 +174,7 @@ async function inspectMappingLayout(page, width) {
 }
 
 async function ignoreSource(page, source) {
+  await expandAdvancedFields(page);
   const row = mappingRow(page, source);
   const ignoreButton = row.getByRole("button", { name: /^忽\s*略$/ });
   if ((await ignoreButton.count()) === 0) {
@@ -174,26 +191,32 @@ async function ignoreSource(page, source) {
 }
 
 async function resolveMapping(page, options = {}) {
+  let groupedConfirmations = 0;
+  let ignoredCount = 0;
   const recommended = page.getByRole("button", {
-    name: /一键应用推荐映射（[1-9]\d*）/,
+    name: /全部采用推荐映射（[1-9]\d*）/,
   });
   if ((await recommended.count()) > 0 && (await recommended.isEnabled())) {
+    groupedConfirmations = 1;
     await recommended.click();
     await page.getByText(/已应用 \d+ 个推荐映射/).waitFor();
   }
-  while ((await page.getByRole("button", { name: "确认建议" }).count()) > 0) {
-    await page.getByRole("button", { name: "确认建议" }).first().click();
+  if ((await page.getByRole("button", { name: "确认建议" }).count()) > 0) {
+    throw new Error(
+      "Beginner import unexpectedly requires per-field confirmation",
+    );
   }
   if (options.bulkIgnore) {
     const bulkButton = page.getByRole("button", {
-      name: /一键忽略可忽略项（[1-9]\d*）/,
+      name: /一键忽略非必要字段（[1-9]\d*）/,
     });
+    const label = (await bulkButton.textContent()) || "";
+    ignoredCount = Number(label.match(/（(\d+)）/)?.[1] || 0);
     await bulkButton.click();
     await page.getByText(/已忽略 \d+ 个非分析字段/).waitFor();
     await page.getByRole("button", { name: "撤销本次忽略" }).click();
-    await page.getByText("Unresolved", { exact: true }).first().waitFor();
     await page
-      .getByRole("button", { name: /一键忽略可忽略项（[1-9]\d*）/ })
+      .getByRole("button", { name: /一键忽略非必要字段（[1-9]\d*）/ })
       .click();
   }
   if (options.ignoreSource) {
@@ -203,42 +226,75 @@ async function resolveMapping(page, options = {}) {
     await row.getByRole("button", { name: /^忽\s*略$/ }).click();
     await row.getByText("Ignored", { exact: true }).waitFor();
   }
-  while ((await page.getByText("Unresolved", { exact: true }).count()) > 0) {
-    const row = mappingRow(page, "Unresolved");
-    await row.getByRole("button", { name: /^忽\s*略$/ }).click();
-  }
   await page.getByText(/还有 \d+ 个字段待处理/).waitFor({ state: "detached" });
+  await page.getByText("字段已准备好，可以开始分析", { exact: true }).waitFor();
+  const taskStatus = page.locator(".import-task-status");
+  await taskStatus.getByText("可开始分析", { exact: true }).waitFor();
+  if ((await taskStatus.getByText("待映射", { exact: true }).count()) > 0) {
+    throw new Error("Import task status conflicts with the current readiness");
+  }
+  return { groupedConfirmations, ignoredCount };
 }
 
 async function openMapping(page, filePath, sheetName) {
   await page.goto(`${baseUrl}/import`, { waitUntil: "networkidle" });
   await assertPublicBrand(page);
-  await chooseDataType(page, "物流轨迹表");
+  await page.getByText("自动识别（推荐）", { exact: true }).waitFor();
   await chooseCustomFile(page, filePath);
   await parseSelectedFile(page, sheetName);
+  await page.getByText(/数据类型识别：物流轨迹数据/).waitFor();
   await page.getByRole("button", { name: "下一步：字段映射" }).click();
-  await page.getByRole("heading", { name: "5. 字段映射" }).waitFor();
+  await page.getByRole("heading", { name: "5. 快速导入" }).waitFor();
 }
 
 async function confirmImport(page, options = {}) {
-  await resolveMapping(page, options);
+  const mappingStats = await resolveMapping(page, options);
   await page.getByRole("button", { name: "运行质量校验" }).click();
   await page.getByText("校验通过，可以确认导入", { exact: true }).waitFor();
   await page.getByRole("button", { name: "下一步：确认导入" }).click();
   await page.getByRole("button", { name: "确认并生成可分析数据集" }).click();
   await page.getByText("数据已导入当前浏览器", { exact: true }).waitFor();
+  return mappingStats;
 }
 
 async function runImport(page, filePath, sheetName) {
   await openMapping(page, filePath, sheetName);
-  await confirmImport(page, {
-    bulkIgnore: !sheetName,
+  return confirmImport(page, {
+    bulkIgnore: true,
   });
+}
+
+async function readLatestDataset(page) {
+  return page.evaluate(
+    () =>
+      new Promise((resolve, reject) => {
+        const request = indexedDB.open("fulfilllens-cn-browser-data", 1);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+          const database = request.result;
+          const query = database
+            .transaction("datasets", "readonly")
+            .objectStore("datasets")
+            .getAll();
+          query.onerror = () => reject(query.error);
+          query.onsuccess = () => {
+            const latest = [...query.result]
+              .sort((left, right) =>
+                String(left.createdAt).localeCompare(String(right.createdAt)),
+              )
+              .at(-1);
+            database.close();
+            resolve(latest ?? null);
+          };
+        };
+      }),
+  );
 }
 
 (async () => {
   assertFixture(csvPath);
   assertFixture(xlsxPath);
+  manualCsvPaths.forEach(assertFixture);
   const browser = await chromium.launch({ headless: true, executablePath });
   const consoleErrors = [];
   const requestFailures = [];
@@ -285,29 +341,12 @@ async function runImport(page, filePath, sheetName) {
     });
 
     await runImport(page, csvPath);
-    const persisted = await page.evaluate(
-      () =>
-        new Promise((resolve, reject) => {
-          const request = indexedDB.open("fulfilllens-cn-browser-data", 1);
-          request.onerror = () => reject(request.error);
-          request.onsuccess = () => {
-            const database = request.result;
-            const query = database
-              .transaction("datasets", "readonly")
-              .objectStore("datasets")
-              .getAll();
-            query.onerror = () => reject(query.error);
-            query.onsuccess = () => {
-              const latest = query.result.at(-1);
-              database.close();
-              resolve({
-                ignored: latest?.qualityReport?.ignored_source_columns ?? [],
-                rowKeys: Object.keys(latest?.rows?.[0] ?? {}),
-              });
-            };
-          };
-        }),
-    );
+    const latestFixtureDataset = await readLatestDataset(page);
+    const persisted = {
+      ignored:
+        latestFixtureDataset?.qualityReport?.ignored_source_columns ?? [],
+      rowKeys: Object.keys(latestFixtureDataset?.rows?.[0] ?? {}),
+    };
     if (
       !persisted.ignored.includes("无关说明") ||
       persisted.rowKeys.includes("无关说明")
@@ -337,20 +376,31 @@ async function runImport(page, filePath, sheetName) {
     await page.keyboard.press("Escape");
     await page.getByText("管理层简报", { exact: true }).click();
     await page.getByText("最值得先处理的 3 件事", { exact: true }).waitFor();
-    records.push({ scenario: "browser-local-analysis-recommendations", passed: true });
+    records.push({
+      scenario: "browser-local-analysis-recommendations",
+      passed: true,
+    });
     await page.goto(`${baseUrl}/diagnostics`, { waitUntil: "networkidle" });
     await page.getByRole("heading", { name: "异常诊断" }).waitFor();
-    await page.getByText(/只有事件数据/).first().waitFor();
+    await page
+      .getByText(/只有事件数据/)
+      .first()
+      .waitFor();
     records.push({ scenario: "browser-local-diagnostics", passed: true });
     await page.goto(`${baseUrl}/reports`, { waitUntil: "networkidle" });
     await page.getByRole("button", { name: "生成预览" }).click();
-    await page.getByText("两种视图使用同一组分析事实", { exact: true }).waitFor();
+    await page
+      .getByText("两种视图使用同一组分析事实", { exact: true })
+      .waitFor();
     await page.getByText("管理层简报", { exact: true }).last().click();
     await page
       .getByText(/当前共形成 \d+ 项有数据依据的行动建议/)
       .last()
       .waitFor();
-    records.push({ scenario: "browser-local-report-recommendations", passed: true });
+    records.push({
+      scenario: "browser-local-report-recommendations",
+      passed: true,
+    });
     await page.reload({ waitUntil: "networkidle" });
     await page.goto(`${baseUrl}/settings`, { waitUntil: "networkidle" });
     await page.getByText("浏览器本地导入", { exact: false }).first().waitFor();
@@ -358,6 +408,63 @@ async function runImport(page, filePath, sheetName) {
 
     await runImport(page, xlsxPath, "物流轨迹");
     records.push({ scenario: "multi-sheet-xlsx", passed: true });
+
+    for (const [index, manualPath] of manualCsvPaths.entries()) {
+      const mappingStats = await runImport(page, manualPath);
+      const dataset = await readLatestDataset(page);
+      if (!dataset)
+        throw new Error(`Manual CSV ${index + 1} was not persisted`);
+      const quality = dataset.qualityReport;
+      const rows = dataset.rows;
+      const blockers = quality.issues.filter(
+        (issue) => issue.severity === "error",
+      ).length;
+      const fieldConfirmations = await page
+        .getByRole("button", { name: "确认建议" })
+        .count();
+      if (rows.length !== quality.total_rows || blockers !== 0) {
+        throw new Error(
+          `Manual CSV ${index + 1} lost rows or retained blockers: ${JSON.stringify({ blockers, imported: rows.length, total: quality.total_rows })}`,
+        );
+      }
+      const unique = (field) =>
+        new Set(rows.map((row) => row[field]).filter(Boolean)).size;
+      records.push({
+        scenario: `manual-nonstandard-csv-${index + 1}`,
+        passed: true,
+        file: path.basename(manualPath),
+        detected_type: dataset.dataType,
+        parsed_rows: quality.total_rows,
+        imported_rows: rows.length,
+        silent_dropped_rows: quality.total_rows - rows.length,
+        shipments: unique("shipment_id"),
+        orders: unique("order_id"),
+        carriers: unique("carrier_id"),
+        mapped_or_generated_fields: quality.field_resolutions.filter((item) =>
+          ["mapped", "generated", "inferred"].includes(item.status),
+        ).length,
+        ignored_fields: quality.ignored_source_columns.length,
+        unresolved_fields: quality.unresolved_source_columns.length,
+        blocking_issues: blockers,
+        invalid_times: quality.invalid_times,
+        unknown_statuses: quality.unknown_statuses,
+        grouped_confirmations: mappingStats.groupedConfirmations,
+        field_confirmations: fieldConfirmations,
+      });
+      await page.goto(`${baseUrl}/analytics`, { waitUntil: "networkidle" });
+      await page.getByRole("heading", { name: "分析总览" }).waitFor();
+      await page.getByText("平均首末轨迹时效", { exact: true }).waitFor();
+      await page.getByText("专业行动方案", { exact: true }).waitFor();
+      await page.getByText("管理层简报", { exact: true }).click();
+      await page.getByText("最值得先处理的 3 件事", { exact: true }).waitFor();
+      await page.goto(`${baseUrl}/diagnostics`, { waitUntil: "networkidle" });
+      await page.getByRole("heading", { name: "异常诊断" }).waitFor();
+      await page.goto(`${baseUrl}/reports`, { waitUntil: "networkidle" });
+      await page.getByRole("button", { name: "生成预览" }).click();
+      await page
+        .getByText("两种视图使用同一组分析事实", { exact: true })
+        .waitFor();
+    }
 
     await openMapping(page, csvPath);
     await resolveMapping(page, { ignoreSource: "无关说明" });
@@ -373,7 +480,7 @@ async function runImport(page, filePath, sheetName) {
     records.push({ scenario: "required-field-ignore-blocked", passed: true });
 
     await page.goto(`${baseUrl}/import`, { waitUntil: "networkidle" });
-    await chooseDataType(page, "物流轨迹表");
+    await chooseDataType(page, "物流轨迹数据");
     const chooserPromise = page.waitForEvent("filechooser");
     await page.getByRole("button", { name: "自主上传文件" }).click();
     await (await chooserPromise).setFiles(invalidFile);

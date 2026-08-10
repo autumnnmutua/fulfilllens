@@ -10,6 +10,7 @@ import {
   Button,
   Card,
   Col,
+  Collapse,
   Descriptions,
   Flex,
   Grid,
@@ -45,11 +46,13 @@ import type {
   CompatibilitySample,
   CompatibilitySampleCatalog,
   DataType,
+  DataTypeSelection,
   FieldSuggestion,
   ImportTask,
   ParseResponse,
   QualityIssue,
   ValidationResponse,
+  ImportDateOrder,
 } from "../types/imports";
 
 const { Dragger } = Upload;
@@ -65,23 +68,28 @@ const stepItems = [
 ];
 
 const dataTypeOptions: Array<{
-  value: DataType;
+  value: DataTypeSelection;
   label: string;
   description: string;
 }> = [
   {
+    value: "auto",
+    label: "自动识别（推荐）",
+    description: "系统结合表头、内容特征和行间关系判断数据类型。",
+  },
+  {
     value: "orders",
-    label: "订单表",
+    label: "订单数据",
     description: "订单创建、承诺与实际交付、数量和订单状态。",
   },
   {
     value: "warehouse_events",
-    label: "仓库事件表",
+    label: "仓库作业数据",
     description: "拣货、质检、打包、出库等仓内作业事件。",
   },
   {
     value: "tracking_events",
-    label: "物流轨迹表",
+    label: "物流轨迹数据",
     description: "揽收、中转、派送、签收和运输异常轨迹。",
   },
 ];
@@ -180,6 +188,8 @@ export function ImportPage() {
   const nativeFileInput = useRef<HTMLInputElement>(null);
   const [current, setCurrent] = useState(0);
   const [dataType, setDataType] = useState<DataType>("orders");
+  const [dataTypeSelection, setDataTypeSelection] =
+    useState<DataTypeSelection>("auto");
   const [file, setFile] = useState<File | null>(null);
   const [task, setTask] = useState<ImportTask | null>(null);
   const [encoding, setEncoding] = useState<string>();
@@ -192,6 +202,7 @@ export function ImportPage() {
   const [manualSourceColumns, setManualSourceColumns] = useState<string[]>([]);
   const [lastBulkIgnored, setLastBulkIgnored] = useState<string[]>([]);
   const [timezone, setTimezone] = useState("Asia/Shanghai");
+  const [dateOrder, setDateOrder] = useState<ImportDateOrder>();
   const [projectStatusMappings, setProjectStatusMappings] = useState<
     Record<string, string>
   >({});
@@ -256,6 +267,7 @@ export function ImportPage() {
   );
   const mappingSummary = useMemo(() => {
     const result = {
+      auxiliary: 0,
       ignored: 0,
       mapped: 0,
       pendingConfirmation: 0,
@@ -266,6 +278,8 @@ export function ImportPage() {
       const target = mapping[source] ?? null;
       if (ignoredSourceSet.has(source)) {
         result.ignored += 1;
+      } else if (suggestion.auxiliary_purpose && target === null) {
+        result.auxiliary += 1;
       } else if (target === null) {
         result.unresolved += 1;
       } else if (
@@ -307,6 +321,7 @@ export function ImportPage() {
     mappingSummary.pendingConfirmation + mappingSummary.unresolved;
 
   function applyParsed(response: ParseResponse) {
+    setDataType(response.selected_data_type ?? response.task.data_type);
     setTask(response.task);
     setParsed(response);
     setMapping(
@@ -320,6 +335,7 @@ export function ImportPage() {
     setIgnoredSourceColumns([]);
     setManualSourceColumns([]);
     setLastBulkIgnored([]);
+    setDateOrder(response.date_order_inference?.order ?? undefined);
     setPersistentError(null);
     setValidation(null);
     setConfirmed(null);
@@ -493,7 +509,9 @@ export function ImportPage() {
       setPersistentError("请先选择一个 CSV 或 XLSX 文件。");
       return;
     }
-    const response = await runAction(() => importApi.upload(dataType, file));
+    const response = await runAction(() =>
+      importApi.upload(dataTypeSelection, file),
+    );
     if (response === null) {
       return;
     }
@@ -523,6 +541,26 @@ export function ImportPage() {
     if (response !== null) {
       applyParsed(response);
     }
+  }
+
+  async function switchParsedDataType(next: DataType) {
+    setDataTypeSelection(next);
+    setDataType(next);
+    if (task === null) return;
+    if (!task.task_id.startsWith("browser-import-")) {
+      setPersistentError(
+        "本地服务模式下请返回上传步骤并按新的数据类型重新读取文件。",
+      );
+      return;
+    }
+    const response = await runAction(() =>
+      importApi.parse(task.task_id, {
+        data_type: next,
+        ...(encoding === undefined ? {} : { encoding }),
+        ...(sheetName === undefined ? {} : { sheet_name: sheetName }),
+      }),
+    );
+    if (response !== null) applyParsed(response);
   }
 
   async function handleSynthetic() {
@@ -594,6 +632,7 @@ export function ImportPage() {
         ignored_source_columns: ignoredSourceColumns,
         default_timezone: timezone.trim() || null,
         project_status_mappings: projectStatusMappings,
+        date_order: dateOrder ?? null,
       }),
     );
     if (response !== null) {
@@ -616,16 +655,50 @@ export function ImportPage() {
     }
     const response = await runAction(() => importApi.confirm(task.task_id));
     if (response !== null) {
-      setTask(response.task);
-      setConfirmed(response);
-      window.localStorage.setItem(
-        response.dataset_id.startsWith("browser-local-")
-          ? `fulfilllens.browser.dataset.${response.task.data_type}`
-          : `fulfilllens.dataset.${response.task.data_type}`,
-        response.dataset_id,
-      );
+      persistConfirmed(response);
       notifications.showSuccess("导入完成", "数据集已进入“可分析”状态。");
     }
+  }
+
+  function persistConfirmed(response: ConfirmResponse) {
+    setTask(response.task);
+    setConfirmed(response);
+    window.localStorage.setItem(
+      response.dataset_id.startsWith("browser-local-")
+        ? `fulfilllens.browser.dataset.${response.task.data_type}`
+        : `fulfilllens.dataset.${response.task.data_type}`,
+      response.dataset_id,
+    );
+  }
+
+  async function handleQuickAnalyze() {
+    if (task === null || blockingMappingCount > 0) return;
+    const result = await runAction(async () => {
+      const checked = await importApi.validate(task.task_id, {
+        mapping,
+        ignored_source_columns: ignoredSourceColumns,
+        default_timezone: timezone.trim() || null,
+        project_status_mappings: projectStatusMappings,
+        date_order: dateOrder ?? null,
+      });
+      if (!checked.report.can_confirm) return { checked, imported: null };
+      const imported = await importApi.confirm(task.task_id);
+      return { checked, imported };
+    });
+    if (result === null) return;
+    setTask(result.checked.task);
+    setValidation(result.checked);
+    setValidationStale(false);
+    if (result.imported === null) {
+      setCurrent(5);
+      return;
+    }
+    persistConfirmed(result.imported);
+    notifications.showSuccess(
+      "已准备好分析",
+      `已导入 ${result.imported.imported_rows} 行；正在打开分析总览。`,
+    );
+    window.location.assign("/analytics");
   }
 
   async function handleCancel() {
@@ -645,6 +718,7 @@ export function ImportPage() {
     setManualSourceColumns([]);
     setLastBulkIgnored([]);
     setProjectStatusMappings({});
+    setDateOrder(undefined);
     setValidationStale(false);
     setPersistentError(null);
     setCurrent(0);
@@ -663,6 +737,24 @@ export function ImportPage() {
           <Tag color="default">已忽略</Tag>
           <Button size="small" onClick={() => restoreSourceColumn(source)}>
             取消忽略并重新映射
+          </Button>
+        </Flex>
+      );
+    }
+    if (suggestion.auxiliary_purpose && mapping[source] == null) {
+      return (
+        <Flex
+          className="mapping-ignored-control"
+          align="center"
+          gap="small"
+          wrap
+        >
+          <Tag color="cyan">用于辅助识别</Tag>
+          <Typography.Text>
+            不直接写入分析字段；仅辅助判断状态、签收或异常。
+          </Typography.Text>
+          <Button size="small" onClick={() => ignoreSourceColumn(source)}>
+            不使用该辅助列
           </Button>
         </Flex>
       );
@@ -724,6 +816,9 @@ export function ImportPage() {
     if (ignoredSourceSet.has(source)) {
       return <Typography.Text type="secondary">— 已忽略</Typography.Text>;
     }
+    if (suggestion.auxiliary_purpose && mapping[source] == null) {
+      return <Typography.Text type="secondary">— 辅助证据</Typography.Text>;
+    }
     const target = mapping[source] ?? null;
     if (target === null) {
       return <Tag color="warning">待处理</Tag>;
@@ -750,13 +845,27 @@ export function ImportPage() {
     if (ignoredSourceSet.has(source)) {
       return <Tag>Ignored</Tag>;
     }
+    if (suggestion.auxiliary_purpose && mapping[source] == null) {
+      return <Tag color="cyan">Inferred</Tag>;
+    }
     if ((mapping[source] ?? null) === null) {
       return <Tag color="warning">Unresolved</Tag>;
     }
     if (manualSourceSet.has(source)) {
       return <Tag color="purple">Manual</Tag>;
     }
-    return <Tag color="blue">{suggestion.method}</Tag>;
+    const evidenceItems = suggestion.candidates[0]?.evidence ?? [];
+    return (
+      <Tooltip
+        title={
+          evidenceItems.length > 0
+            ? evidenceItems.map((item) => item.label).join("；")
+            : "依据字段名和内容画像生成"
+        }
+      >
+        <Tag color="blue">{suggestion.method}</Tag>
+      </Tooltip>
+    );
   }
 
   function applyIssueRecommendation(issue: QualityIssue) {
@@ -842,6 +951,23 @@ export function ImportPage() {
       ),
     },
   ];
+
+  const taskStatusView =
+    task === null
+      ? null
+      : current === 4
+        ? {
+            message:
+              blockingMappingCount === 0
+                ? "核心字段已满足；可直接开始分析，或展开高级设置复核。"
+                : `还需处理 ${blockingMappingCount} 个字段；批量操作后会立即刷新准备度。`,
+            status:
+              blockingMappingCount === 0
+                ? ("ready_to_confirm" as const)
+                : ("awaiting_mapping" as const),
+            status_label: blockingMappingCount === 0 ? "可开始分析" : "待处理",
+          }
+        : task;
 
   return (
     <>
@@ -953,11 +1079,13 @@ export function ImportPage() {
             selectFile(event.target.files?.[0] ?? null);
           }}
         />
-        {task !== null && persistentError === null ? (
+        {taskStatusView !== null && persistentError === null ? (
           <Flex className="import-task-status" align="center" gap="small" wrap>
             <Typography.Text strong>当前任务</Typography.Text>
-            <Tag color={statusColor(task.status)}>{task.status_label}</Tag>
-            <Typography.Text>{task.message}</Typography.Text>
+            <Tag color={statusColor(taskStatusView.status)}>
+              {taskStatusView.status_label}
+            </Tag>
+            <Typography.Text>{taskStatusView.message}</Typography.Text>
           </Flex>
         ) : null}
         {persistentError !== null ? (
@@ -976,9 +1104,11 @@ export function ImportPage() {
               <Typography.Title level={3}>1. 选择数据类型</Typography.Title>
               <Radio.Group
                 className="data-type-grid"
-                value={dataType}
+                value={dataTypeSelection}
                 onChange={(event) => {
-                  setDataType(event.target.value as DataType);
+                  const selected = event.target.value as DataTypeSelection;
+                  setDataTypeSelection(selected);
+                  if (selected !== "auto") setDataType(selected);
                 }}
               >
                 {dataTypeOptions.map((option) => (
@@ -1018,6 +1148,12 @@ export function ImportPage() {
                 <Button
                   icon={<DownloadOutlined />}
                   href={importApi.templateUrl(dataType)}
+                  disabled={dataTypeSelection === "auto"}
+                  title={
+                    dataTypeSelection === "auto"
+                      ? "下载模板前请先选择一种具体数据类型"
+                      : undefined
+                  }
                 >
                   下载空白模板
                 </Button>
@@ -1150,6 +1286,93 @@ export function ImportPage() {
           {current === 3 && parsed !== null ? (
             <Flex vertical gap="large">
               <Typography.Title level={3}>4. 数据预览</Typography.Title>
+              <Card size="small" title="数据类型">
+                <Flex vertical gap="small">
+                  <Flex gap="small" align="center" wrap>
+                    <Select
+                      aria-label="当前数据类型"
+                      value={dataType}
+                      style={{ width: 260 }}
+                      options={dataTypeOptions
+                        .filter(
+                          (
+                            option,
+                          ): option is (typeof dataTypeOptions)[number] & {
+                            value: DataType;
+                          } => option.value !== "auto",
+                        )
+                        .map((option) => ({
+                          label: option.label,
+                          value: option.value,
+                        }))}
+                      onChange={(value: DataType) =>
+                        void switchParsedDataType(value)
+                      }
+                    />
+                    <Tag
+                      color={
+                        parsed.detection_confidence >= 0.9 ? "green" : "blue"
+                      }
+                    >
+                      {parsed.schema_selection_mode === "auto"
+                        ? `自动识别 ${Math.round(parsed.detection_confidence * 100)}%`
+                        : "用户指定"}
+                    </Tag>
+                  </Flex>
+                  <Typography.Text>
+                    系统结合字段名称、内容特征、唯一值比例和一单多事件关系完成判断；可在此一次切换，不需要理解内部
+                    Schema 名称。
+                  </Typography.Text>
+                  {parsed.type_mismatch_warning ? (
+                    <Alert
+                      showIcon
+                      type="warning"
+                      message={parsed.type_mismatch_warning}
+                      action={
+                        <Button
+                          size="small"
+                          onClick={() =>
+                            void switchParsedDataType(parsed.detected_data_type)
+                          }
+                        >
+                          切换为
+                          {
+                            dataTypeOptions.find(
+                              (item) =>
+                                item.value === parsed.detected_data_type,
+                            )?.label
+                          }
+                        </Button>
+                      }
+                    />
+                  ) : null}
+                </Flex>
+              </Card>
+              {parsed.date_order_inference?.ambiguous ? (
+                <Alert
+                  showIcon
+                  type="warning"
+                  message="该文件存在日期顺序歧义，只需确认一次"
+                  description={
+                    <Flex vertical gap="small">
+                      <Typography.Text>
+                        {parsed.date_order_inference.evidence.join("；")}
+                      </Typography.Text>
+                      <Radio.Group
+                        aria-label="整份文件日期顺序"
+                        value={dateOrder}
+                        onChange={(event) =>
+                          setDateOrder(event.target.value as ImportDateOrder)
+                        }
+                        options={[
+                          { label: "日/月/年", value: "DMY" },
+                          { label: "月/日/年", value: "MDY" },
+                        ]}
+                      />
+                    </Flex>
+                  }
+                />
+              ) : null}
               <Alert
                 showIcon
                 type={parsed.sensitive_risks.length > 0 ? "warning" : "success"}
@@ -1277,12 +1500,16 @@ export function ImportPage() {
 
           {current === 4 && parsed !== null ? (
             <Flex vertical gap="large">
-              <Typography.Title level={3}>5. 字段映射</Typography.Title>
+              <Typography.Title level={3}>5. 快速导入</Typography.Title>
               <Alert
                 showIcon
-                type="info"
-                message="自动匹配只是建议"
-                description="建议基于英文代码、中文别名和字段名相似度；请根据置信度复核。分析不需要的源字段应明确设为“忽略”，系统无法识别的字段会保持“待处理”。"
+                type={blockingMappingCount === 0 ? "success" : "info"}
+                message={
+                  blockingMappingCount === 0
+                    ? "字段已准备好，可以开始分析"
+                    : `还需处理 ${blockingMappingCount} 个字段`
+                }
+                description="高置信度字段已自动映射；中等置信度建议可一次批量采用，非必要字段可一次批量忽略。完整字段表默认折叠。"
               />
               {parsed.unmapped_source_columns.length > 0 ? (
                 <Alert
@@ -1310,8 +1537,9 @@ export function ImportPage() {
                   ["待确认", mappingSummary.pendingConfirmation],
                   ["未处理", mappingSummary.unresolved],
                   ["已忽略", mappingSummary.ignored],
+                  ["辅助识别", mappingSummary.auxiliary],
                 ].map(([title, value]) => (
-                  <Col xs={12} md={6} key={String(title)}>
+                  <Col xs={12} md={6} xl={4} key={String(title)}>
                     <Card size="small">
                       <Statistic title={title} value={value} />
                     </Card>
@@ -1319,12 +1547,12 @@ export function ImportPage() {
                 ))}
               </Row>
               <Flex gap="small" wrap>
-                <Tooltip title="只应用高置信度且没有目标冲突的字段建议；系统仍保留人工复核。">
+                <Tooltip title="一次采用所有中等置信度且没有目标冲突的推荐；高置信度字段已经自动完成。">
                   <Button
                     disabled={recommendedMappingSources.length === 0}
                     onClick={applyRecommendedMappings}
                   >
-                    一键应用推荐映射（{recommendedMappingSources.length}）
+                    全部采用推荐映射（{recommendedMappingSources.length}）
                   </Button>
                 </Tooltip>
                 <Tooltip title="仅忽略不影响当前数据类型和后续分析的未处理字段">
@@ -1332,12 +1560,24 @@ export function ImportPage() {
                     disabled={safelyIgnorableColumns.length === 0}
                     onClick={ignoreSafelyInBulk}
                   >
-                    一键忽略可忽略项（{safelyIgnorableColumns.length}）
+                    一键忽略非必要字段（{safelyIgnorableColumns.length}）
                   </Button>
                 </Tooltip>
                 {lastBulkIgnored.length > 0 ? (
                   <Button onClick={undoBulkIgnore}>撤销本次忽略</Button>
                 ) : null}
+                <Button
+                  type="primary"
+                  loading={busy}
+                  disabled={
+                    blockingMappingCount > 0 ||
+                    (parsed.date_order_inference?.ambiguous === true &&
+                      dateOrder === undefined)
+                  }
+                  onClick={() => void handleQuickAnalyze()}
+                >
+                  开始分析
+                </Button>
               </Flex>
               {blockingMappingCount > 0 ? (
                 <Alert
@@ -1347,85 +1587,105 @@ export function ImportPage() {
                   description="请为字段选择目标、重新选择以确认低置信度建议，或明确忽略后再运行质量校验。"
                 />
               ) : null}
-              {screens.md === false ? (
-                <Flex className="mapping-mobile-list" vertical gap="middle">
-                  {parsed.suggestions.map((suggestion) => (
-                    <Card
-                      className={
-                        ignoredSourceSet.has(suggestion.source_column)
-                          ? "mapping-mobile-card mapping-row-ignored"
-                          : "mapping-mobile-card"
-                      }
-                      key={suggestion.source_column}
-                      size="small"
-                      title={suggestion.source_column}
-                    >
-                      <Flex vertical gap="middle">
-                        <label className="import-field">
-                          <Typography.Text strong>目标字段</Typography.Text>
-                          {renderMappingTarget(suggestion)}
-                        </label>
-                        <Row gutter={[12, 12]}>
-                          <Col xs={14}>
-                            <Typography.Text strong>置信度</Typography.Text>
-                            <div className="mapping-mobile-meta">
-                              {renderMappingConfidence(suggestion)}
-                            </div>
-                          </Col>
-                          <Col xs={10}>
-                            <Typography.Text strong>匹配方式</Typography.Text>
-                            <div className="mapping-mobile-meta">
-                              {renderMappingMethod(suggestion)}
-                            </div>
-                          </Col>
-                        </Row>
-                      </Flex>
-                    </Card>
-                  ))}
-                </Flex>
-              ) : (
-                <Table
-                  className="mapping-table"
-                  rowClassName={(suggestion) =>
-                    ignoredSourceSet.has(suggestion.source_column)
-                      ? "mapping-row-ignored"
-                      : ""
-                  }
-                  rowKey="source_column"
-                  pagination={false}
-                  scroll={{ x: 1120 }}
-                  dataSource={parsed.suggestions}
-                  columns={[
-                    {
-                      title: "原字段",
-                      dataIndex: "source_column",
-                      key: "source_column",
-                      width: 210,
-                    },
-                    {
-                      title: "目标字段",
-                      key: "target",
-                      width: 560,
-                      render: (_, suggestion) =>
-                        renderMappingTarget(suggestion),
-                    },
-                    {
-                      title: "置信度",
-                      key: "confidence",
-                      width: 200,
-                      render: (_, suggestion) =>
-                        renderMappingConfidence(suggestion),
-                    },
-                    {
-                      title: "匹配方式",
-                      key: "method",
-                      width: 150,
-                      render: (_, suggestion) =>
-                        renderMappingMethod(suggestion),
-                    },
-                  ]}
-                />
-              )}
+              <Collapse
+                className="advanced-mapping-collapse"
+                items={[
+                  {
+                    key: "advanced-fields",
+                    label: `高级字段设置（${parsed.suggestions.length} 个源字段）`,
+                    children:
+                      screens.md === false ? (
+                        <Flex
+                          className="mapping-mobile-list"
+                          vertical
+                          gap="middle"
+                        >
+                          {parsed.suggestions.map((suggestion) => (
+                            <Card
+                              className={
+                                ignoredSourceSet.has(suggestion.source_column)
+                                  ? "mapping-mobile-card mapping-row-ignored"
+                                  : "mapping-mobile-card"
+                              }
+                              key={suggestion.source_column}
+                              size="small"
+                              title={suggestion.source_column}
+                            >
+                              <Flex vertical gap="middle">
+                                <label className="import-field">
+                                  <Typography.Text strong>
+                                    目标字段
+                                  </Typography.Text>
+                                  {renderMappingTarget(suggestion)}
+                                </label>
+                                <Row gutter={[12, 12]}>
+                                  <Col xs={14}>
+                                    <Typography.Text strong>
+                                      置信度
+                                    </Typography.Text>
+                                    <div className="mapping-mobile-meta">
+                                      {renderMappingConfidence(suggestion)}
+                                    </div>
+                                  </Col>
+                                  <Col xs={10}>
+                                    <Typography.Text strong>
+                                      匹配方式
+                                    </Typography.Text>
+                                    <div className="mapping-mobile-meta">
+                                      {renderMappingMethod(suggestion)}
+                                    </div>
+                                  </Col>
+                                </Row>
+                              </Flex>
+                            </Card>
+                          ))}
+                        </Flex>
+                      ) : (
+                        <Table
+                          className="mapping-table"
+                          rowClassName={(suggestion) =>
+                            ignoredSourceSet.has(suggestion.source_column)
+                              ? "mapping-row-ignored"
+                              : ""
+                          }
+                          rowKey="source_column"
+                          pagination={false}
+                          scroll={{ x: 1120 }}
+                          dataSource={parsed.suggestions}
+                          columns={[
+                            {
+                              title: "原字段",
+                              dataIndex: "source_column",
+                              key: "source_column",
+                              width: 210,
+                            },
+                            {
+                              title: "目标字段",
+                              key: "target",
+                              width: 560,
+                              render: (_, suggestion) =>
+                                renderMappingTarget(suggestion),
+                            },
+                            {
+                              title: "置信度",
+                              key: "confidence",
+                              width: 200,
+                              render: (_, suggestion) =>
+                                renderMappingConfidence(suggestion),
+                            },
+                            {
+                              title: "匹配方式",
+                              key: "method",
+                              width: 150,
+                              render: (_, suggestion) =>
+                                renderMappingMethod(suggestion),
+                            },
+                          ]}
+                        />
+                      ),
+                  },
+                ]}
+              />
               <label className="import-field">
                 <Typography.Text strong>无时区时间的默认时区</Typography.Text>
                 <Input

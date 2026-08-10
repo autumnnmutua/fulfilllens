@@ -1,6 +1,6 @@
 {
   "labels": {
-    "order_id": "订单标识",
+    "order_id": "订单编号",
     "created_at": "订单创建时间",
     "promised_delivery_time": "承诺交付时间",
     "actual_delivery_time": "实际交付时间",
@@ -10,21 +10,21 @@
     "order_status": "标准订单状态",
     "raw_order_status": "原始订单状态",
     "warehouse_id": "仓库标识",
-    "carrier_id": "承运商标识",
+    "carrier_id": "承运商",
     "destination_region": "目的地区",
     "sales_channel": "销售渠道",
     "event_id": "仓库事件标识",
-    "event_time": "事件时间",
+    "event_time": "物流事件时间",
     "event_code": "标准事件代码",
-    "raw_status": "原始状态",
+    "raw_status": "原始物流状态",
     "quantity": "事件数量",
     "source_system": "来源系统代码",
-    "tracking_event_id": "轨迹事件标识",
-    "shipment_id": "运单标识",
-    "location_code": "节点位置代码",
+    "tracking_event_id": "物流事件编号",
+    "shipment_id": "运单编号",
+    "location_code": "物流节点 / 地点",
     "region_code": "区域代码",
-    "exception_code": "异常代码",
-    "sequence_number": "源事件序号"
+    "exception_code": "异常信息",
+    "sequence_number": "源事件顺序"
   },
   "aliases": {
     "order_id": ["订单编号", "订单号", "订单ID", "业务交易键", "order no", "order number", "order code", "sales order id", "sales order no", "trade id", "trade no", "business transaction key"],

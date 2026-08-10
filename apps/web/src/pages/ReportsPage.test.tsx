@@ -118,13 +118,13 @@ function installFetchMock() {
           return response({
             status: "ok",
             service: "fulfilllens-api",
-            version: "1.0.0",
+            version: "1.0.1",
           });
         }
         if (url.pathname === "/api/version") {
           return response({
             app_name: "FulfillLens",
-            app_version: "1.0.0",
+            app_version: "1.0.1",
             api_version: "v1",
             environment: "test",
             contract_versions: { reports: "report-v1.0.0" },

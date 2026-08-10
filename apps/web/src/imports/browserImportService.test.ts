@@ -16,6 +16,7 @@ import {
   parseWorkbookSheet,
   validateFileBasics,
 } from "./parser";
+import { inferDateOrder, parseImportDateValue } from "./dateParser";
 import { parseImportDate } from "./validation";
 
 function fixture(relativePath: string, name: string, type: string): File {
@@ -134,6 +135,14 @@ describe("浏览器本地 CSV/XLSX 导入", () => {
     expect(parsed.task.selected_sheet).toBe("物流轨迹");
     expect(parsed.warnings.join(" ")).toMatch(/Excel 日期/);
     expect(parsed.preview_rows[0]?.values.waybillNo).toBe("SHP-SYN-0001");
+    expect(
+      findSafelyIgnorableColumns(
+        parsed.suggestions,
+        mappingFrom(parsed.suggestions),
+        [],
+        getImportContract("tracking_events"),
+      ),
+    ).toContain("附加备注");
 
     const validated = await browserImportService.validate(
       uploaded.task.task_id,
@@ -177,7 +186,7 @@ describe("浏览器本地 CSV/XLSX 导入", () => {
     expect(table.rows[0]?.values.订单号).toBe("SYN-GBK-01");
   });
 
-  it("低置信度未知字段不自动绑定，人工映射后重新校验", async () => {
+  it("陌生表头可由内容画像识别时间和状态，其余字段仍可人工映射", async () => {
     const selected = csvFile(
       "a1,b2,c3,d4,e5,f6,g7\nTE-01,ORD-01,WB-01,2026-08-01 08:00,已揽件,CAR-A,HUB-A\n",
       "opaque-columns.csv",
@@ -188,7 +197,21 @@ describe("浏览器本地 CSV/XLSX 导入", () => {
     );
     const parsed = await browserImportService.parse(uploaded.task.task_id, {});
     expect(
-      parsed.suggestions.every((item) => item.suggested_field === null),
+      parsed.suggestions.find((item) => item.source_column === "d4"),
+    ).toMatchObject({
+      suggested_field: "event_time",
+      confidence_level: "high",
+    });
+    expect(
+      parsed.suggestions.find((item) => item.source_column === "e5"),
+    ).toMatchObject({
+      suggested_field: "raw_status",
+      confidence_level: "high",
+    });
+    expect(
+      parsed.suggestions
+        .filter((item) => !["d4", "e5"].includes(item.source_column))
+        .every((item) => item.suggested_field === null),
     ).toBe(true);
     const manual = {
       a1: "tracking_event_id",
@@ -394,6 +417,41 @@ describe("浏览器本地 CSV/XLSX 导入", () => {
     expect(safe).not.toEqual(expect.arrayContaining(["系统老码", "签收回传"]));
   });
 
+  it("自动识别物流轨迹 Schema，并用画像和关系处理第二套陌生表头", async () => {
+    const content =
+      "row_key,物流合作方,运输动态描述,发生记录时间,节点作业地点,包裹凭据号,客户业务关联码,历史状态枚举,签收反馈,调试标签\n" +
+      "E-001,承运商甲,货物已交接,14-Aug-2026 08:32,南京中转中心,SHP-01,ORD-01,COLLECT_OK,no-pod,debug-a\n" +
+      "E-002,承运商甲,干线在途定位,17 Aug 2026 09:44,上海分拨中心,SHP-01,ORD-01,GEO_IN_TRANSIT,no-pod,debug-b\n" +
+      "E-003,承运商甲,客户签收确认,Tue 19 Aug 2026 08:11,杭州末端站,SHP-01,ORD-01,CUSTOMER_ACCEPT,ack:customer,debug-c\n";
+    const uploaded = await browserImportService.upload(
+      "auto",
+      csvFile(content, "任意客户导出.csv"),
+    );
+    const parsed = await browserImportService.parse(uploaded.task.task_id, {});
+    expect(parsed).toMatchObject({
+      detected_data_type: "tracking_events",
+      schema_selection_mode: "auto",
+      selected_data_type: "tracking_events",
+      total_rows: 3,
+    });
+    const bySource = Object.fromEntries(
+      parsed.suggestions.map((item) => [item.source_column, item]),
+    );
+    expect(bySource["发生记录时间"]).toMatchObject({
+      suggested_field: "event_time",
+      confidence_level: "high",
+    });
+    expect(bySource["运输动态描述"]?.suggested_field).toBe("raw_status");
+    expect(bySource["包裹凭据号"]?.suggested_field).toBe("shipment_id");
+    expect(bySource["客户业务关联码"]?.suggested_field).toBe("order_id");
+    expect(bySource["历史状态枚举"]?.auxiliary_purpose).toBe(
+      "legacy_status_code",
+    );
+    expect(bySource["签收反馈"]?.auxiliary_purpose).toBe(
+      "delivery_confirmation",
+    );
+  });
+
   it.each([
     ["2026.07.02 06:35", "2026-07-02T06:35:00+08:00"],
     ["2026/7/3 14:17", "2026-07-03T14:17:00+08:00"],
@@ -452,9 +510,48 @@ describe("浏览器本地 CSV/XLSX 导入", () => {
     expect(first.normalized_preview[1]?.exception_code).toBe("WEATHER_DELAY");
   });
 
-  it("拒绝无 AM/PM 的模糊斜杠月日顺序", () => {
+  it("无 AM/PM 的模糊斜杠日期要求一次文件级确认", () => {
     expect(() => parseImportDate("7/2/2026 11:46", "Asia/Shanghai")).toThrow(
-      /无法解析时间/,
+      /日\/月顺序歧义/,
+    );
+  });
+
+  it.each([
+    ["07/07/2026 09:30", "DMY", "2026-07-07T09:30:00+08:00", "minute"],
+    ["2026年8月15日", null, "2026-08-15", "date"],
+    ["14 Aug 2026", null, "2026-08-14", "date"],
+    ["14-Aug-2026 08:32", null, "2026-08-14T08:32:00+08:00", "minute"],
+    ["17 Aug 2026 09:44", null, "2026-08-17T09:44:00+08:00", "minute"],
+    ["Tue 19 Aug 2026 08:11", null, "2026-08-19T08:11:00+08:00", "minute"],
+    ["13 Aug 2026, 10:08", null, "2026-08-13T10:08:00+08:00", "minute"],
+    ["Sat, 15 Aug 2026 04:50", null, "2026-08-15T04:50:00+08:00", "minute"],
+    ["22-08-2026 09:22", null, "2026-08-22T09:22:00+08:00", "minute"],
+    ["2026-08-14T16:26:08+08:00", null, "2026-08-14T16:26:08+08:00", "second"],
+    ["17/08/2026", "DMY", "2026-08-17", "date"],
+  ] as const)(
+    "统一日期解析器保留 %s 的精度",
+    (source, order, iso, precision) => {
+      expect(parseImportDateValue(source, "Asia/Shanghai", order)).toEqual({
+        iso,
+        precision,
+      });
+    },
+  );
+
+  it("按整列证据推断日期顺序，无法判断时只返回一次歧义", () => {
+    expect(inferDateOrder(["17/08/2026", "07/07/2026"])).toMatchObject({
+      ambiguous: false,
+      order: "DMY",
+    });
+    expect(inferDateOrder(["07/08/2026", "08/09/2026"])).toMatchObject({
+      ambiguous: true,
+      order: null,
+    });
+  });
+
+  it("无效日期不会被静默纠正", () => {
+    expect(() => parseImportDateValue("2026-02-31", "Asia/Shanghai")).toThrow(
+      /无法可靠解析/,
     );
   });
 

@@ -256,7 +256,7 @@ describe("分析总览用户路径", () => {
           jsonResponse({
             status: "ok",
             service: "fulfilllens-api",
-            version: "1.0.0",
+            version: "1.0.1",
           }),
         );
       }
@@ -264,7 +264,7 @@ describe("分析总览用户路径", () => {
         return Promise.resolve(
           jsonResponse({
             app_name: "FulfillLens",
-            app_version: "1.0.0",
+            app_version: "1.0.1",
             api_version: "v1",
             environment: "test",
             contract_versions: {},
