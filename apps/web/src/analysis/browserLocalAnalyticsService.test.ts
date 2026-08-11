@@ -6,10 +6,10 @@ import { browserLocalDiagnosticsService } from "./browserLocalDiagnosticsService
 import { browserLocalReportsService } from "./browserLocalReportsService";
 import { saveBrowserDataset } from "../imports/browserDatasetStore";
 
-function qualityReport() {
+function qualityReport(totalRows = 2) {
   return {
-    total_rows: 2,
-    valid_rows: 2,
+    total_rows: totalRows,
+    valid_rows: totalRows,
     error_rows: 0,
     warning_rows: 0,
     null_counts: {},
@@ -96,6 +96,15 @@ describe("浏览器本地分析", () => {
       },
     );
     expect(overview.context.order_count).toBe(1);
+    expect(overview.context).toMatchObject({
+      raw_row_count: 2,
+      valid_row_count: 2,
+      event_count: 2,
+      unique_shipment_count: 1,
+      unique_order_count: 1,
+      analyzed_entity_count: 1,
+      analysis_entity_label: "运单",
+    });
     for (const code of ["ot_rate", "if_rate", "otif_rate"]) {
       const item = overview.metrics.find((metric) => metric.code === code);
       expect(item?.value).toBeNull();
@@ -114,6 +123,12 @@ describe("浏览器本地分析", () => {
     expect(mean).toMatchObject({ display_name: "平均首末轨迹时效", value: 28 });
     expect(p50).toMatchObject({ display_name: "P50 首末轨迹时效", value: 28 });
     expect(p90).toMatchObject({ display_name: "P90 首末轨迹时效", value: 28 });
+    expect(overview.distribution.bins).toHaveLength(1);
+    expect(overview.distribution.bins[0]).toMatchObject({
+      count: 1,
+      lower_bound: 28,
+      upper_bound: 28,
+    });
     expect(mean?.warnings.join(" ")).toContain(
       "不等于订单创建至交付的完整履约时长",
     );
@@ -263,11 +278,47 @@ describe("浏览器本地分析", () => {
     );
     expect(overviewA.distribution.mean).toBe(24);
     expect(overviewB.distribution.mean).toBe(48);
+    expect(
+      overviewA.distribution.bins.reduce((sum, bin) => sum + bin.count, 0),
+    ).toBe(overviewA.distribution.sample_size);
+    expect(
+      overviewB.distribution.bins.reduce((sum, bin) => sum + bin.count, 0),
+    ).toBe(overviewB.distribution.sample_size);
     expect(overviewA.breakdown.groups[0]?.key).toBe("CAR-A");
     expect(overviewB.breakdown.groups[0]?.key).toBe("CAR-B");
+    expect(overviewA.filter_options.statuses.map((item) => item.value)).toEqual(
+      ["delivered"],
+    );
+    expect(overviewB.filter_options.statuses.map((item) => item.value)).toEqual(
+      ["delivery_failed"],
+    );
     const recommendationsA = buildClientRecommendations(overviewA);
     const recommendationsB = buildClientRecommendations(overviewB);
     expect(recommendationsA.facts).not.toEqual(recommendationsB.facts);
+    const diagnosticRequest = (trackingId: string) => ({
+      datasets: {
+        orders_dataset_id: "browser-local-derived-orders",
+        warehouse_events_dataset_id: null,
+        tracking_events_dataset_id: trackingId,
+      },
+      timezone: "Asia/Shanghai",
+      rule_overrides: {},
+      max_evidence_per_result: 20,
+    });
+    const [diagnosticsA, diagnosticsB] = await Promise.all([
+      browserLocalDiagnosticsService.analyze(
+        diagnosticRequest("browser-local-mutation-a"),
+      ),
+      browserLocalDiagnosticsService.analyze(
+        diagnosticRequest("browser-local-mutation-b"),
+      ),
+    ]);
+    expect(diagnosticsA.results).not.toEqual(diagnosticsB.results);
+    expect(
+      diagnosticsB.results.some(
+        (item) => item.rule_id === "TRACKING-EXCEPTION-SIGNAL",
+      ),
+    ).toBe(true);
   });
 
   it("仅有运单、时间和状态仍计算时效，缺订单、承运商或地点只关闭对应能力", async () => {
@@ -320,6 +371,8 @@ describe("浏览器本地分析", () => {
       },
     );
     expect(overview.context.order_count).toBe(1);
+    expect(overview.context.unique_shipment_count).toBe(1);
+    expect(overview.context.unique_order_count).toBe(0);
     expect(overview.distribution.mean).toBe(24);
     expect(
       overview.context.capabilities?.find((item) => item.code === "carrier")
@@ -347,7 +400,7 @@ describe("浏览器本地分析", () => {
       dataType: "tracking_events",
       datasetId,
       fileName: "return-span.csv",
-      qualityReport: qualityReport(),
+      qualityReport: qualityReport(4),
       rows: [
         {
           tracking_event_id: "R-1",
@@ -415,5 +468,148 @@ describe("浏览器本地分析", () => {
     });
     expect(overview.context.time_range_start).toBe("2026-08-01");
     expect(overview.context.time_range_end).toBe("2026-08-04");
+  });
+
+  it("完整订单的 Mean、P50、P90 与直方图来自同一批履约时长", async () => {
+    const datasetId = "browser-local-orders-distribution";
+    await saveBrowserDataset({
+      createdAt: "2026-08-10T00:00:00.000Z",
+      dataType: "orders",
+      datasetId,
+      fileName: "bundled-orders.csv",
+      qualityReport: qualityReport(4),
+      rows: [24, 48, 96, 240].map((hours, index) => ({
+        order_id: `ORD-D-${index + 1}`,
+        created_at: "2026-08-01T08:00:00+08:00",
+        promised_delivery_time: "2026-08-06T08:00:00+08:00",
+        actual_delivery_time: new Date(
+          Date.parse("2026-08-01T08:00:00+08:00") + hours * 3_600_000,
+        ).toISOString(),
+        ordered_quantity: 1,
+        delivered_quantity: 1,
+        order_status: index === 3 ? "cancelled" : "delivered",
+      })),
+      sourceKind: "browser_local_import",
+    });
+    const overview = await browserLocalAnalyticsService.overview(
+      {
+        orders_dataset_id: datasetId,
+        warehouse_events_dataset_id: null,
+        tracking_events_dataset_id: null,
+      },
+      {
+        start_date: null,
+        end_date: null,
+        warehouses: [],
+        carriers: [],
+        regions: [],
+        statuses: [],
+        anomaly_types: [],
+        timezone: "Asia/Shanghai",
+      },
+      {
+        grain: "date",
+        dimension: "carrier_id",
+        breakdownSortBy: "anomaly_order_rate",
+        breakdownSortDirection: "desc",
+      },
+    );
+    const metricValue = (code: string) =>
+      overview.metrics.find((item) => item.code === code)?.value;
+    expect(overview.distribution).toMatchObject({
+      metric_code: "fulfillment_duration_hours",
+      sample_size: 3,
+      mean: 56,
+      median: 48,
+      p90: 86.4,
+    });
+    expect(metricValue("fulfillment_duration_mean_hours")).toBe(
+      overview.distribution.mean,
+    );
+    expect(metricValue("fulfillment_duration_median_hours")).toBe(
+      overview.distribution.median,
+    );
+    expect(metricValue("fulfillment_duration_p90_hours")).toBe(
+      overview.distribution.p90,
+    );
+    expect(
+      overview.distribution.bins.reduce((sum, bin) => sum + bin.count, 0),
+    ).toBe(3);
+    expect(overview.context).toMatchObject({
+      raw_row_count: 4,
+      valid_row_count: 4,
+      event_count: 0,
+      unique_shipment_count: 0,
+      unique_order_count: 4,
+      analyzed_entity_count: 4,
+      analysis_entity_label: "订单",
+    });
+  });
+
+  it("对账 54 条轨迹记录、10 个运单和 10 个业务订单，不把行数当订单数", async () => {
+    const datasetId = "browser-local-count-reconciliation";
+    const rows = Array.from({ length: 10 }, (_, shipmentIndex) => {
+      const eventCount = shipmentIndex < 4 ? 6 : 5;
+      return Array.from({ length: eventCount }, (_, eventIndex) => ({
+        tracking_event_id: `REC-${shipmentIndex + 1}-${eventIndex + 1}`,
+        order_id: `ORD-REC-${shipmentIndex + 1}`,
+        shipment_id: `SHP-REC-${shipmentIndex + 1}`,
+        event_time: new Date(
+          Date.parse("2026-08-01T00:00:00+08:00") +
+            (shipmentIndex * 24 + eventIndex * 6) * 3_600_000,
+        ).toISOString(),
+        raw_status: eventIndex === eventCount - 1 ? "已签收" : "运输中",
+        event_code: eventIndex === eventCount - 1 ? "delivered" : "in_transit",
+        carrier_id: `CAR-${shipmentIndex + 1}`,
+      }));
+    }).flat();
+    expect(rows).toHaveLength(54);
+    await saveBrowserDataset({
+      createdAt: "2026-08-10T00:00:00.000Z",
+      dataType: "tracking_events",
+      datasetId,
+      fileName: "synthetic-54-by-10.csv",
+      qualityReport: qualityReport(54),
+      rows,
+      sourceKind: "browser_local_import",
+    });
+    const overview = await browserLocalAnalyticsService.overview(
+      {
+        orders_dataset_id: "browser-local-derived-orders",
+        warehouse_events_dataset_id: null,
+        tracking_events_dataset_id: datasetId,
+      },
+      {
+        start_date: null,
+        end_date: null,
+        warehouses: [],
+        carriers: [],
+        regions: [],
+        statuses: [],
+        anomaly_types: [],
+        timezone: "Asia/Shanghai",
+      },
+      {
+        grain: "date",
+        dimension: "carrier_id",
+        breakdownSortBy: "anomaly_order_rate",
+        breakdownSortDirection: "desc",
+      },
+    );
+    expect(overview.context).toMatchObject({
+      raw_row_count: 54,
+      valid_row_count: 54,
+      event_count: 54,
+      unique_shipment_count: 10,
+      unique_order_count: 10,
+      analyzed_entity_count: 10,
+      unfiltered_analyzed_entity_count: 10,
+      analysis_entity_label: "运单",
+    });
+    expect(overview.context.order_count).toBe(10);
+    expect(overview.distribution.sample_size).toBe(10);
+    expect(
+      overview.distribution.bins.reduce((sum, bin) => sum + bin.count, 0),
+    ).toBe(10);
   });
 });

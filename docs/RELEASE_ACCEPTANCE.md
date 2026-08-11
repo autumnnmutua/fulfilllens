@@ -1,28 +1,31 @@
-# FulfillLens v1.1.0 发布验收记录
+# FulfillLens v1.1.1 发布验收记录
 
 ## Release Identity
 
-- version：`1.1.0`
+- version：`1.1.1`
 - branch：`main`
 - date：2026-08-11（Asia/Shanghai）
-- accepted application commit：`19e350bfeb66d4268a8b19c32c4c3bc3e021c3d7`
-- accepted commit：以最终 annotated tag `v1.1.0^{commit}` 为准
-- base release：`v1.0.0` 标签、GitHub Release 与历史不修改
+- accepted application commit：以首次 v1.1.1 发布提交及其 GitHub Actions 结果为准
+- accepted commit：以最终 annotated tag `v1.1.1^{commit}` 为准
+- base release：`v1.1.0`；`v1.0.0` 标签、GitHub Release 与历史不修改
 
 ## Functional Acceptance
 
-| 能力           | 结果 | 证据                                                                                          |
-| -------------- | ---- | --------------------------------------------------------------------------------------------- |
-| 导入与新手路径 | PASS | 自动类型、高置信映射、安全 ID、非必要列与校验由“一键整理并分析”一次执行；高级映射仍可审查     |
-| 数据集隔离     | PASS | 新用户会话清理旧 Demo/兼容样例选择；显式 URL 参数视为完整数据包，不回退混入旧来源             |
-| 分析指纹       | PASS | 总览、诊断和报告共享同一 `analysis_fingerprint`；不同输入、时间/status/carrier 变更会改变结果 |
-| 部分数据分析   | PASS | 仅运单/时间/原始状态即可分析首末跨度、P50/P90、状态和时间线；carrier/location 只控制对应能力  |
-| 指标不可计算   | PASS | tracking-only 的 OT、IF、OTIF 为 `null/不可计算`，不显示 0% 或借用跨表字段                    |
-| 多表关联       | PASS | 主动组合订单与事件时输出关联数/孤立事件/关联率；关联率为 0 时拒绝静默组合                     |
-| 诊断与建议     | PASS | 未知状态不直接算经营异常；建议只消费当前可计算 facts，专业方案与管理层简报共享证据            |
-| 报告与追溯     | PASS | 报告、指标抽屉和上下文条显示来源、指纹、样本、时间范围与版本                                  |
-| 本地优先       | PASS | 浏览器 E2E 记录原始文件上传请求 0；标准化数据仅写入当前浏览器 IndexedDB                       |
-| 示例一致性     | PASS | CSV/XLSX 行数、目录摘要、SHA-256、Schema、时序和下载内容由回归测试对账                        |
+| 能力           | 结果 | 证据                                                                                             |
+| -------------- | ---- | ------------------------------------------------------------------------------------------------ |
+| 导入与新手路径 | PASS | 自动类型、高置信映射、安全 ID、非必要列与校验由“一键整理并分析”一次执行；高级映射仍可审查        |
+| 数据集隔离     | PASS | 新用户会话清理旧 Demo/兼容样例选择；显式 URL 参数视为完整数据包，不回退混入旧来源                |
+| 分析指纹       | PASS | 总览、诊断和报告共享同一 `analysis_fingerprint`；不同输入、时间/status/carrier 变更会改变结果    |
+| 部分数据分析   | PASS | 仅运单/时间/原始状态即可分析首末跨度、P50/P90、状态和时间线；carrier/location 只控制对应能力     |
+| 指标不可计算   | PASS | tracking-only 的 OT、IF、OTIF 为 `null/不可计算`，不显示 0% 或借用跨表字段                       |
+| 时长分布       | PASS | 完整订单与 tracking-only 均从 Mean/P50/P90 同一批时长值生成分箱；无样本时显示原因                |
+| 数量对账       | PASS | 原始/有效记录、事件、唯一运单、唯一业务订单和当前分析实体独立展示，不以行数冒充订单数            |
+| 多表关联       | PASS | 主动组合订单与事件时输出关联数/孤立事件/关联率；关联率为 0 时拒绝静默组合                        |
+| 诊断与建议     | PASS | 未知状态不直接算经营异常；建议只消费当前可计算 facts，专业方案与管理层简报共享证据               |
+| 报告与追溯     | PASS | 报告、指标抽屉和上下文条显示来源、指纹、样本、时间范围与版本                                     |
+| 本地优先       | PASS | 浏览器 E2E 记录原始文件上传请求 0；标准化数据仅写入当前浏览器 IndexedDB                          |
+| 示例一致性     | PASS | CSV/XLSX 行数、目录摘要、SHA-256、Schema、时序和下载内容由回归测试对账                           |
+| 示例重新导入   | PASS | 正式提供的 22 张 CSV/XLSX 表全部通过解析、映射、安全忽略、校验与确认；真实 Chromium 覆盖兼容样例 |
 
 ## Beginner Import Acceptance
 
@@ -70,29 +73,52 @@
 
 确定性解析回归覆盖 `07/07/2026 09:30`、`2026年8月15日`、`14 Aug 2026`、`14-Aug-2026 08:32`、`17 Aug 2026 09:44`、`22-08-2026 09:22`、`17/08/2026`、`2026-08-14T16:26:08+08:00`、`2026.07.02 06:35`、`7/2/2026 11:46 AM` 和 `Tue Jul 07 2026 18:20:00 GMT+0800 (中国标准时间)`。date-only 保留精度，非法值不静默强转；整列仍有 DMY/MDY 歧义时只请求一次文件级选择。
 
+## Bundled Sample Re-import
+
+- 单元/集成回归真实读取正式提供的 22 张数据表：兼容性订单 CSV、兼容性 XLSX 三张工作表，以及三套教学案例各自的 CSV/XLSX 订单、仓库事件和物流轨迹；全部 `unresolved=[]`、`error_rows=0` 且可确认导入。
+- 生产 Chromium 重新上传 `compatibility_demo_orders.csv` 后自动识别为订单数据，80 条原始记录、80 条有效记录、80 个唯一业务订单和 80 个当前分析订单一致，履约时长分布可见。
+- 生产 Chromium 重新上传多工作表 `compatibility_demo_logistics.xlsx` 并选择物流轨迹工作表后直接进入分析，无需逐字段确认。
+
+## Data Count Reconciliation
+
+| 输入                   | 原始记录 | 有效记录 | 事件 | 唯一运单 | 唯一业务订单 | 当前分析实体 |
+| ---------------------- | -------: | -------: | ---: | -------: | -----------: | -----------: |
+| 兼容性订单 CSV         |       80 |       80 |    0 |        0 |           80 |      80 订单 |
+| 非标准 tracking CSV #1 |       54 |       54 |   54 |       10 |           10 |      10 运单 |
+| 非标准 tracking CSV #2 |       54 |       54 |   54 |       10 |           10 |      10 运单 |
+
+物流轨迹文件的一行表示一次事件，不表示一个新订单。54 条轨迹来自 10 个运单和 10 个业务订单，因此 54/10/10 是正确业务口径，而不是去重丢失。
+
+## Duration Accuracy
+
+- tracking-only：以每个 `shipment_id` 的最大事件时间减最小事件时间形成一条时长，Mean/P50/P90 和直方图分箱共用这 10 个样本；
+- 完整订单：以有效订单的下单时间至实际签收时间形成时长；取消/退回订单不进入 Mean/P50/P90，也不进入分箱；
+- mutation 回归将一个运单末事件增加 24 小时后，Mean/P90 和分析指纹必须变化；修改承运商必须改变承运商对比，修改状态必须改变状态分布及诊断；
+- Worker 单样本直方图返回有效上下界；没有可计算时长时返回可读空状态，不返回空白图。
+
 ## Sample Expansion
 
-| 公开合成样例                    | 旧行数 | v1.1.0 行数 | SHA-256                                                            |
-| ------------------------------- | -----: | ----------: | ------------------------------------------------------------------ |
-| `compatibility_demo_orders.csv` |      8 |          80 | `26b43ebda76714b0cd64bb437761028d8001e7600f97d135e336df06dc601c0b` |
-| XLSX `订单数据`                 |      6 |          80 | 同一工作簿见下行                                                   |
-| XLSX `仓库事件`                 |     36 |         480 | 同一工作簿见下行                                                   |
-| XLSX `物流轨迹`                 |     36 |         480 | `ae2366b059a35e22a0c198d4c21a7f025d51ff4e8cd3af5bffb00bd84e23cab0` |
+| 公开合成样例                    | 旧行数 | 当前行数 | SHA-256                                                            |
+| ------------------------------- | -----: | -------: | ------------------------------------------------------------------ |
+| `compatibility_demo_orders.csv` |      8 |       80 | `26b43ebda76714b0cd64bb437761028d8001e7600f97d135e336df06dc601c0b` |
+| XLSX `订单数据`                 |      6 |       80 | 同一工作簿见下行                                                   |
+| XLSX `仓库事件`                 |     36 |      480 | 同一工作簿见下行                                                   |
+| XLSX `物流轨迹`                 |     36 |      480 | `ae2366b059a35e22a0c198d4c21a7f025d51ff4e8cd3af5bffb00bd84e23cab0` |
 
 生成器固定输入并规范化 XLSX ZIP 时间戳；重复生成得到相同 SHA-256。三套教学案例未增加、删除或改变体系。
 
 ## Test Evidence
 
-| 实际命令                                              | Exit code | 结果                                                                                                         |
-| ----------------------------------------------------- | --------: | ------------------------------------------------------------------------------------------------------------ |
-| `npm run release:check`                               |         0 | format、lint、TypeScript/mypy、333 项测试、生产构建、npm/pip audit、文档与许可证检查全部通过                 |
-| `npm run test:browser-import:local`（含两份本地附件） |         0 | 19 场景；6 个映射视口、CSV/XLSX、会话隔离、刷新、报告、必填保护与 A/B 分析通过                               |
-| `npm run test:browser`                                |         0 | 8 个路由 × 5 个视口，共 40 组 Chromium 可访问性、键盘、语义与横向溢出检查通过                                |
-| `npm run smoke`                                       |         0 | API、Web 代理、版本、主要 SPA 路由和两份兼容性示例下载通过                                                   |
-| `docker compose config/build/up --wait` + 宿主机探测  |         0 | Docker 29.6.2；API/Web 容器健康，宿主机 `/health` 与 `/api/version` 均返回 1.1.0，容器已停止并清理临时运行卷 |
-| `wrangler deploy --dry-run`                           |         0 | 23 个静态资产、Worker 与 AI/ASSETS bindings 校验通过                                                         |
-| Cloudflare 正式部署与生产浏览器 A/B                   |         0 | Worker 1.1.0；19 个生产浏览器场景通过，两份 54×21 CSV 均零丢行、零阻断、零逐字段确认，原始文件上传请求为 0   |
-| GitHub Actions CI `31453650030`                       |         0 | 质量、测试、构建、Cloudflare 浏览器导入与 Docker 构建/烟雾测试两个任务全部通过                               |
+| 实际命令                                              | Exit code | 结果                                                                                                    |
+| ----------------------------------------------------- | --------: | ------------------------------------------------------------------------------------------------------- |
+| `npm run release:check`                               |         0 | format、lint、TypeScript/mypy、357 项测试、生产构建、npm/pip audit、文档与许可证检查全部通过            |
+| `npm run test:browser-import:local`（含两份本地附件） |         0 | 21 场景；含内置 CSV/XLSX、时长分布、节点布局、会话隔离、报告、必填保护与 A/B 分析通过                   |
+| `npm run test:browser`                                |         0 | 8 个路由 × 5 个视口，共 40 组 Chromium 可访问性、键盘、语义与横向溢出检查通过                           |
+| `npm run smoke`                                       |         0 | API、Web 代理、版本 1.1.1、主要 SPA 路由和两份兼容性示例下载通过                                        |
+| `docker compose config/build/up --wait` + 宿主机探测  |         0 | Docker 29.6.2；API/Web 容器健康，`/api/version` 返回 1.1.1，40 组浏览器审计通过，临时容器与数据卷已清理 |
+| `wrangler deploy --dry-run`                           |         0 | 23 个静态资产、Worker 与 AI/ASSETS bindings 校验通过                                                    |
+| Cloudflare 正式部署与生产浏览器 A/B                   |         0 | Worker 1.1.1；21 个生产导入场景及 40 组全站审计通过；两份附件零丢行/阻断/逐字段确认，原始上传请求为 0   |
+| GitHub Actions CI                                     |         1 | 尚未运行本次提交；在 Actions 全绿前禁止创建 v1.1.1 tag/Release                                          |
 
 ## Security & Privacy
 
@@ -106,17 +132,16 @@
 
 - Worker：`fulfilllens`
 - production URL：<https://fulfilllens.esthertreu3724.workers.dev>
-- deployment ID：`20794534-5427-4b64-82ab-3eb13129d7aa`
-- version ID：`34973221-e771-48fd-8537-2b87ff204ef2`
-- deployed at：2026-08-11 10:57:41（Asia/Shanghai）
-- production smoke：`/health`、`/api/version`、8 个 SPA 路由、两份兼容样例、Workers AI 固定合成探针和 19 个浏览器导入/A/B 场景全部通过；版本为 1.1.0，Workers AI 探针使用 71 tokens 且未发送业务数据。
+- version ID：`05cd5c35-7efc-448c-975f-3bf35ac66f1d`
+- deployed at：2026-08-11 12:21:24（Asia/Shanghai）
+- production smoke：`/health`、`/api/version`、8 个 SPA 路由、内置 CSV/XLSX、两份一次性附件、Workers AI 固定合成探针、21 个导入场景和 40 组全站审计全部通过；版本为 1.1.1，Workers AI 探针使用 71 tokens 且未发送业务数据。
 
 ## Release Assets
 
 - 七张真实生产构建截图：导入、总览、诊断、专业行动方案、管理层简报、情景对比、教学案例；
 - `README.md`、`README_EN.md`、`CHANGELOG.md`；
 - `docs/IMPORTING.md`、`docs/ARCHITECTURE.md`、`docs/COMPATIBILITY_VALIDATION.md`；
-- `docs/releases/v1.1.0.md`。
+- `docs/releases/v1.1.1.md`。
 
 ## Known Limitations
 
@@ -130,6 +155,6 @@
 
 ## Final Verdict
 
-**READY FOR v1.1.0**
+**BLOCKED**
 
-本地与远端质量门槛、Docker、Cloudflare 正式部署、Workers AI 固定合成探针和生产 A/B 浏览器复验均已通过。最终验收证据提交再次通过 GitHub Actions 后，可创建 `v1.1.0` annotated tag 与正式 Release。
+本地质量门槛、Docker、Cloudflare 正式部署、Workers AI 固定合成探针和生产 A/B 浏览器复验均已通过。当前唯一发布阻断是本次提交尚未进入 GitHub Actions；Actions 全绿并回写证据前，不创建 `v1.1.1` annotated tag 或正式 Release。

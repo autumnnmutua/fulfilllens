@@ -58,6 +58,12 @@ export interface ReportHeader {
   time_range_end: string | null;
   order_count: number;
   valid_order_count: number;
+  raw_row_count?: number | null;
+  valid_row_count?: number | null;
+  event_count?: number | null;
+  unique_shipment_count?: number | null;
+  unique_order_count?: number | null;
+  analysis_entity_label?: "订单" | "运单" | "业务实体";
   data_coverage: number | null;
   generated_at: string;
   timezone: string;

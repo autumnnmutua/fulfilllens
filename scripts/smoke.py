@@ -13,6 +13,7 @@ from urllib.error import URLError
 from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
+APP_VERSION = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))["version"]
 WEB_ROOT = ROOT / "apps" / "web"
 VITE_ENTRY = ROOT / "node_modules" / "vite" / "bin" / "vite.js"
 API_BASE = "http://127.0.0.1:8000"
@@ -324,7 +325,7 @@ def main() -> None:
 
             assert direct_health["status"] == "ok"
             assert proxy_health["status"] == "ok"
-            assert direct_version["app_version"] == "1.1.0"
+            assert direct_version["app_version"] == APP_VERSION
             assert proxy_version["api_version"] == "v1"
             assert len(compatibility_samples["samples"]) == 2
             assert home_status == 200

@@ -5,8 +5,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "../app/App";
 
 vi.mock("../components/EChart", () => ({
-  EChart: ({ ariaLabel }: { ariaLabel: string }) => (
-    <div role="img" aria-label={ariaLabel} />
+  EChart: ({ ariaLabel, option }: { ariaLabel: string; option: unknown }) => (
+    <div
+      role="img"
+      aria-label={ariaLabel}
+      data-option={JSON.stringify(option)}
+    />
   ),
 }));
 
@@ -305,6 +309,23 @@ describe("分析总览用户路径", () => {
 
     expect(await screen.findByText("当前分析上下文")).toBeVisible();
     expect(screen.getByText("订单数据集 11111111")).toBeVisible();
+    const distributionChart = screen.getByRole("img", {
+      name: "履约时长分布直方图，横轴小时，纵轴订单数",
+    });
+    expect(distributionChart).toBeVisible();
+    const distributionOption = JSON.parse(
+      distributionChart.getAttribute("data-option") ?? "{}",
+    ) as { series?: Array<{ data?: number[] }> };
+    expect(distributionOption.series?.[0]?.data).toEqual([1, 1]);
+    const nodeChart = screen.getByRole("img", {
+      name: "各标准节点平均、P50、P90 时长对比图",
+    });
+    expect(nodeChart.closest(".node-duration-chart")).not.toBeNull();
+    const nodeOption = JSON.parse(
+      nodeChart.getAttribute("data-option") ?? "{}",
+    ) as { grid?: { bottom?: number }; xAxis?: { nameGap?: number } };
+    expect(nodeOption.grid?.bottom).toBe(60);
+    expect(nodeOption.xAxis?.nameGap).toBe(38);
 
     await user.click(screen.getByLabelText("承运商"));
     await user.click(await screen.findByText("CAR-B（2）"));

@@ -18,6 +18,7 @@ import {
 } from "./parser";
 import { inferDateOrder, parseImportDateValue } from "./dateParser";
 import { parseImportDate } from "./validation";
+import type { DataType } from "../types/imports";
 
 function fixture(relativePath: string, name: string, type: string): File {
   const bytes = readFileSync(resolve(process.cwd(), "..", "..", relativePath));
@@ -54,6 +55,44 @@ function ignoredFrom(
     .filter((suggestion) => suggestion.suggested_field === null)
     .map((suggestion) => suggestion.source_column);
 }
+
+const BUNDLED_TABLE_SPECS: Array<{
+  dataType: DataType;
+  path: string;
+  sheet?: string;
+}> = [
+  {
+    dataType: "orders",
+    path: "data/samples/compatibility_demo_orders.csv",
+  },
+  ...(
+    [
+      ["orders", "订单数据"],
+      ["warehouse_events", "仓库事件"],
+      ["tracking_events", "物流轨迹"],
+    ] as const
+  ).map(([dataType, sheet]) => ({
+    dataType,
+    path: "data/samples/compatibility_demo_logistics.xlsx",
+    sheet,
+  })),
+  ...["normal_operations", "promotion_surge", "carrier_disruption"].flatMap(
+    (caseId) =>
+      (["orders", "warehouse_events", "tracking_events"] as const).flatMap(
+        (dataType) => [
+          {
+            dataType,
+            path: `data/cases/${caseId}/${dataType}.csv`,
+          },
+          {
+            dataType,
+            path: `data/cases/${caseId}/case.xlsx`,
+            sheet: dataType,
+          },
+        ],
+      ),
+  ),
+];
 
 describe("浏览器本地 CSV/XLSX 导入", () => {
   it("真实走完非标准物流轨迹 CSV 的解析、映射、校验与确认", async () => {
@@ -157,6 +196,74 @@ describe("浏览器本地 CSV/XLSX 导入", () => {
     expect(validated.report.valid_rows).toBe(480);
     expect(validated.report.time_order_conflicts).toBe(0);
   }, 15_000);
+
+  it.each(BUNDLED_TABLE_SPECS)(
+    "项目自带 $path#$sheet 可自动映射并通过浏览器导入流水线",
+    async (spec) => {
+      const extension = spec.path.endsWith(".xlsx") ? "xlsx" : "csv";
+      const selected = fixture(
+        spec.path,
+        `bundled-reupload-${spec.dataType}-${spec.sheet ?? "csv"}.${extension}`,
+        extension === "xlsx"
+          ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          : "text/csv",
+      );
+      const uploaded = await browserImportService.upload(
+        spec.dataType,
+        selected,
+      );
+      const parsed = await browserImportService.parse(uploaded.task.task_id, {
+        ...(spec.sheet ? { sheet_name: spec.sheet } : {}),
+      });
+      expect(
+        parsed.detected_data_type,
+        `${spec.path}#${spec.sheet ?? "csv"}`,
+      ).toBe(spec.dataType);
+      const suggestedMapping = mappingFrom(parsed.suggestions);
+      const ignored = [
+        ...new Set([
+          ...ignoredFrom(parsed.suggestions),
+          ...findSafelyIgnorableColumns(
+            parsed.suggestions,
+            suggestedMapping,
+            [],
+            getImportContract(spec.dataType),
+          ),
+        ]),
+      ];
+      const validated = await browserImportService.validate(
+        uploaded.task.task_id,
+        {
+          default_timezone: "Asia/Shanghai",
+          ignored_source_columns: ignored,
+          mapping: suggestedMapping,
+          project_status_mappings: {},
+        },
+      );
+      expect(
+        validated.report.unresolved_source_columns,
+        `${spec.path}#${spec.sheet ?? "csv"}`,
+      ).toEqual([]);
+      expect(
+        validated.report.can_confirm,
+        `${spec.path}#${spec.sheet ?? "csv"}: ${validated.report.issues
+          .filter((issue) => issue.severity === "error")
+          .slice(0, 3)
+          .map((issue) => issue.message)
+          .join("；")}`,
+      ).toBe(true);
+      expect(
+        validated.report.error_rows,
+        `${spec.path}#${spec.sheet ?? "csv"}`,
+      ).toBe(0);
+      const confirmed = await browserImportService.confirm(
+        uploaded.task.task_id,
+      );
+      expect(confirmed.imported_rows).toBe(validated.report.valid_rows);
+      expect(confirmed.imported_rows).toBeGreaterThan(0);
+    },
+    30_000,
+  );
 
   it("支持 UTF-8 BOM、引号内逗号、CRLF、LF 和引号内换行", async () => {
     const content =

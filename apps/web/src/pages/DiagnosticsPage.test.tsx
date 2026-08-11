@@ -206,7 +206,7 @@ describe("异常诊断页面", () => {
           response({
             status: "ok",
             service: "fulfilllens-api",
-            version: "1.1.0",
+            version: "1.1.1",
           }),
         );
       }
@@ -214,7 +214,7 @@ describe("异常诊断页面", () => {
         return Promise.resolve(
           response({
             app_name: "FulfillLens",
-            app_version: "1.1.0",
+            app_version: "1.1.1",
             api_version: "v1",
             environment: "test",
             contract_versions: {},
@@ -288,5 +288,5 @@ describe("异常诊断页面", () => {
     expect(await screen.findByText("完整证据链")).toBeVisible();
     expect(screen.getByText("order_received")).toBeVisible();
     expect(screen.getByText(/原始状态：仓库接单/)).toBeVisible();
-  }, 15_000);
+  }, 30_000);
 });

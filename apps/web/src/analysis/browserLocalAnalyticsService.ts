@@ -23,10 +23,12 @@ import type {
   OrderMetricDetail,
 } from "../types/metrics";
 
-export const BROWSER_METRICS_VERSION = "browser-metrics-v1.1.0";
-const BROWSER_RULE_VERSION = "browser-analysis-rules-v1.1.0";
+export const BROWSER_METRICS_VERSION = "browser-metrics-v1.1.1";
+const BROWSER_RULE_VERSION = "browser-analysis-rules-v1.1.1";
 
 export interface EventRow {
+  analysis_entity_id: string;
+  carrier_id: string;
   event_code: string;
   event_id: string;
   event_time: string;
@@ -55,6 +57,11 @@ export interface LocalAnalysisData {
     orphan_event_count: number;
     unlinked_order_count: number;
   } | null;
+  rawRowCount: number;
+  validRowCount: number;
+  eventCount: number;
+  uniqueOrderCount: number;
+  uniqueShipmentCount: number;
 }
 
 function text(value: unknown, fallback = ""): string {
@@ -100,6 +107,35 @@ function average(values: number[]): number | null {
     : values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
+function histogram(values: number[], requestedBinCount = 10) {
+  if (values.length === 0) return [];
+  const minimum = Math.min(...values);
+  const maximum = Math.max(...values);
+  if (minimum === maximum) {
+    return [
+      {
+        lower_bound: minimum,
+        upper_bound: maximum,
+        count: values.length,
+        includes_upper_bound: true,
+      },
+    ];
+  }
+  const binCount = Math.max(1, Math.floor(requestedBinCount));
+  const width = (maximum - minimum) / binCount;
+  const counts = Array.from({ length: binCount }, () => 0);
+  values.forEach((value) => {
+    const index = Math.min(Math.floor((value - minimum) / width), binCount - 1);
+    counts[index] = (counts[index] ?? 0) + 1;
+  });
+  return counts.map((count, index) => ({
+    lower_bound: minimum + index * width,
+    upper_bound: minimum + (index + 1) * width,
+    count,
+    includes_upper_bound: index === binCount - 1,
+  }));
+}
+
 function trackingSpanHours(detail: OrderMetricDetail): number | null {
   const values = detail.node_durations.map((item) => item.duration_hours);
   return values.length === 0
@@ -111,7 +147,10 @@ function durationValues(
   details: OrderMetricDetail[],
   orderDatasetPresent: boolean,
 ): number[] {
-  return details
+  const eligible = orderDatasetPresent
+    ? details.filter((item) => !isExcludedStatus(item.order_status))
+    : details;
+  return eligible
     .map((item) =>
       orderDatasetPresent
         ? item.fulfillment_duration_hours
@@ -175,22 +214,31 @@ async function optionalDataset(
 function eventRows(
   dataset: BrowserDataset | null,
   source: EventRow["source"],
+  orderDatasetPresent: boolean,
 ): EventRow[] {
   if (!dataset) return [];
-  return dataset.rows.map((row, index) => ({
-    event_code: text(row.event_code, "unmapped"),
-    event_id: text(
-      row.tracking_event_id ?? row.event_id,
-      `${dataset.datasetId}:${index + 1}`,
-    ),
-    event_time: text(row.event_time),
-    exception_code: text(row.exception_code),
-    location_code: text(row.location_code, "未知"),
-    order_id: text(row.order_id),
-    raw_status: text(row.raw_status),
-    shipment_id: text(row.shipment_id),
-    source,
-  }));
+  return dataset.rows.map((row, index) => {
+    const orderId = text(row.order_id);
+    const shipmentId = text(row.shipment_id);
+    return {
+      analysis_entity_id: orderDatasetPresent
+        ? orderId || shipmentId
+        : shipmentId || orderId,
+      carrier_id: text(row.carrier_id),
+      event_code: text(row.event_code, "unmapped"),
+      event_id: text(
+        row.tracking_event_id ?? row.event_id,
+        `${dataset.datasetId}:${index + 1}`,
+      ),
+      event_time: text(row.event_time),
+      exception_code: text(row.exception_code),
+      location_code: text(row.location_code, "未知"),
+      order_id: orderId,
+      raw_status: text(row.raw_status),
+      shipment_id: shipmentId,
+      source,
+    };
+  });
 }
 
 function isExcludedStatus(status: string): boolean {
@@ -211,7 +259,7 @@ function eventAnomaly(event: EventRow): string[] {
 }
 
 function eventEntityId(event: EventRow): string {
-  return event.order_id || event.shipment_id;
+  return event.analysis_entity_id;
 }
 
 function nodeDurations(events: EventRow[]): NodeDuration[] {
@@ -255,8 +303,8 @@ async function load(selection: DatasetSelection): Promise<LocalAnalysisData> {
     optionalDataset(selection.tracking_events_dataset_id),
   ]);
   const events = [
-    ...eventRows(warehouseDataset, "warehouse"),
-    ...eventRows(trackingDataset, "tracking"),
+    ...eventRows(warehouseDataset, "warehouse", ordersDataset !== null),
+    ...eventRows(trackingDataset, "tracking", ordersDataset !== null),
   ];
   const eventsByOrder = new Map<string, EventRow[]>();
   events.forEach((event) => {
@@ -343,20 +391,7 @@ async function load(selection: DatasetSelection): Promise<LocalAnalysisData> {
       delivered_quantity: delivered,
       quantity_unit: text(row.quantity_unit) || null,
       warehouse_id: text(row.warehouse_id, "未知"),
-      carrier_id: text(
-        row.carrier_id,
-        latest?.source === "tracking"
-          ? text(
-              (
-                trackingDataset?.rows.find(
-                  (item) =>
-                    (text(item.order_id) || text(item.shipment_id)) === orderId,
-                ) ?? {}
-              ).carrier_id,
-              "未知",
-            )
-          : "未知",
-      ),
+      carrier_id: text(row.carrier_id, text(latest?.carrier_id, "未知")),
       destination_region: text(row.destination_region, "未知"),
       sales_channel: text(row.sales_channel, "未知"),
       ot,
@@ -424,6 +459,13 @@ async function load(selection: DatasetSelection): Promise<LocalAnalysisData> {
     datasetFingerprints,
   );
   const session = readBrowserAnalysisSession();
+  const uniqueOrderCount = new Set([
+    ...orderRows.map((row) => text(row.order_id)).filter(Boolean),
+    ...events.map((event) => event.order_id).filter(Boolean),
+  ]).size;
+  const uniqueShipmentCount = new Set(
+    events.map((event) => event.shipment_id).filter(Boolean),
+  ).size;
   return {
     datasets: selection,
     details,
@@ -440,6 +482,17 @@ async function load(selection: DatasetSelection): Promise<LocalAnalysisData> {
     analysisFingerprint,
     analysisSource: session?.sourceKind ?? "user_import",
     linkage,
+    rawRowCount: datasets.reduce(
+      (sum, dataset) => sum + dataset.qualityReport.total_rows,
+      0,
+    ),
+    validRowCount: datasets.reduce(
+      (sum, dataset) => sum + dataset.rows.length,
+      0,
+    ),
+    eventCount: events.length,
+    uniqueOrderCount,
+    uniqueShipmentCount,
   };
 }
 
@@ -519,7 +572,7 @@ function metricsFor(
   return [
     metric(
       "total_order_count",
-      "订单总数",
+      orderDatasetPresent ? "订单总数" : "分析运单数",
       "order",
       details.length,
       details.length,
@@ -528,7 +581,7 @@ function metricsFor(
     ),
     metric(
       "valid_order_count",
-      "有效订单数",
+      orderDatasetPresent ? "有效订单数" : "有效运单数",
       "order",
       details.length,
       details.length,
@@ -834,6 +887,14 @@ export const browserLocalAnalyticsService = {
         data_coverage: coverageMetric?.value ?? null,
         last_analyzed_at: new Date().toISOString(),
         warning_count: data.qualityWarningCount + warnings.length,
+        raw_row_count: data.rawRowCount,
+        valid_row_count: data.validRowCount,
+        event_count: data.eventCount,
+        unique_shipment_count: data.uniqueShipmentCount,
+        unique_order_count: data.uniqueOrderCount,
+        analyzed_entity_count: filtered.length,
+        unfiltered_analyzed_entity_count: data.details.length,
+        analysis_entity_label: data.orderDatasetPresent ? "订单" : "运单",
         analysis_fingerprint: data.analysisFingerprint,
         analysis_source: data.analysisSource,
         capabilities,
@@ -872,7 +933,7 @@ export const browserLocalAnalyticsService = {
         median,
         p90,
         quantile_method: "Hyndman-Fan Type 7 / linear",
-        bins: [],
+        bins: histogram(durations),
         warnings: durations.length
           ? []
           : [

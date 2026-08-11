@@ -10,7 +10,7 @@ import type {
   DiagnosticSeverity,
 } from "../types/diagnostics";
 
-const RULE_VERSION = "browser-diagnostics-v1.1.0";
+const RULE_VERSION = "browser-diagnostics-v1.1.1";
 const SEVERITY_ORDER: Record<DiagnosticSeverity, number> = {
   critical: 4,
   high: 3,
@@ -53,12 +53,15 @@ async function analyze(
   const data = await browserLocalAnalyticsService.load(request.datasets);
   const results: DiagnosticResult[] = [];
   const orderCount = data.details.length;
+  const entityLabel = data.orderDatasetPresent ? "订单" : "运单";
   const unmapped = data.events.filter(
     (event) => event.event_code === "unmapped",
   );
   if (unmapped.length > 0) {
     const affected = [
-      ...new Set(unmapped.map((event) => event.order_id).filter(Boolean)),
+      ...new Set(
+        unmapped.map((event) => event.analysis_entity_id).filter(Boolean),
+      ),
     ];
     results.push(
       result({
@@ -66,13 +69,13 @@ async function analyze(
         title: "存在未映射物流状态",
         category: "data_quality",
         severity: "medium",
-        factual_observation: `${unmapped.length} 条事件的原始状态未能可靠映射，影响 ${affected.length} 个订单。`,
+        factual_observation: `${unmapped.length} 条事件的原始状态未能可靠映射，影响 ${affected.length} 个${entityLabel}。`,
         rule_judgement: "状态覆盖不足会降低节点耗时和流程变体分析的完整性。",
         possible_causes: ["可能是源系统自定义状态，需核对状态字典。"],
         evidence: unmapped
           .slice(0, request.max_evidence_per_result)
           .map((event) => ({
-            order_id: event.order_id || null,
+            order_id: event.analysis_entity_id || null,
             event_id: event.event_id,
             shipment_id: event.shipment_id || null,
             node_code: event.event_code,
@@ -114,7 +117,9 @@ async function analyze(
   if (exceptionEvents.length > 0) {
     const affected = [
       ...new Set(
-        exceptionEvents.map((event) => event.order_id).filter(Boolean),
+        exceptionEvents
+          .map((event) => event.analysis_entity_id)
+          .filter(Boolean),
       ),
     ];
     results.push(
@@ -124,7 +129,7 @@ async function analyze(
         category: "data_quality",
         severity:
           affected.length / Math.max(orderCount, 1) >= 0.15 ? "high" : "medium",
-        factual_observation: `${exceptionEvents.length} 条事件带有异常、失败或退件信号，影响 ${affected.length} / ${orderCount} 个订单。`,
+        factual_observation: `${exceptionEvents.length} 条事件带有异常、失败或退件信号，影响 ${affected.length} / ${orderCount} 个${entityLabel}。`,
         rule_judgement:
           "这些事件需要订单级核查；信号本身不等于已确认责任或根因。",
         possible_causes: [
@@ -133,7 +138,7 @@ async function analyze(
         evidence: exceptionEvents
           .slice(0, request.max_evidence_per_result)
           .map((event) => ({
-            order_id: event.order_id || null,
+            order_id: event.analysis_entity_id || null,
             event_id: event.event_id,
             shipment_id: event.shipment_id || null,
             node_code: event.event_code,
@@ -321,7 +326,7 @@ export const browserLocalDiagnosticsService = {
         item.affected_order_sample.includes(orderId),
       ),
       timeline: data.events
-        .filter((event) => event.order_id === orderId)
+        .filter((event) => event.analysis_entity_id === orderId)
         .sort((left, right) => left.event_time.localeCompare(right.event_time))
         .map((event) => ({
           source: event.source,

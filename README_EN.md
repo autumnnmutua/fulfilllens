@@ -6,7 +6,7 @@ FulfillLens is a local-first, open-source fulfillment analytics tool for logisti
 
 The project is designed to make every percentage, anomaly, and scenario traceable to fields, formulas, thresholds, samples, and order-level evidence instead of generating a merely plausible story.
 
-> Current stable version: `1.1.0`. Users do not need to rename CSV/XLSX columns to FulfillLens templates first. Keep Auto-detect (recommended), upload the file, and choose “Organize and analyze”: the engine combines headers, value profiles, column relationships, and the data contract to apply high-confidence mappings, generate safe internal IDs, retain unknown statuses, and ignore non-analytical columns. Only key ambiguities that could change business meaning require one confirmation. The Cloudflare edition performs custom-file parsing and analysis in the browser without uploading raw files or normalized rows to the Worker. See [Project status](#project-status-and-known-limitations).
+> Current stable version: `1.1.1`. Users do not need to rename CSV/XLSX columns to FulfillLens templates first. Keep Auto-detect (recommended), upload the file, and choose “Organize and analyze”: the engine combines headers, value profiles, column relationships, and the data contract to apply high-confidence mappings, generate safe internal IDs, retain unknown statuses, and ignore non-analytical columns. Only key ambiguities that could change business meaning require one confirmation. The Cloudflare edition performs custom-file parsing and analysis in the browser without uploading raw files or normalized rows to the Worker. See [Project status](#project-status-and-known-limitations).
 
 ## Why FulfillLens
 
@@ -278,9 +278,9 @@ See [Architecture](docs/ARCHITECTURE.md) and [ADRs](docs/adr/README.md). The Clo
 
 ## Project status and known limitations
 
-Stages 0–12, the v1.0.0 stable release, and the v1.1.0 data-correctness and beginner-import improvements are complete. The current version adds isolated analysis sessions and input fingerprints, so user files are not automatically mixed with demos or compatibility samples; switching files recomputes dashboards, diagnostics, recommendations, and reports. Current evidence includes:
+Stages 0–12, the v1.0.0 stable release, the v1.1.0 beginner-import work, and the v1.1.1 data-contract fixes are complete. The current version lets bundled CSV/XLSX files re-enter analysis directly, fixes empty and inconsistent duration distributions, and separately reports raw rows, valid rows, events, unique shipments, unique business orders, and analyzed entities. User files are not automatically mixed with demos or compatibility samples; switching files recomputes dashboards, diagnostics, recommendations, and reports. Current evidence includes:
 
-- 84 frontend, 14 Cloudflare Worker, and 235 backend/contract tests;
+- 108 frontend, 14 Cloudflare Worker, and 235 backend/contract tests;
 - 10,000/50,000-order performance benchmarks;
 - real import interaction at 360/390/430/1440 Chromium, plus site-wide 360/390/430/768/1440 audits;
 - npm/Python vulnerability audits and repository secret scans;
@@ -304,7 +304,7 @@ Reports and benchmarks are evidence for a specific revision, dataset, and machin
 - Stage 11: bilingual open-source docs, license, governance templates, and RC assets;
 - Stage 12: clean-environment acceptance and the v1.0 release decision.
 
-See the [Roadmap](docs/ROADMAP.md), [final acceptance record](docs/RELEASE_ACCEPTANCE.md), [compatibility validation report](docs/COMPATIBILITY_VALIDATION.md), [v1.0.0 release notes](docs/releases/v1.0.0.md), and [v1.1.0 release notes](docs/releases/v1.1.0.md).
+See the [Roadmap](docs/ROADMAP.md), [final acceptance record](docs/RELEASE_ACCEPTANCE.md), [compatibility validation report](docs/COMPATIBILITY_VALIDATION.md), [v1.0.0 release notes](docs/releases/v1.0.0.md), [v1.1.0 release notes](docs/releases/v1.1.0.md), and [v1.1.1 release notes](docs/releases/v1.1.1.md).
 
 ## Privacy, security, and disclaimer
 

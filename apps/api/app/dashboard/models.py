@@ -91,6 +91,14 @@ class DashboardContext(BaseModel):
     data_coverage: float | None
     last_analyzed_at: datetime
     warning_count: int
+    raw_row_count: int | None = None
+    valid_row_count: int | None = None
+    event_count: int | None = None
+    unique_shipment_count: int | None = None
+    unique_order_count: int | None = None
+    analyzed_entity_count: int | None = None
+    unfiltered_analyzed_entity_count: int | None = None
+    analysis_entity_label: Literal["订单", "运单", "业务实体"] = "订单"
 
 
 class NodeDurationSummary(BaseModel):

@@ -24,6 +24,7 @@ REQUIRED_FILES = (
     "docs/SCREENSHOTS.md",
     "docs/releases/v1.0.0.md",
     "docs/releases/v1.1.0.md",
+    "docs/releases/v1.1.1.md",
     ".github/ISSUE_TEMPLATE/bug.yml",
     ".github/ISSUE_TEMPLATE/feature.yml",
     ".github/ISSUE_TEMPLATE/data-mapping.yml",
@@ -179,11 +180,15 @@ def main() -> int:
     for heading in REQUIRED_README_EN:
         if heading not in readme_en:
             errors.append(f"README_EN.md missing section: {heading}")
-    for required_text in ("1.1.0", "127.0.0.1:5173", "127.0.0.1:8000"):
+    package = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
+    for required_text in (
+        package["version"],
+        "127.0.0.1:5173",
+        "127.0.0.1:8000",
+    ):
         if required_text not in readme_cn or required_text not in readme_en:
             errors.append(f"bilingual README mismatch or missing value: {required_text}")
 
-    package = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
     scripts = package.get("scripts", {})
     missing_scripts = sorted(REQUIRED_SCRIPTS - set(scripts))
     if missing_scripts:

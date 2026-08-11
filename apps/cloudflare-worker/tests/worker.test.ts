@@ -55,7 +55,7 @@ describe("Cloudflare Worker", () => {
 
     await expect(health.json()).resolves.toMatchObject({
       status: "ok",
-      version: "1.1.0",
+      version: "1.1.1",
     });
     await expect(version.json()).resolves.toMatchObject({
       environment: "cloudflare-online-demo",
@@ -102,12 +102,23 @@ describe("Cloudflare Worker", () => {
     );
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
-      context: { dataset_label: "Cloudflare 在线合成履约演示" },
+    const payload = (await response.json()) as {
+      context: Record<string, unknown>;
+      distribution: { bins: Array<{ count: number }>; sample_size: number };
+      metrics: Array<{ code: string }>;
+    };
+    expect(payload).toMatchObject({
+      context: {
+        dataset_label: "Cloudflare 在线合成履约演示",
+        analysis_entity_label: "订单",
+      },
       metrics: expect.arrayContaining([
         expect.objectContaining({ code: "otif_rate" }),
       ]),
     });
+    expect(
+      payload.distribution.bins.reduce((sum, bin) => sum + bin.count, 0),
+    ).toBe(payload.distribution.sample_size);
   });
 
   it("loads the online teaching case catalog", async () => {

@@ -13,6 +13,12 @@ const csvPath = path.join(
   "fixtures",
   "nonstandard_tracking_user.csv",
 );
+const bundledOrdersPath = path.join(
+  repoRoot,
+  "data",
+  "samples",
+  "compatibility_demo_orders.csv",
+);
 const xlsxPath = path.join(
   repoRoot,
   "data",
@@ -243,13 +249,20 @@ async function resolveMapping(page, options = {}) {
   return { groupedConfirmations, ignoredCount };
 }
 
-async function openMapping(page, filePath, sheetName) {
+async function openMapping(
+  page,
+  filePath,
+  sheetName,
+  expectedDataType = "物流轨迹数据",
+) {
   await page.goto(route("/import"), { waitUntil: "networkidle" });
   await assertPublicBrand(page);
   await page.getByText("自动识别（推荐）", { exact: true }).waitFor();
   await chooseCustomFile(page, filePath);
   await parseSelectedFile(page, sheetName);
-  await page.getByText(/数据类型识别：物流轨迹数据/).waitFor();
+  await page
+    .getByText(new RegExp(`数据类型识别：${expectedDataType}`))
+    .waitFor();
   await page.getByRole("button", { name: "下一步：字段映射" }).click();
   await page.getByRole("heading", { name: "5. 快速导入" }).waitFor();
 }
@@ -343,10 +356,7 @@ function trackingSpanEvidence(rows) {
     const position = (values.length - 1) * probability;
     const lower = Math.floor(position);
     const upper = Math.ceil(position);
-    return (
-      values[lower] +
-      (values[upper] - values[lower]) * (position - lower)
-    );
+    return values[lower] + (values[upper] - values[lower]) * (position - lower);
   };
   return {
     mean: values.reduce((sum, value) => sum + value, 0) / values.length,
@@ -366,8 +376,13 @@ async function confirmImport(page, options = {}) {
   return mappingStats;
 }
 
-async function runImport(page, filePath, sheetName) {
-  await openMapping(page, filePath, sheetName);
+async function runImport(
+  page,
+  filePath,
+  sheetName,
+  expectedDataType = "物流轨迹数据",
+) {
+  await openMapping(page, filePath, sheetName, expectedDataType);
   return confirmImport(page, {
     bulkIgnore: true,
   });
@@ -414,6 +429,7 @@ async function readLatestDataset(page) {
 
 (async () => {
   assertFixture(csvPath);
+  assertFixture(bundledOrdersPath);
   assertFixture(xlsxPath);
   manualCsvPaths.forEach(assertFixture);
   const browser = await chromium.launch({ headless: true, executablePath });
@@ -480,6 +496,31 @@ async function readLatestDataset(page) {
     records.push({ scenario: "ignored-field-excluded", passed: true });
     await page.getByRole("link", { name: "前往分析总览" }).click();
     await page.getByRole("heading", { name: "分析总览" }).waitFor();
+    await page.getByRole("img", { name: /轨迹首末时效分布直方图/ }).waitFor();
+    const nodeChartSpacing = await page
+      .locator(".node-duration-chart")
+      .evaluate((element) =>
+        Number.parseFloat(getComputedStyle(element).marginBottom),
+      );
+    if (nodeChartSpacing < 8) {
+      throw new Error(
+        `Node duration chart spacing is too small: ${nodeChartSpacing}px`,
+      );
+    }
+    await page.setViewportSize({ width: 390, height: 900 });
+    const dashboardOverflow = await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth >
+        document.documentElement.clientWidth + 1,
+    );
+    if (dashboardOverflow) {
+      throw new Error("Analytics dashboard overflows horizontally at 390px");
+    }
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    records.push({
+      scenario: "duration-distribution-and-node-layout",
+      passed: true,
+    });
     try {
       await page.getByText("行动建议", { exact: true }).waitFor();
     } catch (error) {
@@ -530,6 +571,31 @@ async function readLatestDataset(page) {
     await runImport(page, xlsxPath, "物流轨迹");
     records.push({ scenario: "multi-sheet-xlsx", passed: true });
 
+    await runImport(page, bundledOrdersPath, undefined, "订单数据");
+    records.push({ scenario: "bundled-orders-csv", passed: true });
+    await page.getByRole("link", { name: "前往分析总览" }).click();
+    await page.getByRole("heading", { name: "分析总览" }).waitFor();
+    await page.getByRole("img", { name: /履约时长分布直方图/ }).waitFor();
+    const bundledContext = (
+      await page.locator(".dashboard-context").innerText()
+    ).replace(/\s+/g, " ");
+    for (const [label, expected] of [
+      ["原始记录", 80],
+      ["有效记录", 80],
+      ["唯一业务订单", 80],
+      ["当前分析订单", 80],
+    ]) {
+      if (!bundledContext.includes(`${label} ${expected}`)) {
+        throw new Error(
+          `Bundled orders reconciliation missing ${label}=${expected}: ${bundledContext}`,
+        );
+      }
+    }
+    records.push({
+      scenario: "bundled-orders-duration-distribution",
+      passed: true,
+    });
+
     const manualEvidence = [];
     for (const [index, manualPath] of manualCsvPaths.entries()) {
       if (index === 0) {
@@ -544,10 +610,7 @@ async function readLatestDataset(page) {
           );
         });
       }
-      const mappingStats = await oneClickOrganizeAndAnalyze(
-        page,
-        manualPath,
-      );
+      const mappingStats = await oneClickOrganizeAndAnalyze(page, manualPath);
       const dataset = await readLatestDataset(page);
       if (!dataset)
         throw new Error(`Manual CSV ${index + 1} was not persisted`);
@@ -574,7 +637,9 @@ async function readLatestDataset(page) {
         storageState.legacyBrowserOrders ||
         storageState.legacyServerOrders
       ) {
-        throw new Error("A stale order dataset remained in the user analysis session");
+        throw new Error(
+          "A stale order dataset remained in the user analysis session",
+        );
       }
       if (rows.length !== quality.total_rows || blockers !== 0) {
         throw new Error(
@@ -609,6 +674,21 @@ async function readLatestDataset(page) {
       });
       await page.getByText("平均首末轨迹时效", { exact: true }).waitFor();
       const analysisEvidence = await readAnalysisEvidence(page);
+      const reconciledContext = analysisEvidence.context.replace(/\s+/g, " ");
+      for (const [label, expected] of [
+        ["原始记录", 54],
+        ["有效记录", 54],
+        ["物流/作业事件", 54],
+        ["唯一运单", 10],
+        ["唯一业务订单", 10],
+        ["当前分析运单", 10],
+      ]) {
+        if (!reconciledContext.includes(`${label} ${expected}`)) {
+          throw new Error(
+            `Manual CSV ${index + 1} reconciliation missing ${label}=${expected}: ${reconciledContext}`,
+          );
+        }
+      }
       manualEvidence.push(analysisEvidence);
       records.at(-1).analysis = analysisEvidence;
       for (const [key, expected] of Object.entries(

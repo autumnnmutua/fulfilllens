@@ -11,7 +11,10 @@ export function DashboardContextBar({ context }: DashboardContextBarProps) {
   const timeRange =
     context.time_range_start && context.time_range_end
       ? `${context.time_range_start} 至 ${context.time_range_end}`
-      : "当前筛选无有效下单时间";
+      : "当前筛选无有效分析时间";
+  const hasReconciliation =
+    context.raw_row_count !== null && context.raw_row_count !== undefined;
+  const entityLabel = context.analysis_entity_label ?? "订单";
   return (
     <section className="dashboard-context" aria-label="当前分析数据上下文">
       <Typography.Title level={2}>当前分析上下文</Typography.Title>
@@ -48,19 +51,58 @@ export function DashboardContextBar({ context }: DashboardContextBarProps) {
                     : "服务端数据集",
           },
           { key: "range", label: "时间范围", children: timeRange },
-          {
-            key: "orders",
-            label: "订单数",
-            children:
-              context.order_count === context.unfiltered_order_count
-                ? context.order_count
-                : `${context.order_count} / 全部 ${context.unfiltered_order_count}`,
-          },
-          {
-            key: "valid",
-            label: "有效订单",
-            children: context.valid_order_count,
-          },
+          ...(hasReconciliation
+            ? [
+                {
+                  key: "raw_rows",
+                  label: "原始记录",
+                  children: context.raw_row_count,
+                },
+                {
+                  key: "valid_rows",
+                  label: "有效记录",
+                  children: context.valid_row_count ?? "—",
+                },
+                {
+                  key: "events",
+                  label: "物流/作业事件",
+                  children: context.event_count ?? "—",
+                },
+                {
+                  key: "shipments",
+                  label: "唯一运单",
+                  children: context.unique_shipment_count ?? "—",
+                },
+                {
+                  key: "business_orders",
+                  label: "唯一业务订单",
+                  children: context.unique_order_count ?? "—",
+                },
+                {
+                  key: "entities",
+                  label: `当前分析${entityLabel}`,
+                  children:
+                    context.analyzed_entity_count ===
+                    context.unfiltered_analyzed_entity_count
+                      ? context.analyzed_entity_count
+                      : `${context.analyzed_entity_count ?? 0} / 全部 ${context.unfiltered_analyzed_entity_count ?? 0}`,
+                },
+              ]
+            : [
+                {
+                  key: "orders",
+                  label: "订单数",
+                  children:
+                    context.order_count === context.unfiltered_order_count
+                      ? context.order_count
+                      : `${context.order_count} / 全部 ${context.unfiltered_order_count}`,
+                },
+                {
+                  key: "valid",
+                  label: "有效订单",
+                  children: context.valid_order_count,
+                },
+              ]),
           {
             key: "coverage",
             label: "数据覆盖率",

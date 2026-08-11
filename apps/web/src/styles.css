@@ -388,6 +388,10 @@ a {
   line-height: 1.6;
 }
 
+.node-duration-chart {
+  margin-bottom: 12px;
+}
+
 .skip-link {
   position: fixed;
   top: 8px;
@@ -1193,6 +1197,10 @@ a {
 
   .chart-container {
     min-height: 310px;
+  }
+
+  .node-duration-chart {
+    margin-bottom: 8px;
   }
 }
 

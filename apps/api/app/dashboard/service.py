@@ -335,6 +335,10 @@ class DashboardService:
                 ),
                 last_analyzed_at=datetime.now(UTC),
                 warning_count=len(output.warnings),
+                unique_order_count=base_output.total_unique_orders,
+                analyzed_entity_count=output.total_unique_orders,
+                unfiltered_analyzed_entity_count=base_output.total_unique_orders,
+                analysis_entity_label="订单",
             ),
             active_filters=filters,
             filter_options=self._filter_options(

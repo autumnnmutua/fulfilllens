@@ -65,6 +65,15 @@ export interface DashboardContext {
   data_coverage: number | null;
   last_analyzed_at: string;
   warning_count: number;
+  /** Source-to-analysis reconciliation. Null means the source cannot prove the count. */
+  raw_row_count?: number | null;
+  valid_row_count?: number | null;
+  event_count?: number | null;
+  unique_shipment_count?: number | null;
+  unique_order_count?: number | null;
+  analyzed_entity_count?: number | null;
+  unfiltered_analyzed_entity_count?: number | null;
+  analysis_entity_label?: "订单" | "运单" | "业务实体";
   analysis_fingerprint?: string;
   analysis_source?:
     "user_import" | "compatibility_sample" | "teaching_data" | "server_dataset";

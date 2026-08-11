@@ -196,12 +196,29 @@ function PreviewSection({ section }: { section: ReportSection }) {
       {section.code === "data_quality" ? (
         <>
           <Descriptions size="small" bordered column={{ xs: 1, sm: 2 }}>
-            <Descriptions.Item label="订单数">
+            <Descriptions.Item
+              label={`${valueText(section.data.analysis_entity_label) === "—" ? "订单" : valueText(section.data.analysis_entity_label)}数`}
+            >
               {valueText(section.data.order_count)}
             </Descriptions.Item>
-            <Descriptions.Item label="有效订单">
+            <Descriptions.Item
+              label={`有效${valueText(section.data.analysis_entity_label) === "—" ? "订单" : valueText(section.data.analysis_entity_label)}`}
+            >
               {valueText(section.data.valid_order_count)}
             </Descriptions.Item>
+            {section.data.raw_row_count !== undefined ? (
+              <Descriptions.Item label="原始 / 有效记录">
+                {valueText(section.data.raw_row_count)} /{" "}
+                {valueText(section.data.valid_row_count)}
+              </Descriptions.Item>
+            ) : null}
+            {section.data.event_count !== undefined ? (
+              <Descriptions.Item label="事件 / 运单 / 业务订单">
+                {valueText(section.data.event_count)} /{" "}
+                {valueText(section.data.unique_shipment_count)} /{" "}
+                {valueText(section.data.unique_order_count)}
+              </Descriptions.Item>
+            ) : null}
             <Descriptions.Item label="覆盖率">
               {percent(
                 typeof section.data.data_coverage === "number"
@@ -882,10 +899,20 @@ export function ReportsPage() {
                   {preview.header.time_range_start ?? "—"} 至{" "}
                   {preview.header.time_range_end ?? "—"}
                 </Descriptions.Item>
-                <Descriptions.Item label="订单 / 有效订单">
+                <Descriptions.Item
+                  label={`${preview.header.analysis_entity_label ?? "订单"}数 / 有效${preview.header.analysis_entity_label ?? "订单"}`}
+                >
                   {preview.header.order_count} /{" "}
                   {preview.header.valid_order_count}
                 </Descriptions.Item>
+                {preview.header.raw_row_count !== undefined ? (
+                  <Descriptions.Item label="记录 / 事件 / 运单 / 业务订单">
+                    {preview.header.raw_row_count ?? "—"} /{" "}
+                    {preview.header.event_count ?? "—"} /{" "}
+                    {preview.header.unique_shipment_count ?? "—"} /{" "}
+                    {preview.header.unique_order_count ?? "—"}
+                  </Descriptions.Item>
+                ) : null}
                 <Descriptions.Item label="数据覆盖率">
                   {percent(preview.header.data_coverage)}
                 </Descriptions.Item>

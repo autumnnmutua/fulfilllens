@@ -845,21 +845,30 @@ function distributionResponse(
     includes_upper_bound: boolean;
   }>;
   if (minimum !== null && maximum !== null) {
-    const width = Math.max(1, (maximum - minimum) / Math.max(1, binCount));
-    for (let index = 0; index < binCount; index += 1) {
-      const lower = minimum + width * index;
-      const upper =
-        index === binCount - 1 ? maximum : minimum + width * (index + 1);
+    if (minimum === maximum) {
       bins.push({
-        lower_bound: round(lower, 2),
-        upper_bound: round(upper, 2),
-        count: values.filter((value) =>
-          index === binCount - 1
-            ? value >= lower && value <= upper
-            : value >= lower && value < upper,
-        ).length,
-        includes_upper_bound: index === binCount - 1,
+        lower_bound: minimum,
+        upper_bound: maximum,
+        count: values.length,
+        includes_upper_bound: true,
       });
+    } else {
+      const safeBinCount = Math.max(1, binCount);
+      const width = (maximum - minimum) / safeBinCount;
+      for (let index = 0; index < safeBinCount; index += 1) {
+        const lower = minimum + width * index;
+        const upper = minimum + width * (index + 1);
+        bins.push({
+          lower_bound: round(lower, 2),
+          upper_bound: round(upper, 2),
+          count: values.filter((value) =>
+            index === safeBinCount - 1
+              ? value >= lower && value <= upper
+              : value >= lower && value < upper,
+          ).length,
+          includes_upper_bound: index === safeBinCount - 1,
+        });
+      }
     }
   }
   return {
@@ -952,6 +961,21 @@ function dashboardOverview(
           : round(orders.length / unfiltered.length, 4),
       last_analyzed_at: now(),
       warning_count: 0,
+      raw_row_count: unfiltered.length,
+      valid_row_count: unfiltered.length,
+      event_count: null,
+      unique_shipment_count: new Set(
+        unfiltered.flatMap((order) =>
+          order.node_durations
+            .map((node) => node.shipment_id)
+            .filter((value): value is string => Boolean(value)),
+        ),
+      ).size,
+      unique_order_count: new Set(unfiltered.map((order) => order.order_id))
+        .size,
+      analyzed_entity_count: orders.length,
+      unfiltered_analyzed_entity_count: unfiltered.length,
+      analysis_entity_label: "订单",
     },
     active_filters: filters,
     filter_options: filterOptions(unfiltered),

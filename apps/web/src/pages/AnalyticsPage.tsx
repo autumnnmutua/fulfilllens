@@ -259,10 +259,19 @@ export function AnalyticsPage() {
     void loadOrders(appliedFilters, next);
   }
 
+  const trackingOnly =
+    overview?.distribution.metric_code === "tracking_span_hours";
+  const analysisVolumeLabel = trackingOnly ? "运单量" : "订单量";
+  const durationTitle = trackingOnly ? "轨迹首末时效分布" : "履约时长分布";
+  const durationAxisLabel = trackingOnly
+    ? "轨迹首末时效（小时）"
+    : "履约时长（小时）";
+  const durationSampleLabel = trackingOnly ? "运单数" : "订单数";
+
   const trendOption: EChartOption = {
     color: ["#4f6d7a", "#146c94", "#d9485f"],
     tooltip: { trigger: "axis" },
-    legend: { data: ["订单量", "OTIF", "异常率"] },
+    legend: { data: [analysisVolumeLabel, "OTIF", "异常率"] },
     grid: { left: 58, right: 64, top: 56, bottom: 62 },
     xAxis: {
       type: "category",
@@ -271,7 +280,7 @@ export function AnalyticsPage() {
     yAxis: [
       {
         type: "value",
-        name: "订单数",
+        name: analysisVolumeLabel,
         min: 0,
         minInterval: 1,
       },
@@ -287,7 +296,7 @@ export function AnalyticsPage() {
     ],
     series: [
       {
-        name: "订单量",
+        name: analysisVolumeLabel,
         type: "bar",
         yAxisIndex: 0,
         data: overview?.trend.groups.map((group) => group.order_count) ?? [],
@@ -325,7 +334,7 @@ export function AnalyticsPage() {
     grid: { left: 58, right: 24, top: 28, bottom: 78 },
     xAxis: {
       type: "category",
-      name: "履约时长（小时）",
+      name: durationAxisLabel,
       nameLocation: "middle",
       nameGap: 56,
       axisLabel: { rotate: 28 },
@@ -337,13 +346,13 @@ export function AnalyticsPage() {
     },
     yAxis: {
       type: "value",
-      name: "订单数",
+      name: durationSampleLabel,
       min: 0,
       minInterval: 1,
     },
     series: [
       {
-        name: "订单数",
+        name: durationSampleLabel,
         type: "bar",
         data: overview?.distribution.bins.map((bin) => bin.count) ?? [],
       },
@@ -354,10 +363,13 @@ export function AnalyticsPage() {
     color: ["#7895a3", "#146c94", "#d97706"],
     tooltip: { trigger: "axis" },
     legend: { data: ["平均", "P50", "P90"] },
-    grid: { left: 118, right: 34, top: 58, bottom: 48 },
+    grid: { left: 118, right: 34, top: 58, bottom: 60 },
     xAxis: {
       type: "value",
       name: "小时",
+      nameLocation: "middle",
+      nameGap: 38,
+      axisLabel: { margin: 12 },
       min: 0,
     },
     yAxis: {
@@ -610,7 +622,7 @@ export function AnalyticsPage() {
                 }
               >
                 <Typography.Paragraph>
-                  回答“何时变差”：柱为订单量，实线为
+                  回答“何时变差”：柱为{analysisVolumeLabel}，实线为
                   OTIF，虚线菱形为异常率；比例轴固定 0–100%。样本{" "}
                   {overview.context.order_count} 单，OTIF 覆盖{" "}
                   {formatPercent(
@@ -635,7 +647,7 @@ export function AnalyticsPage() {
 
               <Card
                 className="section-card"
-                title="履约时长分布"
+                title={durationTitle}
                 extra={<BarChartOutlined />}
               >
                 <Typography.Paragraph>
@@ -645,12 +657,22 @@ export function AnalyticsPage() {
                   {formatHours(overview.distribution.median)}，P90{" "}
                   {formatHours(overview.distribution.p90)}
                   。合法非负样本全部保留；非法或负时长不进入分布并保留警告。
+                  {trackingOnly
+                    ? " 当前按同一运单的首个与最后一个有效事件计算，不等于订单创建到交付的完整履约时长。"
+                    : " 当前使用订单创建时间到实际交付时间。"}
                 </Typography.Paragraph>
                 {overview.distribution.sample_size === 0 ? (
-                  <Empty description="完成订单缺少有效创建/交付时间，无法形成分布。请检查时间字段和数据质量报告。" />
+                  <Empty
+                    description={
+                      overview.distribution.warnings[0] ??
+                      (trackingOnly
+                        ? "同一运单至少需要两个有效时间事件，当前无法形成轨迹首末时效分布。"
+                        : "完成订单缺少有效创建/交付时间，无法形成履约时长分布。")
+                    }
+                  />
                 ) : (
                   <EChart
-                    ariaLabel="履约时长直方图，横轴小时，纵轴订单数"
+                    ariaLabel={`${durationTitle}直方图，横轴小时，纵轴${durationSampleLabel}`}
                     option={distributionOption}
                   />
                 )}
@@ -669,10 +691,12 @@ export function AnalyticsPage() {
                   <Empty description="缺少可配对的仓库或物流事件。请关联事件数据集，或检查事件状态与时间顺序。" />
                 ) : (
                   <>
-                    <EChart
-                      ariaLabel="各标准节点平均、P50、P90 时长对比图"
-                      option={nodeOption}
-                    />
+                    <div className="node-duration-chart">
+                      <EChart
+                        ariaLabel="各标准节点平均、P50、P90 时长对比图"
+                        option={nodeOption}
+                      />
+                    </div>
                     <Table
                       rowKey="interval_code"
                       size="small"
