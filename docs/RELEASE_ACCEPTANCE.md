@@ -5,7 +5,7 @@
 - version：`1.1.1`
 - branch：`main`
 - date：2026-08-11（Asia/Shanghai）
-- accepted application commit：以首次 v1.1.1 发布提交及其 GitHub Actions 结果为准
+- accepted application commit：`e6aecb3219d9df2d02fb3cad88cb584b63f814c9`
 - accepted commit：以最终 annotated tag `v1.1.1^{commit}` 为准
 - base release：`v1.1.0`；`v1.0.0` 标签、GitHub Release 与历史不修改
 
@@ -118,7 +118,7 @@
 | `docker compose config/build/up --wait` + 宿主机探测  |         0 | Docker 29.6.2；API/Web 容器健康，`/api/version` 返回 1.1.1，40 组浏览器审计通过，临时容器与数据卷已清理 |
 | `wrangler deploy --dry-run`                           |         0 | 23 个静态资产、Worker 与 AI/ASSETS bindings 校验通过                                                    |
 | Cloudflare 正式部署与生产浏览器 A/B                   |         0 | Worker 1.1.1；21 个生产导入场景及 40 组全站审计通过；两份附件零丢行/阻断/逐字段确认，原始上传请求为 0   |
-| GitHub Actions CI                                     |         1 | 尚未运行本次提交；在 Actions 全绿前禁止创建 v1.1.1 tag/Release                                          |
+| GitHub Actions CI `31459433478`                       |         0 | 静态检查/测试/构建任务与真实 Docker 构建/烟雾测试任务全部通过                                           |
 
 ## Security & Privacy
 
@@ -155,6 +155,6 @@
 
 ## Final Verdict
 
-**BLOCKED**
+**READY FOR v1.1.1**
 
-本地质量门槛、Docker、Cloudflare 正式部署、Workers AI 固定合成探针和生产 A/B 浏览器复验均已通过。当前唯一发布阻断是本次提交尚未进入 GitHub Actions；Actions 全绿并回写证据前，不创建 `v1.1.1` annotated tag 或正式 Release。
+本地质量门槛、GitHub Actions、Docker、Cloudflare 正式部署、Workers AI 固定合成探针和生产 A/B 浏览器复验均已通过。可在本验收证据提交再次通过 GitHub Actions 后创建 `v1.1.1` annotated tag 与正式 Release。
