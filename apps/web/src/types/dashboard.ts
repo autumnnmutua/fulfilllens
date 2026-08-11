@@ -65,6 +65,25 @@ export interface DashboardContext {
   data_coverage: number | null;
   last_analyzed_at: string;
   warning_count: number;
+  analysis_fingerprint?: string;
+  analysis_source?:
+    "user_import" | "compatibility_sample" | "teaching_data" | "server_dataset";
+  capabilities?: AnalysisCapability[];
+  linkage?: DatasetLinkage | null;
+}
+
+export interface AnalysisCapability {
+  available: boolean;
+  code: string;
+  label: string;
+  reason: string;
+}
+
+export interface DatasetLinkage {
+  linked_order_count: number;
+  linkage_rate: number | null;
+  orphan_event_count: number;
+  unlinked_order_count: number;
 }
 
 export interface NodeDurationSummary {

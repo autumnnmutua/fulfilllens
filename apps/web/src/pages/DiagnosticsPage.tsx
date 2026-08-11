@@ -639,6 +639,16 @@ export function DiagnosticsPage() {
               <Descriptions.Item label="警告">
                 {analysis.context.warning_count}
               </Descriptions.Item>
+              {analysis.context.analysis_fingerprint ? (
+                <Descriptions.Item label="分析指纹">
+                  <Typography.Text
+                    code
+                    title={analysis.context.analysis_fingerprint}
+                  >
+                    {analysis.context.analysis_fingerprint.slice(0, 20)}…
+                  </Typography.Text>
+                </Descriptions.Item>
+              ) : null}
             </Descriptions>
           </Card>
 

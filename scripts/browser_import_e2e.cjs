@@ -23,6 +23,13 @@ const manualCsvPaths = [
   process.env.FL_MANUAL_CSV_1,
   process.env.FL_MANUAL_CSV_2,
 ].filter(Boolean);
+const runNonce = Date.now().toString(36);
+
+function route(pathname) {
+  const target = new URL(pathname, baseUrl);
+  target.searchParams.set("_fl_e2e", runNonce);
+  return target.toString();
+}
 const executablePath =
   process.env.FL_CHROMIUM_PATH ||
   [
@@ -237,7 +244,7 @@ async function resolveMapping(page, options = {}) {
 }
 
 async function openMapping(page, filePath, sheetName) {
-  await page.goto(`${baseUrl}/import`, { waitUntil: "networkidle" });
+  await page.goto(route("/import"), { waitUntil: "networkidle" });
   await assertPublicBrand(page);
   await page.getByText("自动识别（推荐）", { exact: true }).waitFor();
   await chooseCustomFile(page, filePath);
@@ -245,6 +252,108 @@ async function openMapping(page, filePath, sheetName) {
   await page.getByText(/数据类型识别：物流轨迹数据/).waitFor();
   await page.getByRole("button", { name: "下一步：字段映射" }).click();
   await page.getByRole("heading", { name: "5. 快速导入" }).waitFor();
+}
+
+async function oneClickOrganizeAndAnalyze(page, filePath, sheetName) {
+  await openMapping(page, filePath, sheetName);
+  const recommended = page.getByRole("button", {
+    name: /全部采用推荐映射（\d+）/,
+  });
+  const ignored = page.getByRole("button", {
+    name: /一键忽略非必要字段（\d+）/,
+  });
+  const recommendedLabel = (await recommended.textContent()) || "";
+  const ignoredLabel = (await ignored.textContent()) || "";
+  const groupedConfirmations = Number(
+    recommendedLabel.match(/（([1-9]\d*)）/)?.[1] || 0,
+  )
+    ? 1
+    : 0;
+  const ignoredCount = Number(ignoredLabel.match(/（(\d+)）/)?.[1] || 0);
+  await page.getByRole("button", { name: "一键整理并分析" }).click();
+  try {
+    await page.getByRole("heading", { name: "分析总览" }).waitFor();
+  } catch (error) {
+    throw new Error(
+      `One-click organize did not reach analytics. Visible text:\n${(
+        await page.locator("body").innerText()
+      ).slice(-6000)}`,
+      { cause: error },
+    );
+  }
+  return { groupedConfirmations, ignoredCount };
+}
+
+async function readAnalysisEvidence(page) {
+  const metric = async (name) => {
+    const card = page.getByRole("button", { name: `查看${name}定义` });
+    const displayed = await card
+      .locator(".ant-statistic-content-value")
+      .innerText();
+    const numeric = displayed.replace(/,/g, "").match(/-?\d+(?:\.\d+)?/);
+    return numeric ? Number(numeric[0]) : null;
+  };
+  const contextText = await page.locator(".dashboard-context").innerText();
+  const fingerprint = await page
+    .locator('.dashboard-context [title^="sha256-"]')
+    .first()
+    .getAttribute("title");
+  const professionalText = await page
+    .getByText("专业行动方案", { exact: true })
+    .locator("xpath=ancestor::*[contains(@class, 'ant-card')][1]")
+    .innerText();
+  return {
+    context: contextText,
+    fingerprint,
+    mean: await metric("平均首末轨迹时效"),
+    p50: await metric("P50 首末轨迹时效"),
+    p90: await metric("P90 首末轨迹时效"),
+    recommendation_signature: professionalText.slice(0, 800),
+  };
+}
+
+async function assertPageFingerprint(page, expected, pageName) {
+  const actual = await page
+    .locator(`[title="${expected}"]`)
+    .first()
+    .getAttribute("title");
+  if (actual !== expected) {
+    throw new Error(
+      `${pageName} analysis fingerprint mismatch: expected ${expected}, got ${actual}`,
+    );
+  }
+}
+
+function trackingSpanEvidence(rows) {
+  const groups = new Map();
+  for (const row of rows) {
+    const key = String(row.shipment_id || row.order_id || "");
+    const timestamp = Date.parse(String(row.event_time || ""));
+    if (!key || !Number.isFinite(timestamp)) continue;
+    groups.set(key, [...(groups.get(key) || []), timestamp]);
+  }
+  const spans = [...groups.entries()]
+    .map(([shipment, values]) => ({
+      shipment,
+      hours: (Math.max(...values) - Math.min(...values)) / 3_600_000,
+    }))
+    .sort((left, right) => left.shipment.localeCompare(right.shipment));
+  const values = spans.map((item) => item.hours).sort((a, b) => a - b);
+  const quantile = (probability) => {
+    const position = (values.length - 1) * probability;
+    const lower = Math.floor(position);
+    const upper = Math.ceil(position);
+    return (
+      values[lower] +
+      (values[upper] - values[lower]) * (position - lower)
+    );
+  };
+  return {
+    mean: values.reduce((sum, value) => sum + value, 0) / values.length,
+    p50: quantile(0.5),
+    p90: quantile(0.9),
+    spans,
+  };
 }
 
 async function confirmImport(page, options = {}) {
@@ -268,21 +377,33 @@ async function readLatestDataset(page) {
   return page.evaluate(
     () =>
       new Promise((resolve, reject) => {
+        const session = JSON.parse(
+          localStorage.getItem("fulfilllens.browser.analysis.session.v1") ||
+            "null",
+        );
+        const activeDatasetId =
+          session?.datasetIds?.[session.activeDataType] || null;
         const request = indexedDB.open("fulfilllens-cn-browser-data", 1);
         request.onerror = () => reject(request.error);
         request.onsuccess = () => {
           const database = request.result;
-          const query = database
+          const store = database
             .transaction("datasets", "readonly")
-            .objectStore("datasets")
-            .getAll();
+            .objectStore("datasets");
+          const query = activeDatasetId
+            ? store.get(activeDatasetId)
+            : store.getAll();
           query.onerror = () => reject(query.error);
           query.onsuccess = () => {
-            const latest = [...query.result]
-              .sort((left, right) =>
-                String(left.createdAt).localeCompare(String(right.createdAt)),
-              )
-              .at(-1);
+            const latest = activeDatasetId
+              ? query.result
+              : [...query.result]
+                  .sort((left, right) =>
+                    String(left.createdAt).localeCompare(
+                      String(right.createdAt),
+                    ),
+                  )
+                  .at(-1);
             database.close();
             resolve(latest ?? null);
           };
@@ -380,14 +501,14 @@ async function readLatestDataset(page) {
       scenario: "browser-local-analysis-recommendations",
       passed: true,
     });
-    await page.goto(`${baseUrl}/diagnostics`, { waitUntil: "networkidle" });
+    await page.goto(route("/diagnostics"), { waitUntil: "networkidle" });
     await page.getByRole("heading", { name: "异常诊断" }).waitFor();
     await page
       .getByText(/只有事件数据/)
       .first()
       .waitFor();
     records.push({ scenario: "browser-local-diagnostics", passed: true });
-    await page.goto(`${baseUrl}/reports`, { waitUntil: "networkidle" });
+    await page.goto(route("/reports"), { waitUntil: "networkidle" });
     await page.getByRole("button", { name: "生成预览" }).click();
     await page
       .getByText("两种视图使用同一组分析事实", { exact: true })
@@ -402,15 +523,31 @@ async function readLatestDataset(page) {
       passed: true,
     });
     await page.reload({ waitUntil: "networkidle" });
-    await page.goto(`${baseUrl}/settings`, { waitUntil: "networkidle" });
+    await page.goto(route("/settings"), { waitUntil: "networkidle" });
     await page.getByText("浏览器本地导入", { exact: false }).first().waitFor();
     records.push({ scenario: "refresh-persistence", passed: true });
 
     await runImport(page, xlsxPath, "物流轨迹");
     records.push({ scenario: "multi-sheet-xlsx", passed: true });
 
+    const manualEvidence = [];
     for (const [index, manualPath] of manualCsvPaths.entries()) {
-      const mappingStats = await runImport(page, manualPath);
+      if (index === 0) {
+        await page.evaluate(() => {
+          localStorage.setItem(
+            "fulfilllens.browser.dataset.orders",
+            "browser-local-stale-compatibility-orders",
+          );
+          localStorage.setItem(
+            "fulfilllens.dataset.orders",
+            "server-stale-teaching-orders",
+          );
+        });
+      }
+      const mappingStats = await oneClickOrganizeAndAnalyze(
+        page,
+        manualPath,
+      );
       const dataset = await readLatestDataset(page);
       if (!dataset)
         throw new Error(`Manual CSV ${index + 1} was not persisted`);
@@ -422,6 +559,23 @@ async function readLatestDataset(page) {
       const fieldConfirmations = await page
         .getByRole("button", { name: "确认建议" })
         .count();
+      const storageState = await page.evaluate(() => ({
+        session: JSON.parse(
+          localStorage.getItem("fulfilllens.browser.analysis.session.v1") ||
+            "null",
+        ),
+        legacyBrowserOrders: localStorage.getItem(
+          "fulfilllens.browser.dataset.orders",
+        ),
+        legacyServerOrders: localStorage.getItem("fulfilllens.dataset.orders"),
+      }));
+      if (
+        storageState.session?.datasetIds?.orders ||
+        storageState.legacyBrowserOrders ||
+        storageState.legacyServerOrders
+      ) {
+        throw new Error("A stale order dataset remained in the user analysis session");
+      }
       if (rows.length !== quality.total_rows || blockers !== 0) {
         throw new Error(
           `Manual CSV ${index + 1} lost rows or retained blockers: ${JSON.stringify({ blockers, imported: rows.length, total: quality.total_rows })}`,
@@ -429,6 +583,7 @@ async function readLatestDataset(page) {
       }
       const unique = (field) =>
         new Set(rows.map((row) => row[field]).filter(Boolean)).size;
+      const spanEvidence = trackingSpanEvidence(rows);
       records.push({
         scenario: `manual-nonstandard-csv-${index + 1}`,
         passed: true,
@@ -450,36 +605,85 @@ async function readLatestDataset(page) {
         unknown_statuses: quality.unknown_statuses,
         grouped_confirmations: mappingStats.groupedConfirmations,
         field_confirmations: fieldConfirmations,
+        normalized_tracking_span: spanEvidence,
       });
-      await page.goto(`${baseUrl}/analytics`, { waitUntil: "networkidle" });
-      await page.getByRole("heading", { name: "分析总览" }).waitFor();
       await page.getByText("平均首末轨迹时效", { exact: true }).waitFor();
+      const analysisEvidence = await readAnalysisEvidence(page);
+      manualEvidence.push(analysisEvidence);
+      records.at(-1).analysis = analysisEvidence;
+      for (const [key, expected] of Object.entries(
+        index === 0
+          ? { mean: 33.64, p50: 29.8333, p90: 58.99 }
+          : { mean: 30.7782, p50: 31.7817, p90: 34.0402 },
+      )) {
+        if (Math.abs(spanEvidence[key] - expected) > 0.06) {
+          throw new Error(
+            `Manual CSV ${index + 1} ${key} mismatch: expected ${expected}, got ${spanEvidence[key]}; spans=${JSON.stringify(spanEvidence.spans)}`,
+          );
+        }
+        if (
+          analysisEvidence[key] === null ||
+          Math.abs(analysisEvidence[key] - expected) > 0.11
+        ) {
+          throw new Error(
+            `Manual CSV ${index + 1} displayed ${key} mismatch: expected ${expected}, got ${analysisEvidence[key]}`,
+          );
+        }
+      }
       await page.getByText("专业行动方案", { exact: true }).waitFor();
       await page.getByText("管理层简报", { exact: true }).click();
       await page.getByText("最值得先处理的 3 件事", { exact: true }).waitFor();
-      await page.goto(`${baseUrl}/diagnostics`, { waitUntil: "networkidle" });
+      await page.goto(route("/diagnostics"), { waitUntil: "networkidle" });
       await page.getByRole("heading", { name: "异常诊断" }).waitFor();
-      await page.goto(`${baseUrl}/reports`, { waitUntil: "networkidle" });
+      await assertPageFingerprint(
+        page,
+        analysisEvidence.fingerprint,
+        `Manual CSV ${index + 1} diagnostics`,
+      );
+      await page.goto(route("/reports"), { waitUntil: "networkidle" });
       await page.getByRole("button", { name: "生成预览" }).click();
       await page
         .getByText("两种视图使用同一组分析事实", { exact: true })
         .waitFor();
+      await assertPageFingerprint(
+        page,
+        analysisEvidence.fingerprint,
+        `Manual CSV ${index + 1} report`,
+      );
+    }
+    if (manualEvidence.length === 2) {
+      const [first, second] = manualEvidence;
+      if (
+        !first?.fingerprint ||
+        !second?.fingerprint ||
+        first.fingerprint === second.fingerprint ||
+        first.context === second.context ||
+        (first.mean === second.mean &&
+          first.p50 === second.p50 &&
+          first.p90 === second.p90) ||
+        first.recommendation_signature === second.recommendation_signature
+      ) {
+        throw new Error(
+          `Different manual CSV files reused analysis output: ${JSON.stringify(manualEvidence)}`,
+        );
+      }
+      records.push({ scenario: "manual-csv-analysis-isolation", passed: true });
     }
 
     await openMapping(page, csvPath);
     await resolveMapping(page, { ignoreSource: "无关说明" });
-    await ignoreSource(page, "订单号");
+    await ignoreSource(page, "快递单号");
     await page.getByRole("button", { name: "运行质量校验" }).click();
     await page
       .getByText("存在阻断错误，暂不能确认导入", { exact: true })
       .waitFor();
     await page
-      .getByText(/order_id/)
+      .getByText(/shipment_id/)
       .first()
       .waitFor();
     records.push({ scenario: "required-field-ignore-blocked", passed: true });
 
-    await page.goto(`${baseUrl}/import`, { waitUntil: "networkidle" });
+    await page.goto(route("/import"), { waitUntil: "networkidle" });
     await chooseDataType(page, "物流轨迹数据");
     const chooserPromise = page.waitForEvent("filechooser");
     await page.getByRole("button", { name: "自主上传文件" }).click();

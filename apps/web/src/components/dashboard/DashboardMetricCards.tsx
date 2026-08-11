@@ -15,6 +15,7 @@ import { useState } from "react";
 import { formatMetricValue, formatPercent, metricByCode } from "./formatters";
 import { metricGuidance } from "./metric-guidance";
 import type { MetricResult } from "../../types/metrics";
+import type { DashboardContext } from "../../types/dashboard";
 
 const headlineCodes = [
   "ot_rate",
@@ -27,10 +28,14 @@ const headlineCodes = [
 ];
 
 interface DashboardMetricCardsProps {
+  context: DashboardContext;
   metrics: MetricResult[];
 }
 
-export function DashboardMetricCards({ metrics }: DashboardMetricCardsProps) {
+export function DashboardMetricCards({
+  context,
+  metrics,
+}: DashboardMetricCardsProps) {
   const [selected, setSelected] = useState<MetricResult | null>(null);
   const selectedGuidance = selected ? metricGuidance(selected.code) : undefined;
   return (
@@ -132,6 +137,23 @@ export function DashboardMetricCards({ metrics }: DashboardMetricCardsProps) {
                   key: "version",
                   label: "口径版本",
                   children: <Tag>{selected.definition_version}</Tag>,
+                },
+                {
+                  key: "dataset-lineage",
+                  label: "使用的数据",
+                  children: context.dataset_label,
+                },
+                {
+                  key: "field-lineage",
+                  label: "字段与样本",
+                  children: `${selected.computable_count} 个可计算，${selected.not_computable_count} 个不可计算；时间范围 ${context.time_range_start ?? "未知"} 至 ${context.time_range_end ?? "未知"}`,
+                },
+                {
+                  key: "fingerprint-lineage",
+                  label: "分析指纹",
+                  children:
+                    context.analysis_fingerprint ??
+                    "服务端数据集未提供内容指纹",
                 },
               ]}
             />

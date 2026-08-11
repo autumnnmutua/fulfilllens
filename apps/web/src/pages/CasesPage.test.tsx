@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { BROWSER_ANALYSIS_SESSION_KEY } from "../analysis/browserAnalysisSession";
 import { App } from "../app/App";
 
 const oldOrders = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
@@ -44,6 +45,23 @@ describe("教学案例页面", () => {
     window.history.replaceState({}, "", "/cases");
     window.localStorage.clear();
     window.localStorage.setItem("fulfilllens.dataset.orders", oldOrders);
+    window.localStorage.setItem(
+      BROWSER_ANALYSIS_SESSION_KEY,
+      JSON.stringify({
+        activeDataType: "tracking_events",
+        activatedAt: "2026-08-11T00:00:00.000Z",
+        datasetIds: { tracking_events: "browser-local-stale-tracking" },
+        fileNames: { tracking_events: "stale-user.csv" },
+        fingerprint: `sha256-${"a".repeat(64)}`,
+        sessionId: "stale-browser-session",
+        sourceKind: "user_import",
+        version: 1,
+      }),
+    );
+    window.localStorage.setItem(
+      "fulfilllens.browser.dataset.tracking_events",
+      "browser-local-stale-tracking",
+    );
   });
 
   it("取消不替换上下文，确认后一次写入三个合成数据集", async () => {
@@ -54,12 +72,12 @@ describe("教学案例页面", () => {
           return response({
             status: "ok",
             service: "fulfilllens-api",
-            version: "1.0.1",
+            version: "1.1.0",
           });
         if (url.pathname === "/api/version")
           return response({
             app_name: "FulfillLens",
-            app_version: "1.0.1",
+            app_version: "1.1.0",
             api_version: "v1",
             environment: "test",
             contract_versions: {},
@@ -124,6 +142,14 @@ describe("教学案例页面", () => {
     expect(
       window.localStorage.getItem("fulfilllens.dataset.tracking_events"),
     ).toBe(newDatasets.tracking_events_dataset_id);
+    expect(
+      window.localStorage.getItem(BROWSER_ANALYSIS_SESSION_KEY),
+    ).toBeNull();
+    expect(
+      window.localStorage.getItem(
+        "fulfilllens.browser.dataset.tracking_events",
+      ),
+    ).toBeNull();
     expect(screen.getByText(/已成为当前分析上下文/)).toBeVisible();
   });
 });

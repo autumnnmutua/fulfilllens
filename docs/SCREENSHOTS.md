@@ -1,6 +1,6 @@
 # 截图与 GIF 拍摄清单
 
-以下截图由 `scripts/capture_release_screenshots.cjs` 从 v1.0.1 Cloudflare 模式生产构建自动拍摄，全部使用固定合成数据。2026-08-10 已逐张检查分辨率、关键文案、隐私和文件大小；GIF 仍为可选资产。
+以下截图由 `scripts/capture_release_screenshots.cjs` 从 v1.1.0 Cloudflare 模式生产构建自动拍摄，全部使用固定合成数据。2026-08-11 已逐张检查分辨率、关键文案、隐私和文件大小；GIF 仍为可选资产。
 
 ## 统一准备
 

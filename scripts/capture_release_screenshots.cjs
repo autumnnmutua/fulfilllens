@@ -78,10 +78,13 @@ async function assertNoLegacyBrand(page) {
     await page
       .getByText("字段已准备好，可以开始分析", { exact: true })
       .waitFor();
-    await mappingHeading.scrollIntoViewIfNeeded();
+    const analyzeButton = page.getByRole("button", {
+      name: "一键整理并分析",
+    });
+    await analyzeButton.scrollIntoViewIfNeeded();
     await screenshotViewport(page, "import-mapping.png");
 
-    await page.getByRole("button", { name: "开始分析" }).click();
+    await analyzeButton.click();
     await page.getByRole("heading", { name: "分析总览" }).waitFor();
 
     const contextHeading = page.getByRole("heading", {

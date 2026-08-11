@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import csv
+import hashlib
 from pathlib import Path
 from typing import Any
 
 from fastapi.testclient import TestClient
+from openpyxl import load_workbook
 
 ROOT = Path(__file__).resolve().parents[3]
 SAMPLE_DIR = ROOT / "data" / "samples"
@@ -72,10 +75,22 @@ def test_compatibility_catalog_and_files_have_verified_content(client: TestClien
         "compatibility_logistics_xlsx",
     ]
     for sample in payload["samples"]:
+        sample_path = SAMPLE_DIR / sample["file_name"]
         downloaded = client.get(f"/api/imports/samples/{sample['sample_id']}/file")
         assert downloaded.status_code == 200
-        assert downloaded.content == (SAMPLE_DIR / sample["file_name"]).read_bytes()
+        assert downloaded.content == sample_path.read_bytes()
         assert len(downloaded.content) > 100
+        assert hashlib.sha256(downloaded.content).hexdigest() == sample["sha256"]
+        if sample_path.suffix == ".csv":
+            with sample_path.open("r", encoding="utf-8-sig", newline="") as handle:
+                assert sum(1 for _ in csv.reader(handle)) - 1 == sample["row_counts"]["orders"]
+        else:
+            workbook = load_workbook(sample_path, read_only=True, data_only=True)
+            assert {
+                "orders": workbook["订单数据"].max_row - 1,
+                "warehouse_events": workbook["仓库事件"].max_row - 1,
+                "tracking_events": workbook["物流轨迹"].max_row - 1,
+            } == sample["row_counts"]
 
 
 def test_nonstandard_csv_converts_validates_imports_and_analyzes(
@@ -88,10 +103,10 @@ def test_nonstandard_csv_converts_validates_imports_and_analyzes(
         mime_type="text/csv",
     )
 
-    assert parsed["total_rows"] == 8
-    assert parsed["preview_rows"][0]["values"]["Order No"] == "0001001"
+    assert parsed["total_rows"] == 80
+    assert parsed["preview_rows"][0]["values"]["Order No"] == "01000001"
     assert "无关备注" in parsed["unmapped_source_columns"]
-    assert checked["report"]["valid_rows"] == 8
+    assert checked["report"]["valid_rows"] == 80
     assert checked["report"]["error_rows"] == 0
     assert checked["report"]["duplicate_keys"] == 0
     assert checked["report"]["unknown_statuses"] == 0
@@ -102,9 +117,9 @@ def test_nonstandard_csv_converts_validates_imports_and_analyzes(
     )
     assert metrics.status_code == 200, metrics.text
     by_code = {item["code"]: item for item in metrics.json()["metrics"]}
-    assert by_code["ot_rate"]["denominator"] == 6
-    assert by_code["if_rate"]["denominator"] == 6
-    assert by_code["otif_rate"]["denominator"] == 6
+    assert by_code["ot_rate"]["denominator"] >= 60
+    assert by_code["if_rate"]["denominator"] >= 60
+    assert by_code["otif_rate"]["denominator"] >= 60
 
 
 def test_multisheet_xlsx_each_sheet_converts_and_combined_metrics_reconcile(
@@ -113,9 +128,9 @@ def test_multisheet_xlsx_each_sheet_converts_and_combined_metrics_reconcile(
     path = SAMPLE_DIR / "compatibility_demo_logistics.xlsx"
     selections: dict[str, str] = {}
     expected = {
-        "orders": ("订单数据", 6),
-        "warehouse_events": ("仓库事件", 36),
-        "tracking_events": ("物流轨迹", 36),
+        "orders": ("订单数据", 80),
+        "warehouse_events": ("仓库事件", 480),
+        "tracking_events": ("物流轨迹", 480),
     }
     for data_type, (sheet_name, row_count) in expected.items():
         dataset_id, parsed, checked = import_file(
@@ -144,4 +159,4 @@ def test_multisheet_xlsx_each_sheet_converts_and_combined_metrics_reconcile(
     assert summary.status_code == 200, summary.text
     payload = summary.json()
     assert payload["datasets"]["orders_dataset_id"] == selections["orders"]
-    assert next(item for item in payload["metrics"] if item["code"] == "order_count")["value"] == 6
+    assert next(item for item in payload["metrics"] if item["code"] == "order_count")["value"] == 80

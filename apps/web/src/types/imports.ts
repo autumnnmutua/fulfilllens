@@ -209,6 +209,7 @@ export interface ValidationResponse {
 }
 
 export interface ConfirmResponse {
+  analysis_fingerprint?: string;
   task: ImportTask;
   dataset_id: string;
   imported_rows: number;

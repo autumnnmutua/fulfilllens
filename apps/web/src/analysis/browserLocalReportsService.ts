@@ -95,6 +95,8 @@ async function preview(request: ReportRequest): Promise<ReportDocument> {
   });
   return {
     header: {
+      analysis_fingerprint: overview.context.analysis_fingerprint,
+      analysis_source: overview.context.analysis_source,
       title: `${request.dataset_name}履约分析报告`,
       dataset_name: request.dataset_name,
       time_range_start: overview.context.time_range_start,
@@ -107,8 +109,8 @@ async function preview(request: ReportRequest): Promise<ReportDocument> {
       metrics_definition_version: overview.definition_version,
       diagnostic_rule_version: diagnostic.rule_set_version,
       simulation_version: "browser-simulation-not-selected",
-      report_version: "browser-report-v1.0.0",
-      renderer_version: "browser-renderer-v1.0.0",
+      report_version: "browser-report-v1.1.0",
+      renderer_version: "browser-renderer-v1.1.0",
       synthetic_data: false,
     },
     filters: request.filters,
@@ -126,6 +128,7 @@ async function preview(request: ReportRequest): Promise<ReportDocument> {
     source_notes: [
       `指标来源：浏览器本地指标引擎 / ${overview.definition_version}`,
       `建议来源：确定性建议模板 / ${recommendations.definition_version}`,
+      `分析指纹：${overview.context.analysis_fingerprint ?? "未提供"}`,
     ],
     chart_map: [],
     identifier_policy: request.include_order_identifiers
@@ -133,7 +136,7 @@ async function preview(request: ReportRequest): Promise<ReportDocument> {
       : "默认最小化展示；不包含姓名、手机号、身份证或详细地址。",
     reading_mode: request.reading_mode,
     reading_guide: [],
-    contract_version: "browser-report-v1.0.0",
+    contract_version: "browser-report-v1.1.0",
   };
 }
 

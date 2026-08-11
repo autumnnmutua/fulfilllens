@@ -1,6 +1,11 @@
 import { onlineDemoDatasetId } from "../config/runtime";
+import {
+  browserSessionSelection,
+  readBrowserAnalysisSession,
+} from "./browserAnalysisSession";
+import { BROWSER_DERIVED_ORDERS_ID } from "./browserSelectionConstants";
 
-export const BROWSER_DERIVED_ORDERS_ID = "browser-local-derived-orders";
+export { BROWSER_DERIVED_ORDERS_ID } from "./browserSelectionConstants";
 
 export function isBrowserDatasetId(value: string | null | undefined): boolean {
   return (
@@ -22,15 +27,22 @@ export function hasBrowserDatasetSelection(selection: {
 }
 
 export function initialAnalysisDataset(dataType: string): string {
+  const parameters = new URLSearchParams(window.location.search);
   const parameter = `${dataType}_dataset_id`;
-  const fromUrl = new URLSearchParams(window.location.search)
-    .get(parameter)
-    ?.trim();
-  if (fromUrl) return fromUrl;
+  const hasExplicitBundle = [
+    "orders_dataset_id",
+    "warehouse_events_dataset_id",
+    "tracking_events_dataset_id",
+  ].some((key) => parameters.has(key));
+  if (hasExplicitBundle) return parameters.get(parameter)?.trim() ?? "";
+  const session = readBrowserAnalysisSession();
+  if (session) {
+    const selection = browserSessionSelection(session);
+    return String(selection[parameter as keyof typeof selection] ?? "").trim();
+  }
   const browser = window.localStorage
     .getItem(`fulfilllens.browser.dataset.${dataType}`)
     ?.trim();
-  if (browser) return browser;
   if (
     dataType === "orders" &&
     (window.localStorage.getItem(
@@ -42,6 +54,7 @@ export function initialAnalysisDataset(dataType: string): string {
   ) {
     return BROWSER_DERIVED_ORDERS_ID;
   }
+  if (browser) return browser;
   return (
     window.localStorage.getItem(`fulfilllens.dataset.${dataType}`)?.trim() ??
     onlineDemoDatasetId(dataType)

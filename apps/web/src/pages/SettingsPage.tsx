@@ -18,6 +18,10 @@ import { datasetsApi } from "../api/datasets";
 import { workersAIApi } from "../api/workers-ai";
 import { PageHeader } from "../components/PageHeader";
 import { useNotifications } from "../components/notification-context";
+import {
+  clearBrowserAnalysisSession,
+  readBrowserAnalysisSession,
+} from "../analysis/browserAnalysisSession";
 import { isCloudflareDeploy } from "../config/runtime";
 import type {
   WorkersAIProbeResult,
@@ -110,6 +114,13 @@ export function SettingsPage() {
             window.localStorage.removeItem(storageKey);
           }
         }
+      }
+      const session = readBrowserAnalysisSession();
+      if (
+        session &&
+        Object.values(session.datasetIds).includes(result.dataset_id)
+      ) {
+        clearBrowserAnalysisSession();
       }
       notifications.showSuccess(
         "本地数据已清理",

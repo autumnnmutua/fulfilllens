@@ -1,133 +1,129 @@
-# FulfillLens v1.0.1 发布验收记录
+# FulfillLens v1.1.0 发布验收记录
 
 ## Release Identity
 
-- version：`1.0.1`
+- version：`1.1.0`
 - branch：`main`
-- date：2026-08-10（Asia/Shanghai）
-- production：<https://fulfilllens.esthertreu3724.workers.dev>
-- final commit / tag：在生产复验和远程 CI 全绿后，以 annotated tag `v1.0.1^{commit}` 为准
-
-本记录只写入实际取得的证据。Git 提交不能预先包含自己的 SHA；最终提交、Cloudflare deployment ID、GitHub Actions 与 Release URL 会在完成外部发布门槛后记录。
+- date：2026-08-11（Asia/Shanghai）
+- accepted commit：以最终 annotated tag `v1.1.0^{commit}` 为准
+- base release：`v1.0.0` 标签、GitHub Release 与历史不修改
 
 ## Functional Acceptance
 
-| 能力            | 结果 | 实际证据                                                                                                |
-| --------------- | ---- | ------------------------------------------------------------------------------------------------------- |
-| 新手快速导入    | PASS | 自主上传默认自动识别数据类型，高置信字段直接应用，中置信建议一次批量采用，完整字段表默认折叠            |
-| CSV/XLSX        | PASS | UTF-8/BOM、GBK/GB18030、多 Sheet、Excel 日期、文本数字、前导零、文件类型/大小及 XLSX 主动内容限制有回归 |
-| 字段语义识别    | PASS | 组合 NFKC 表头、别名、值画像、唯一性、重复规律、跨列关系和所选 Schema；无文件名白名单                   |
-| 一键忽略        | PASS | 仅忽略不影响最低分析能力的非必要列；支持撤销；`ignored` 与 `unresolved` 分离，旧校验结果立即失效        |
-| 必填保护        | PASS | 唯一核心候选不会被安全忽略；缺失时展示问题、原因、影响和推荐操作                                        |
-| 生成/推导字段   | PASS | 缺少可信事件 ID 时稳定、唯一、可复现生成；状态从原文确定性标准化，未知值保留为 `unmapped`               |
-| 日期与时区      | PASS | 中英文日期、AM/PM、显式时区、DMY/MDY 文件级推断与 date-only 精度均有回归；无 locale 静默猜测            |
-| 能力驱动分析    | PASS | tracking-only 仍提供首末轨迹平均/P50/P90、状态、承运商、异常、时间线、诊断、建议与报告                  |
-| OT/IF/OTIF 边界 | PASS | 缺订单承诺时间或数量时显示不可计算和所需字段，不以 `0%`、`100%` 或跨表猜测伪造                          |
-| 行动建议        | PASS | 专业行动方案与管理层简报共享同一 recommendation facts、数值、证据和优先级；AI 不可用时模板正常          |
-| 隐私            | PASS | 自主文件只在浏览器内存解析，确认数据只进入当前浏览器 IndexedDB；原始上传网络请求断言为 0                |
+| 能力           | 结果 | 证据                                                                                          |
+| -------------- | ---- | --------------------------------------------------------------------------------------------- |
+| 导入与新手路径 | PASS | 自动类型、高置信映射、安全 ID、非必要列与校验由“一键整理并分析”一次执行；高级映射仍可审查     |
+| 数据集隔离     | PASS | 新用户会话清理旧 Demo/兼容样例选择；显式 URL 参数视为完整数据包，不回退混入旧来源             |
+| 分析指纹       | PASS | 总览、诊断和报告共享同一 `analysis_fingerprint`；不同输入、时间/status/carrier 变更会改变结果 |
+| 部分数据分析   | PASS | 仅运单/时间/原始状态即可分析首末跨度、P50/P90、状态和时间线；carrier/location 只控制对应能力  |
+| 指标不可计算   | PASS | tracking-only 的 OT、IF、OTIF 为 `null/不可计算`，不显示 0% 或借用跨表字段                    |
+| 多表关联       | PASS | 主动组合订单与事件时输出关联数/孤立事件/关联率；关联率为 0 时拒绝静默组合                     |
+| 诊断与建议     | PASS | 未知状态不直接算经营异常；建议只消费当前可计算 facts，专业方案与管理层简报共享证据            |
+| 报告与追溯     | PASS | 报告、指标抽屉和上下文条显示来源、指纹、样本、时间范围与版本                                  |
+| 本地优先       | PASS | 浏览器 E2E 记录原始文件上传请求 0；标准化数据仅写入当前浏览器 IndexedDB                       |
+| 示例一致性     | PASS | CSV/XLSX 行数、目录摘要、SHA-256、Schema、时序和下载内容由回归测试对账                        |
 
 ## Beginner Import Acceptance
 
-两份用户附件只用于本轮人工兼容验收，未提交 GitHub、未进入前端 bundle、Cloudflare、CI 或发布门槛。**这两份文件不是正式版依赖。** 通用回归使用仓库内完全合成 fixture，且上传时更换文件名以验证不存在文件名特判。
+| 检查项                 |       CSV #1 |       CSV #2 |
+| ---------------------- | -----------: | -----------: |
+| 源行 / 源列            |      54 / 21 |      54 / 21 |
+| 自动识别数据类型       |     物流轨迹 |     物流轨迹 |
+| 解析 / 导入 / 静默丢行 |  54 / 54 / 0 |  54 / 54 / 0 |
+| 运单 / 业务单 / 承运商 | 10 / 10 / 10 | 10 / 10 / 10 |
+| 映射或生成字段         |           12 |           11 |
+| 一键忽略字段           |           11 |           11 |
+| unresolved / blocker   |        0 / 0 |        0 / 0 |
+| 非法时间 / 未知状态    |       0 / 17 |        0 / 7 |
+| 逐字段 / 批量确认      |        0 / 0 |        0 / 0 |
+| 原始文件网络上传       |            0 |            0 |
 
-| 检查项                 |                           CSV #1 |                           CSV #2 |
-| ---------------------- | -------------------------------: | -------------------------------: |
-| 数据类型               |                     物流轨迹数据 |                     物流轨迹数据 |
-| 原始 / 解析 / 导入行   |                     54 / 54 / 54 |                     54 / 54 / 54 |
-| 源字段                 |                               21 |                               21 |
-| 运单 / 业务单 / 承运商 |                     10 / 10 / 10 |                     10 / 10 / 10 |
-| 映射、生成或辅助推导   |                               12 |                               11 |
-| 一键忽略非必要字段     |                               11 |                               11 |
-| 逐字段人工确认         |                                0 |                                0 |
-| 批量确认               |                                0 |                                1 |
-| unresolved / blocker   |                            0 / 0 |                            0 / 0 |
-| 非法时间 / 静默丢行    |                            0 / 0 |                            0 / 0 |
-| 未识别状态             |                     17（非阻断） |                      7（非阻断） |
-| 最终路径               | 分析、诊断、报告与双视图建议通过 | 分析、诊断、报告与双视图建议通过 |
+两份附件仅用于本轮人工兼容验收，未提交 GitHub、未进入生产包，也不是 CI、Cloudflare 或 Release 依赖。自动化回归使用仓库内完全合成 fixture。
 
-CSV #1 高置信识别包括源事件顺序、承运商、原始状态、地点、事件时间、运单、业务单和异常；事件 ID 由系统稳定生成，签收回传、旧状态码和异常列作为辅助证据。CSV #2 高置信识别唯一 `row_key` 为事件 ID，并识别承运商、时间、地点、运单、业务单和异常；原始状态只需一次批量采用。两份文件的批次、备注、营销、设备、标签等列一次安全忽略后不再产生错误。
+## A/B Accuracy
+
+| 项目              | CSV #1                                                                    | CSV #2                                                                    |
+| ----------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| 时间范围          | 2026-07-01 至 2026-07-09                                                  | 2026-08-12 至 2026-08-22                                                  |
+| Mean 首末轨迹跨度 | 33.6400 h                                                                 | 30.7782 h                                                                 |
+| P50               | 29.8333 h                                                                 | 31.7817 h                                                                 |
+| P90               | 58.9900 h                                                                 | 34.0402 h                                                                 |
+| 浏览器显示        | 33.6 / 29.8 / 59.0 h                                                      | 30.8 / 31.8 / 34.0 h                                                      |
+| 分析指纹          | `sha256-1c0f16cde24ba7787e364bf02d038864019968c81120cbfb614c00d2106680c3` | `sha256-282963259d925695280be6637c89f8cea8d353d2e4e52241b344cf52ddb4f42c` |
+| 异常率            | 40.0%                                                                     | 50.0%                                                                     |
+| 建议差异          | P90-P50 长尾约 29.2 h；优先核查 4/10 异常运单                             | 分布较集中；优先核查 5/10 异常运单并补充订单 KPI 数据                     |
+
+独立复算以每个 `shipment_id` 的最大事件时间减最小事件时间形成 10 个样本，再按线性插值定义计算 P50/P90。浏览器程序值与独立复算一致；两份文件的指纹、时间范围、Mean/P50/P90、诊断和建议均不同。
+
+## Partial Data Matrix
+
+| 输入覆盖             | 可分析                                                               | 明确不可用                 |
+| -------------------- | -------------------------------------------------------------------- | -------------------------- |
+| 完整订单 + 事件      | OT/IF/OTIF、履约时效、维度、异常、诊断、建议、报告                   | 仅按实际空值降低相应覆盖率 |
+| tracking-only        | 运单数、事件数、首末跨度、Mean/P50/P90、状态、时间线、异常、数据质量 | OT/IF/OTIF                 |
+| tracking 缺 carrier  | tracking-only 能力保持                                               | 承运商对比                 |
+| tracking 缺 location | tracking-only 能力保持                                               | 节点/地点分析              |
+| 部分状态未知         | 已识别状态、时间与其他能力保持；未知值保留 `raw_status`/`unmapped`   | 未知行不伪造标准状态       |
 
 ## Date Parsing Acceptance
 
-统一解析器保留原始字符串、标准时间、时区和精度。以下格式均由单元回归实际覆盖：
+确定性解析回归覆盖 `07/07/2026 09:30`、`2026年8月15日`、`14 Aug 2026`、`14-Aug-2026 08:32`、`17 Aug 2026 09:44`、`22-08-2026 09:22`、`17/08/2026`、`2026-08-14T16:26:08+08:00`、`2026.07.02 06:35`、`7/2/2026 11:46 AM` 和 `Tue Jul 07 2026 18:20:00 GMT+0800 (中国标准时间)`。date-only 保留精度，非法值不静默强转；整列仍有 DMY/MDY 歧义时只请求一次文件级选择。
 
-- `2026.07.02 06:35`、`2026/7/3 14:17`、`2026年07月06日 08:05`
-- `07/07/2026 09:30`、`7/2/2026 11:46 AM`、`04-07-2026 22:15`
-- `2026-07-03T07:52+08:00`、`Tue Jul 07 2026 18:20:00 GMT+0800 (中国标准时间)`
-- `14-Aug-2026 08:32`、`17 Aug 2026 09:44`、`22-08-2026 09:22`
-- `2026年8月15日`、`14 Aug 2026`、`17/08/2026`
+## Sample Expansion
 
-年月日和英文月份确定性解析；数字日期由全文件推断 DMY/MDY，只在仍有歧义时产生一次文件级选择。date-only 保留 `date` 精度，不静默补午夜后参与小时级 SLA；非法日期不强制转换。
+| 公开合成样例                    | 旧行数 | v1.1.0 行数 | SHA-256                                                            |
+| ------------------------------- | -----: | ----------: | ------------------------------------------------------------------ |
+| `compatibility_demo_orders.csv` |      8 |          80 | `26b43ebda76714b0cd64bb437761028d8001e7600f97d135e336df06dc601c0b` |
+| XLSX `订单数据`                 |      6 |          80 | 同一工作簿见下行                                                   |
+| XLSX `仓库事件`                 |     36 |         480 | 同一工作簿见下行                                                   |
+| XLSX `物流轨迹`                 |     36 |         480 | `ae2366b059a35e22a0c198d4c21a7f025d51ff4e8cd3af5bffb00bd84e23cab0` |
 
-## Recommendation Acceptance
-
-```text
-Deterministic metrics + deterministic diagnostics
-                   ↓
-        versioned recommendation facts
-                   ↓
-Professional Action Plan + Executive Brief
-```
-
-- 优先级由影响数量、偏差程度、异常频率、覆盖范围和数据可信度产生，不随机；
-- 每项事实带 `fact_id`、证据、影响范围、动作、KPI、目标方向、风险和验证方法；
-- 两种呈现复用同一 facts，不重新计算 KPI；指标不可计算时只给数据覆盖建议；
-- AI 不参与字段映射、KPI、诊断、事实或优先级计算，也不接收原始 CSV；Workers AI 不可用时确定性模板继续工作。
+生成器固定输入并规范化 XLSX ZIP 时间戳；重复生成得到相同 SHA-256。三套教学案例未增加、删除或改变体系。
 
 ## Test Evidence
 
-| 实际命令/检查                                         | Exit code | 结果                                                                        |
-| ----------------------------------------------------- | --------: | --------------------------------------------------------------------------- |
-| `npm run check`                                       |         0 | format check、lint、typecheck、312 项测试及生产 build 通过                  |
-| `npm run test`                                        |         0 | Web 20 files / 64 tests；Worker 14；Python/API/contracts 234                |
-| `npm run audit`                                       |         0 | npm audit 与 pip-audit：0 已知漏洞                                          |
-| `npm run docs:check`                                  |         0 | 350 个候选文件、60 个 Markdown 文件、链接、双语和隐私规则通过               |
-| `npm run licenses:check`                              |         0 | 330 个 npm 包、77 个 Python 分发包，无阻断许可证或未知直接许可证            |
-| `npm run test:browser-import:local`                   |         0 | 15 个合成场景通过；两份一次性附件另完成 17 场景人工验收；原始文件上传请求 0 |
-| `npm run test:browser-import:local`（可访问性审计）   |         0 | 8 路由 × 5 视口 = 40/40；axe、键盘焦点、语义、表格和横向溢出通过            |
-| `npm run smoke`                                       |         0 | API/Web/代理版本、兼容样例及全部核心 SPA 路由通过                           |
-| 七条 `demo:*` 命令                                    |         0 | 导入、指标、总览、诊断、模拟、案例和报告固定合成路径全部通过                |
-| `docker compose ... config/up --build` 与容器内 smoke |         0 | Docker 29.6.2；API healthy 1.0.1、Web 深链路、Web→API 代理与日志检查通过    |
-| `npm run release:check`                               |         0 | 格式、lint、类型、312 项测试、构建、漏洞、文档和许可证发布链通过            |
-| Cloudflare 生产浏览器复验                             |    待执行 | 部署 1.0.1 后更新                                                           |
-
-首次 `npm run check` 发现日期解析器中一处无效临时赋值，ESLint 正确阻断；删除无效赋值并增加相同日期边界回归后，全量检查重跑成功。默认系统 Python 不含项目工具，随后明确使用 `apps/api/.venv` 执行 Python 门槛，未把环境缺失误报为通过。
+| 实际命令                                              | Exit code | 结果                                                                                                         |
+| ----------------------------------------------------- | --------: | ------------------------------------------------------------------------------------------------------------ |
+| `npm run release:check`                               |         0 | format、lint、TypeScript/mypy、333 项测试、生产构建、npm/pip audit、文档与许可证检查全部通过                 |
+| `npm run test:browser-import:local`（含两份本地附件） |         0 | 19 场景；6 个映射视口、CSV/XLSX、会话隔离、刷新、报告、必填保护与 A/B 分析通过                               |
+| `npm run test:browser`                                |         0 | 8 个路由 × 5 个视口，共 40 组 Chromium 可访问性、键盘、语义与横向溢出检查通过                                |
+| `npm run smoke`                                       |         0 | API、Web 代理、版本、主要 SPA 路由和两份兼容性示例下载通过                                                   |
+| `docker compose config/build/up --wait` + 宿主机探测  |         0 | Docker 29.6.2；API/Web 容器健康，宿主机 `/health` 与 `/api/version` 均返回 1.1.0，容器已停止并清理临时运行卷 |
+| Cloudflare / GitHub 外部门槛                          |    待执行 | Wrangler dry-run、正式部署、生产 A/B 浏览器复验、最终提交与 GitHub Actions 全绿后更新                        |
 
 ## Security & Privacy
 
-- tracked files 未发现 Token、私钥、`.env`、真实物流附件或本机绝对路径；构建、Playwright、缓存和运行数据库保持忽略；
-- 原始文件只在浏览器内存解析，确认标准行只进入 IndexedDB；E2E 断言原始上传请求为 0；
-- CSV 导出转义公式前缀，HTML/Markdown 动态内容转义；
-- 文件类型、MIME、签名、大小、XLSX 解压、宏、公式、外部链接、路径和长文本有安全限制；
-- 示例、fixture 和截图均为固定种子完全合成数据。
+- tracked files 不得包含 Token、私钥、`.env`、本机路径或两份用户附件；
+- 原始文件仅在页面内存解析，确认后的标准行写入 IndexedDB；E2E 断言上传请求 0；
+- CSV 导出防公式注入，报告动态内容转义；文件类型、MIME、签名、大小和 XLSX 主动内容受限；
+- 示例、fixture 和截图均为固定种子完全合成数据；
+- recommendation facts 只使用聚合指标与诊断证据，AI 不计算 KPI、不读取原始文件，且不可用时模板继续工作。
+
+## Cloudflare Evidence
+
+- Worker：`fulfilllens`
+- production URL：<https://fulfilllens.esthertreu3724.workers.dev>
+- deployment / production smoke：最终部署后更新
 
 ## Release Assets
 
-- `docs/media/import-mapping.png`
-- `docs/media/dashboard-overview.png`
-- `docs/media/diagnostics-trace.png`
-- `docs/media/professional-action-plan.png`
-- `docs/media/executive-brief.png`
-- `docs/media/scenario-comparison.png`
-- `docs/media/teaching-cases.png`
-- `README.md`、`README_EN.md`、`CHANGELOG.md`
-- `docs/releases/v1.0.1.md`
-
-七张截图由 v1.0.1 Cloudflare 模式生产构建、真实 Chrome 和固定合成数据生成，不是 mockup；隐私扫描与图片链接检查已通过。
+- 七张真实生产构建截图：导入、总览、诊断、专业行动方案、管理层简报、情景对比、教学案例；
+- `README.md`、`README_EN.md`、`CHANGELOG.md`；
+- `docs/IMPORTING.md`、`docs/ARCHITECTURE.md`、`docs/COMPATIBILITY_VALIDATION.md`；
+- `docs/releases/v1.1.0.md`。
 
 ## Known Limitations
 
-1. Firefox、Safari 和物理移动设备尚未实际验证；Chrome/Chromium 是本次正式验收浏览器系列。
+1. Firefox、Safari 和物理移动设备尚未实际验证；Chrome/Chromium 是正式验收浏览器系列。
 2. PDF 尚未达到可靠中文字体、分页和长表门槛；Markdown、自包含 HTML 和安全 CSV 是正式路径。
 3. Cloudflare 浏览器自主数据暂不支持 What-if，也不跨设备同步；公开合成 What-if 与本地/Docker 完整路径可用。
-4. Ant Design 单块 gzip 约 371 KiB；功能与可访问性通过，但首屏体积仍可优化。
-5. 自动映射不能保证覆盖所有企业私有字段；冲突或中置信核心字段仍可能需要一次批量确认。
-6. 未识别状态会保留为 `unmapped` 并降低状态覆盖率，不会被猜成正常状态。
-7. 本机 Docker Desktop 本轮未把已配置的 8000/5173 端口发布到 Windows 主机；容器内部与 Nginx 代理 smoke 已通过，Linux GitHub Actions 的 Docker smoke 仍必须全绿。
-8. `workers.dev` 地址没有自有域名 SLA、多租户身份或长期云存储承诺。
+4. Ant Design 单块 gzip 约 371 KiB，首屏体积仍可优化。
+5. 自动映射不能保证覆盖所有企业私有字段；会改变业务含义的中置信冲突仍需要一次确认。
+6. 未识别状态保留为 `unmapped` 并降低状态覆盖率，不会被猜成正常状态。
+7. `workers.dev` 地址没有自有域名 SLA、多租户身份或长期云存储承诺。
 
 ## Final Verdict
 
-**BLOCKED（仅待外部门槛）**
+**BLOCKED（等待剩余发布门槛）**
 
-本地核心代码、单元/集成测试、构建、依赖审计、文档与许可证门槛已经通过。正式结论将在浏览器可访问性、smoke、Docker、最终 `release:check`、Cloudflare 1.0.1 部署与生产浏览器复验、GitHub Actions 全绿后更新为 `READY FOR v1.0.1`；任一门槛失败都禁止创建 tag 或 GitHub Release。
+本地代码、A/B 浏览器正确性、全量 `release:check`、可访问性、smoke 与 Docker 门槛已通过；在 Cloudflare 正式部署与生产 A/B 复验、最终提交和 GitHub Actions 全绿前，不创建 `v1.1.0` 标签或 Release。

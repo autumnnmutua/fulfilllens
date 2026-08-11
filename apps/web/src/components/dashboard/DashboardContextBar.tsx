@@ -24,6 +24,29 @@ export function DashboardContextBar({ context }: DashboardContextBarProps) {
             label: "当前数据集",
             children: context.dataset_label,
           },
+          {
+            key: "fingerprint",
+            label: "分析指纹",
+            children: context.analysis_fingerprint ? (
+              <Typography.Text code title={context.analysis_fingerprint}>
+                {context.analysis_fingerprint.slice(0, 20)}…
+              </Typography.Text>
+            ) : (
+              "服务端数据集"
+            ),
+          },
+          {
+            key: "source",
+            label: "数据来源",
+            children:
+              context.analysis_source === "user_import"
+                ? "用户本地导入"
+                : context.analysis_source === "compatibility_sample"
+                  ? "兼容性示例"
+                  : context.analysis_source === "teaching_data"
+                    ? "教学案例"
+                    : "服务端数据集",
+          },
           { key: "range", label: "时间范围", children: timeRange },
           {
             key: "orders",
@@ -57,6 +80,15 @@ export function DashboardContextBar({ context }: DashboardContextBarProps) {
               </Tag>
             ),
           },
+          ...(context.linkage
+            ? [
+                {
+                  key: "linkage",
+                  label: "跨表关联",
+                  children: `${context.linkage.linked_order_count} 个订单已关联；${context.linkage.orphan_event_count} 条孤立事件`,
+                },
+              ]
+            : []),
         ]}
       />
     </section>

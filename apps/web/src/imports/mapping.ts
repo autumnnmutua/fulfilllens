@@ -173,6 +173,15 @@ function profileAdjustment(
   if (field === "carrier_id" && headerScore > 0 && profile.uniqueCount >= 2)
     promote(0.95, `低基数承运主体：${profile.uniqueCount} 个不同值`);
   if (
+    field === "carrier_id" &&
+    profile.carrierRatio >= 0.7 &&
+    profile.uniqueRatio <= 0.5
+  )
+    promote(
+      headerScore > 0 ? 0.96 : 0.91,
+      `承运商名称特征覆盖 ${Math.round(profile.carrierRatio * 100)}%`,
+    );
+  if (
     field === "location_code" &&
     headerScore > 0 &&
     profile.locationRatio >= 0.25
@@ -180,6 +189,12 @@ function profileAdjustment(
     promote(
       0.95,
       `网点/节点文本覆盖 ${Math.round(profile.locationRatio * 100)}%`,
+    );
+  if (field === "location_code" && profile.locationRatio >= 0.7)
+    promote(
+      headerScore > 0 ? 0.95 : 0.88,
+      `地点与物流节点特征覆盖 ${Math.round(profile.locationRatio * 100)}%`,
+      headerScore > 0 ? "high" : "medium",
     );
   if (field === "exception_code" && headerScore > 0)
     promote(
@@ -449,7 +464,7 @@ function criticalFields(contract: ImportContract): Set<string> {
 const CRITICAL_HEADER_PATTERN =
   /(订单|运单|物流|轨迹|事件|时间|时刻|日期|状态|扫描|承运|快递|节点|网点|场站|位置|区域|城市|异常|序号|签收|老码|代码|编号|标识|参考|order|shipment|tracking|event|time|date|status|scan|carrier|courier|location|region|exception|sequence|reference|\bid\b|\bno\b)/i;
 const NON_ANALYSIS_HEADER_PATTERN =
-  /(客户?备注|内部备注|营销|推广|标签|批次|班次|设备|采集来源|接入入口|采集终端|计费重|称重|计价|流向简述|路径摘要|收件偏好|店铺来源|销售员|debug|(?:预计|承诺).*(送达|交付|日期|时间))/i;
+  /(客户?备注|内部备注|营销|推广|标签|批次|班次|设备|采集来源|接入入口|采集终端|计费重|称重|计价|流向简述|路径摘要|收件偏好|店铺来源|销售员|销售渠道|订单渠道|渠道|debug|(?:预计|承诺).*(送达|交付|日期|时间))/i;
 
 function auxiliaryHeaders(contract: ImportContract): Set<string> {
   return new Set(

@@ -8,7 +8,7 @@ def test_health_smoke(client: TestClient) -> None:
     assert response.json() == {
         "status": "ok",
         "service": "fulfilllens-api",
-        "version": "1.0.1",
+        "version": "1.1.0",
     }
     assert response.headers["X-Request-ID"]
 
@@ -19,11 +19,11 @@ def test_version_exposes_contract_versions(client: TestClient) -> None:
     assert response.status_code == 200
     assert response.json() == {
         "app_name": "FulfillLens",
-        "app_version": "1.0.1",
+        "app_version": "1.1.0",
         "api_version": "v1",
         "environment": "test",
         "contract_versions": {
-            "data": "data-contract-v1.0-draft",
+            "data": "data-contract-v1.1.0",
             "metrics": "metrics-v1.1.0",
             "status": "status-v1.0-draft",
             "diagnostics": "diagnostics-v1.0.0",

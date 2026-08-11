@@ -89,6 +89,8 @@ export interface DiagnosticResult {
 }
 
 export interface DiagnosticContext {
+  analysis_fingerprint?: string;
+  analysis_source?: string;
   datasets: DatasetSelection;
   analyzed_at: string;
   order_count: number;

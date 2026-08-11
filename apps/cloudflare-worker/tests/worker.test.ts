@@ -55,7 +55,7 @@ describe("Cloudflare Worker", () => {
 
     await expect(health.json()).resolves.toMatchObject({
       status: "ok",
-      version: "1.0.1",
+      version: "1.1.0",
     });
     await expect(version.json()).resolves.toMatchObject({
       environment: "cloudflare-online-demo",
@@ -140,8 +140,20 @@ describe("Cloudflare Worker", () => {
     expect(catalogResponse.status).toBe(200);
     await expect(catalogResponse.json()).resolves.toMatchObject({
       samples: [
-        { sample_id: "compatibility_orders_csv", file_format: "csv" },
-        { sample_id: "compatibility_logistics_xlsx", file_format: "xlsx" },
+        {
+          sample_id: "compatibility_orders_csv",
+          file_format: "csv",
+          row_counts: { orders: 80 },
+        },
+        {
+          sample_id: "compatibility_logistics_xlsx",
+          file_format: "xlsx",
+          row_counts: {
+            orders: 80,
+            warehouse_events: 480,
+            tracking_events: 480,
+          },
+        },
       ],
     });
     expect(rejected.status).toBe(409);

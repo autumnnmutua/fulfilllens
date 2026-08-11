@@ -1,6 +1,12 @@
 import "@testing-library/jest-dom/vitest";
 
+import { configure } from "@testing-library/dom";
 import { afterEach, vi } from "vitest";
+
+// Large XLSX parser regressions and page-level tests run in the same suite.
+// Keep async UI assertions strict, while allowing normal CI/Windows resource
+// contention to settle instead of treating the library's 1s default as a bug.
+configure({ asyncUtilTimeout: 5_000 });
 
 class ResizeObserverMock implements ResizeObserver {
   observe(): void {}

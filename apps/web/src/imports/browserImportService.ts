@@ -17,7 +17,10 @@ import {
 } from "./parser";
 import { scalarText } from "./scalar";
 import { inferDateOrder } from "./dateParser";
-import { saveBrowserDataset } from "./browserDatasetStore";
+import {
+  fingerprintBrowserDataset,
+  saveBrowserDataset,
+} from "./browserDatasetStore";
 import { validateBrowserImport, type ValidationArtifacts } from "./validation";
 import type {
   ConfirmResponse,
@@ -338,11 +341,16 @@ export const browserImportService = {
       );
     }
     const datasetId = `browser-local-${crypto.randomUUID()}`;
+    const fingerprint = await fingerprintBrowserDataset(
+      record.task.data_type,
+      record.artifacts.normalizedRows,
+    );
     await saveBrowserDataset({
       createdAt: new Date().toISOString(),
       dataType: record.task.data_type,
       datasetId,
       fileName: record.task.file_name,
+      fingerprint,
       qualityReport: record.artifacts.report,
       rows: record.artifacts.normalizedRows,
       sourceKind: "browser_local_import",
@@ -355,6 +363,7 @@ export const browserImportService = {
       "标准化数据已保存到此浏览器的 IndexedDB；原始文件引用已清理。",
     );
     return {
+      analysis_fingerprint: fingerprint,
       dataset_id: datasetId,
       imported_rows: record.artifacts.normalizedRows.length,
       message: "导入完成；原始文件和内容没有离开浏览器。",

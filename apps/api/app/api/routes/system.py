@@ -45,7 +45,7 @@ async def version(
         api_version=settings.api_version,
         environment=settings.environment,
         contract_versions=ContractVersions(
-            data="data-contract-v1.0-draft",
+            data="data-contract-v1.1.0",
             metrics=DEFINITION_VERSION,
             status="status-v1.0-draft",
             diagnostics=DIAGNOSTIC_RULE_SET_VERSION,

@@ -256,7 +256,7 @@ function PreviewSection({ section }: { section: ReportSection }) {
         </Row>
       ) : null}
       {findings.length > 0 ? (
-        <Space direction="vertical" size="middle" className="report-stack">
+        <Space orientation="vertical" size="middle" className="report-stack">
           {findings.slice(0, 4).map((finding, index) => (
             <Card
               size="small"
@@ -283,7 +283,7 @@ function PreviewSection({ section }: { section: ReportSection }) {
         </Space>
       ) : null}
       {section.code === "recommendations" ? (
-        <Space direction="vertical" size="middle" className="report-stack">
+        <Space orientation="vertical" size="middle" className="report-stack">
           <Alert
             type="info"
             showIcon
@@ -868,7 +868,7 @@ export function ReportsPage() {
         {!preview ? (
           <Empty description="选择章节并生成预览；未生成时不会显示静态假结果。" />
         ) : (
-          <Space direction="vertical" size="large" className="report-stack">
+          <Space orientation="vertical" size="large" className="report-stack">
             <Card className="section-card" title={preview.header.title}>
               {preview.header.synthetic_data ? (
                 <Tag color="blue">完全合成数据</Tag>
@@ -908,6 +908,16 @@ export function ReportsPage() {
                 <Descriptions.Item label="标识策略">
                   {preview.identifier_policy}
                 </Descriptions.Item>
+                {preview.header.analysis_fingerprint ? (
+                  <Descriptions.Item label="分析指纹">
+                    <Typography.Text
+                      code
+                      title={preview.header.analysis_fingerprint}
+                    >
+                      {preview.header.analysis_fingerprint.slice(0, 20)}…
+                    </Typography.Text>
+                  </Descriptions.Item>
+                ) : null}
               </Descriptions>
               {preview.reading_guide.length > 0 ? (
                 <section aria-labelledby="report-guide-title">

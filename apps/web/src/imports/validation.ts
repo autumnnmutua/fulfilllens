@@ -266,6 +266,8 @@ function normalizeStatus(
 }
 
 const noExceptionValues = new Set(["", "0", "n", "正常", "无", "-", "常规"]);
+const noExceptionPattern =
+  /^(?:none|clear|stable|low|zero|normal|ok|no[_\s-]*exception)(?:[_-][a-z0-9]+)*$/i;
 const knownExceptionCodes = new Set([
   "WEATHER_DELAY",
   "CALL_FAIL",
@@ -281,7 +283,9 @@ function normalizeExceptionCode(value: unknown): {
 } {
   const raw = scalarText(value).normalize("NFKC").trim();
   const lookup = raw.toLocaleLowerCase("zh-CN");
-  if (noExceptionValues.has(lookup)) return { code: null, warning: false };
+  if (noExceptionValues.has(lookup) || noExceptionPattern.test(lookup)) {
+    return { code: null, warning: false };
+  }
   if (lookup === "1") return { code: "GENERIC_EXCEPTION", warning: true };
   const code = raw
     .toUpperCase()
@@ -296,15 +300,15 @@ function generatedTrackingEventId(
   rowNumber: number,
 ): string | null {
   const required = [
-    record.order_id,
     record.shipment_id,
     record.event_time,
     record.raw_status,
-    record.carrier_id,
   ].map((value) => scalarText(value).trim());
   if (required.some((value) => !value)) return null;
   const canonical = [
     ...required,
+    scalarText(record.order_id).trim(),
+    scalarText(record.carrier_id).trim(),
     scalarText(record.sequence_number).trim(),
     String(rowNumber),
   ].join("\u001f");

@@ -23,7 +23,7 @@ REQUIRED_FILES = (
     "docs/DEPENDENCY_LICENSES.md",
     "docs/SCREENSHOTS.md",
     "docs/releases/v1.0.0.md",
-    "docs/releases/v1.0.1.md",
+    "docs/releases/v1.1.0.md",
     ".github/ISSUE_TEMPLATE/bug.yml",
     ".github/ISSUE_TEMPLATE/feature.yml",
     ".github/ISSUE_TEMPLATE/data-mapping.yml",
@@ -179,7 +179,7 @@ def main() -> int:
     for heading in REQUIRED_README_EN:
         if heading not in readme_en:
             errors.append(f"README_EN.md missing section: {heading}")
-    for required_text in ("1.0.1", "127.0.0.1:5173", "127.0.0.1:8000"):
+    for required_text in ("1.1.0", "127.0.0.1:5173", "127.0.0.1:8000"):
         if required_text not in readme_cn or required_text not in readme_en:
             errors.append(f"bilingual README mismatch or missing value: {required_text}")
 

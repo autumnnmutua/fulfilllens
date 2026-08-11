@@ -1,13 +1,53 @@
 import type { DataType, QualityReport } from "../types/imports";
 
 export interface BrowserDataset {
+  analysisSource?: "user_import" | "compatibility_sample" | "teaching_data";
   createdAt: string;
   dataType: DataType;
   datasetId: string;
   fileName: string;
+  fingerprint?: string;
   qualityReport: QualityReport;
   rows: Record<string, unknown>[];
   sourceKind: "browser_local_import";
+}
+
+function stableValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(stableValue);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, item]) => [key, stableValue(item)]),
+    );
+  }
+  return value;
+}
+
+function fallbackHash(value: string): string {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return `fnv1a-${(hash >>> 0).toString(16).padStart(8, "0")}`;
+}
+
+export async function fingerprintBrowserDataset(
+  dataType: DataType,
+  rows: Record<string, unknown>[],
+): Promise<string> {
+  const canonical = JSON.stringify(stableValue({ dataType, rows }));
+  if (globalThis.crypto?.subtle) {
+    const digest = await globalThis.crypto.subtle.digest(
+      "SHA-256",
+      new TextEncoder().encode(canonical),
+    );
+    return `sha256-${[...new Uint8Array(digest)]
+      .map((value) => value.toString(16).padStart(2, "0"))
+      .join("")}`;
+  }
+  return fallbackHash(canonical);
 }
 
 const memoryDatasets = new Map<string, BrowserDataset>();

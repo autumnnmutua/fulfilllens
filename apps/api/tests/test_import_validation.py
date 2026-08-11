@@ -123,7 +123,9 @@ def test_tracking_id_status_and_exception_normalization(tmp_path: Path) -> None:
         "业务交易键,跟单参考,发生时刻(原串),扫描结果,承运单位,异常标注,export_line,场站/网点,系统老码,客户备注\n"
         "ORD-01,SHP-01,2026.07.02 06:35,运输中 | Linehaul,CAR-01,0,1,HUB-A,HUB_ARR,忽略我\n"
         "ORD-01,SHP-01,Tue Jul 07 2026 18:20:00 GMT+0800 "
-        "(中国标准时间),妥投(POD),CAR-01,1,2,HUB-B,POD_OK,忽略我\n",
+        "(中国标准时间),妥投(POD),CAR-01,1,2,HUB-B,POD_OK,忽略我\n"
+        "ORD-02,SHP-02,2026-07-08T08:20:00+08:00,已揽收,CAR-02,"
+        "clear-01,1,HUB-C,PICKUP_OK,忽略我\n",
         encoding="utf-8",
     )
     table = parse_csv(
@@ -165,11 +167,12 @@ def test_tracking_id_status_and_exception_normalization(tmp_path: Path) -> None:
     )
 
     assert first.report.can_confirm is True
-    assert len(first.normalized_rows) == 2
+    assert len(first.normalized_rows) == 3
     assert first.normalized_rows[0]["event_code"] == "in_transit"
     assert first.normalized_rows[1]["event_code"] == "delivered"
     assert first.normalized_rows[0]["exception_code"] is None
     assert first.normalized_rows[1]["exception_code"] == "GENERIC_EXCEPTION"
+    assert first.normalized_rows[2]["exception_code"] is None
     assert first.normalized_rows[0]["tracking_event_id"].startswith("TRE-GEN-000002-")
     assert first.normalized_rows == second.normalized_rows
     assert "客户备注" not in first.normalized_rows[0]
@@ -184,3 +187,38 @@ def test_tracking_id_status_and_exception_normalization(tmp_path: Path) -> None:
         item.source_column == "客户备注" and item.status.value == "ignored"
         for item in first.report.field_resolutions
     )
+
+
+def test_minimal_tracking_without_order_or_carrier_is_valid(tmp_path: Path) -> None:
+    path = tmp_path / "minimal-tracking.csv"
+    path.write_text(
+        "运单号,轨迹时间,物流状态\n"
+        "SHP-MIN-01,2026-08-01 08:00,已揽收\n"
+        "SHP-MIN-01,2026-08-02 08:00,已签收\n",
+        encoding="utf-8",
+    )
+    table = parse_csv(
+        path,
+        encoding="utf-8",
+        settings=Settings(environment="test", import_root=tmp_path / "imports"),
+    )
+    result = validate_import(
+        table=table,
+        contract=get_contract(DataType.TRACKING_EVENTS),
+        mapping={
+            "运单号": "shipment_id",
+            "轨迹时间": "event_time",
+            "物流状态": "raw_status",
+        },
+        ignored_source_columns=[],
+        default_timezone="Asia/Shanghai",
+        project_status_mappings={},
+        sensitive_risks=[],
+        max_cell_chars=4096,
+    )
+
+    assert result.report.can_confirm is True
+    assert len(result.normalized_rows) == 2
+    assert all(row["tracking_event_id"].startswith("TRE-GEN-") for row in result.normalized_rows)
+    assert all("order_id" not in row for row in result.normalized_rows)
+    assert all("carrier_id" not in row for row in result.normalized_rows)

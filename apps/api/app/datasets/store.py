@@ -234,7 +234,7 @@ class DatasetStore:
                             task_id,
                             len(rows),
                             created_at,
-                            "data-contract-v1.0-draft",
+                            "data-contract-v1.1.0",
                         ),
                     )
             except Exception:

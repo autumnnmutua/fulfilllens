@@ -29,7 +29,7 @@ describe("FulfillLens 应用壳", () => {
             jsonResponse({
               status: "ok",
               service: "fulfilllens-api",
-              version: "1.0.1",
+              version: "1.1.0",
             }),
           );
         }
@@ -38,11 +38,11 @@ describe("FulfillLens 应用壳", () => {
           return Promise.resolve(
             jsonResponse({
               app_name: "FulfillLens",
-              app_version: "1.0.1",
+              app_version: "1.1.0",
               api_version: "v1",
               environment: "test",
               contract_versions: {
-                data: "data-contract-v1.0-draft",
+                data: "data-contract-v1.1.0",
                 metrics: "metrics-v1.1.0",
                 status: "status-v1.0-draft",
                 diagnostics: "diagnostics-v1.0.0",

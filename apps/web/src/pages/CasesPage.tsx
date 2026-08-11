@@ -22,6 +22,7 @@ import { useEffect, useState } from "react";
 
 import { ApiClientError } from "../api/client";
 import { caseApi } from "../api/cases";
+import { clearBrowserAnalysisSession } from "../analysis/browserAnalysisSession";
 import { PageHeader } from "../components/PageHeader";
 import { LoadingState } from "../components/PageStates";
 import { useNotifications } from "../components/notification-context";
@@ -84,7 +85,10 @@ export function CasesPage() {
     setError(null);
     try {
       const response = await caseApi.load(selected.case_id);
-      window.localStorage.removeItem("fulfilllens.dashboard.filters");
+      // A teaching case replaces the complete active analysis bundle. Clear a
+      // browser-local import session first so it cannot keep precedence over
+      // the newly selected linked case datasets.
+      clearBrowserAnalysisSession();
       window.localStorage.setItem(
         "fulfilllens.dataset.orders",
         response.datasets.orders_dataset_id,

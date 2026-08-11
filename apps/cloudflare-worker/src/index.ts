@@ -1,6 +1,6 @@
 import { handleOnlineDemoApi } from "./online-demo";
 
-const APP_VERSION = "1.0.1";
+const APP_VERSION = "1.1.0";
 const API_VERSION = "v1";
 const MODEL = "@cf/meta/llama-3.1-8b-instruct-fast";
 const PROBE_SENTINEL = "FULFILLLENS_WORKERS_AI_OK";
@@ -139,7 +139,7 @@ async function apiResponse(
       api_version: API_VERSION,
       environment: "cloudflare-online-demo",
       contract_versions: {
-        data: "1.0.0",
+        data: "1.1.0",
         metrics: "1.1.0",
         status: "1.0.0",
         diagnostics: "1.0.0",

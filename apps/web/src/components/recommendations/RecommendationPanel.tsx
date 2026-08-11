@@ -29,7 +29,7 @@ export function RecommendationPanel({
   );
   return (
     <Card className="section-card" title="行动建议">
-      <Space direction="vertical" size="middle" className="report-stack">
+      <Space orientation="vertical" size="middle" className="report-stack">
         <Alert
           type="info"
           showIcon

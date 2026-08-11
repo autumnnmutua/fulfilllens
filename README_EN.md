@@ -6,7 +6,7 @@ FulfillLens is a local-first, open-source fulfillment analytics tool for logisti
 
 The project is designed to make every percentage, anomaly, and scenario traceable to fields, formulas, thresholds, samples, and order-level evidence instead of generating a merely plausible story.
 
-> Current stable version: `1.0.1`. Custom upload defaults to Auto-detect (recommended). The engine combines headers, value profiles, column relationships, and the selected data contract: high-confidence fields apply automatically, medium-confidence suggestions use one grouped confirmation, and optional columns use one safe bulk-ignore action. The Cloudflare edition parses and analyses custom CSV/XLSX files in the browser without uploading raw files or normalized rows to the Worker. See [Project status](#project-status-and-known-limitations).
+> Current stable version: `1.1.0`. Users do not need to rename CSV/XLSX columns to FulfillLens templates first. Keep Auto-detect (recommended), upload the file, and choose “Organize and analyze”: the engine combines headers, value profiles, column relationships, and the data contract to apply high-confidence mappings, generate safe internal IDs, retain unknown statuses, and ignore non-analytical columns. Only key ambiguities that could change business meaning require one confirmation. The Cloudflare edition performs custom-file parsing and analysis in the browser without uploading raw files or normalized rows to the Worker. See [Project status](#project-status-and-known-limitations).
 
 ## Why FulfillLens
 
@@ -133,7 +133,7 @@ python scripts/demo_simulation.py
 
 To focus on real-world compatibility conversion, open <http://127.0.0.1:5173/import> and choose “Non-standard order CSV auto-conversion sample” or “Non-standard logistics XLSX auto-conversion sample.” Both use the ordinary upload, sheet selection, mapping, Schema validation, and confirmation flow.
 
-To import your own file, keep the default Auto-detect (recommended) option and choose “Upload your own file.” The engine identifies Orders, Warehouse Operations, or Tracking Data from headers, value patterns, and repetition relationships. High-confidence mappings are automatic; a normal first-time user needs at most one “Apply all recommendations” action, one “Ignore optional fields” action, and “Start analysis.” The complete mapping table remains available under Advanced field settings.
+To import your own file, keep the default Auto-detect (recommended) option and choose “Upload your own file.” The engine identifies Orders, Warehouse Operations, or Tracking Data from headers, value patterns, and repetition relationships. High-confidence mappings and safe internal IDs are automatic. A normal first-time user chooses “Organize and analyze” once to apply recommendations, ignore optional fields, validate, and enter an isolated analysis session; only a key ambiguity that could change metric meaning requires one grouped confirmation. The complete mapping table remains available under Advanced field settings.
 
 ### 4. Follow the full path
 
@@ -278,9 +278,9 @@ See [Architecture](docs/ARCHITECTURE.md) and [ADRs](docs/adr/README.md). The Clo
 
 ## Project status and known limitations
 
-Stages 0–12, the v1.0.0 stable release, and the v1.0.1 beginner-import improvements are complete. Current evidence includes:
+Stages 0–12, the v1.0.0 stable release, and the v1.1.0 data-correctness and beginner-import improvements are complete. The current version adds isolated analysis sessions and input fingerprints, so user files are not automatically mixed with demos or compatibility samples; switching files recomputes dashboards, diagnostics, recommendations, and reports. Current evidence includes:
 
-- 64 frontend, 14 Cloudflare Worker, and 234 backend/contract tests;
+- 84 frontend, 14 Cloudflare Worker, and 235 backend/contract tests;
 - 10,000/50,000-order performance benchmarks;
 - real import interaction at 360/390/430/1440 Chromium, plus site-wide 360/390/430/768/1440 audits;
 - npm/Python vulnerability audits and repository secret scans;
@@ -304,7 +304,7 @@ Reports and benchmarks are evidence for a specific revision, dataset, and machin
 - Stage 11: bilingual open-source docs, license, governance templates, and RC assets;
 - Stage 12: clean-environment acceptance and the v1.0 release decision.
 
-See the [Roadmap](docs/ROADMAP.md), [final acceptance record](docs/RELEASE_ACCEPTANCE.md), [compatibility validation report](docs/COMPATIBILITY_VALIDATION.md), [v1.0.0 release notes](docs/releases/v1.0.0.md), and [v1.0.1 release notes](docs/releases/v1.0.1.md).
+See the [Roadmap](docs/ROADMAP.md), [final acceptance record](docs/RELEASE_ACCEPTANCE.md), [compatibility validation report](docs/COMPATIBILITY_VALIDATION.md), [v1.0.0 release notes](docs/releases/v1.0.0.md), and [v1.1.0 release notes](docs/releases/v1.1.0.md).
 
 ## Privacy, security, and disclaimer
 

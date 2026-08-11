@@ -130,7 +130,7 @@ const compatibilitySamples = [
     default_data_type: "orders",
     default_sheet: null,
     sheet_names: [],
-    row_counts: { orders: 8 },
+    row_counts: { orders: 80 },
     purpose:
       "验证非模板字段、混合中英文表头、日期文本、文本数量、ID 前导零、可选空值和附加列的转换。",
     conversion_features: [
@@ -141,7 +141,7 @@ const compatibilitySamples = [
       "文本数量与 ID 前导零",
       "可选空值和无关字段",
     ],
-    sha256: "4730a123d51e0747c50077147b6121ed7583bbb7f6eb5b53255e3becf828844f",
+    sha256: "26b43ebda76714b0cd64bb437761028d8001e7600f97d135e336df06dc601c0b",
     privacy_statement:
       "全部内容为 FulfillLens 为兼容性测试生成的合成数据，不含真实个人、企业、订单或运单信息。",
   },
@@ -153,7 +153,7 @@ const compatibilitySamples = [
     default_data_type: "tracking_events",
     default_sheet: "物流轨迹",
     sheet_names: ["订单数据", "仓库事件", "物流轨迹"],
-    row_counts: { orders: 6, warehouse_events: 36, tracking_events: 36 },
+    row_counts: { orders: 80, warehouse_events: 480, tracking_events: 480 },
     purpose:
       "验证多工作表、Excel 日期、文本数字、状态别名、字段顺序变化、附加字段与可忽略空单元格。",
     conversion_features: [
@@ -164,7 +164,7 @@ const compatibilitySamples = [
       "中文、英文和 camelCase 字段",
       "附加字段与空白单元格",
     ],
-    sha256: "05f2c1e56ba8fbae9266ce1389803c73e50f3b8c0c98cfcb0e3688d2ae05fddf",
+    sha256: "ae2366b059a35e22a0c198d4c21a7f025d51ff4e8cd3af5bffb00bd84e23cab0",
     privacy_statement:
       "全部内容为 FulfillLens 为兼容性测试生成的合成数据，不含真实个人、企业、订单或运单信息。",
   },
@@ -2671,7 +2671,7 @@ function compatibilityParseResponse(
       Object.values(mapping).filter((value): value is string => value !== null),
     ),
   );
-  const totalRows = ordersSample ? 8 : 36;
+  const totalRows = ordersSample ? 80 : dataType === "orders" ? 80 : 480;
   return {
     task: importTask(dataType, "awaiting_mapping", sampleId, selectedSheet),
     fields: targetFields.map((field) => ({
@@ -3725,9 +3725,11 @@ export async function handleOnlineDemoApi(
       const sample = sampleId === null ? null : compatibilitySample(sampleId);
       const totalRows =
         sampleId === "compatibility_orders_csv"
-          ? 8
+          ? 80
           : sampleId === "compatibility_logistics_xlsx"
-            ? 36
+            ? dataType === "orders"
+              ? 80
+              : 480
             : buildOrders("promotion").length;
       return helpers.json({
         task: importTask(
@@ -3786,9 +3788,11 @@ export async function handleOnlineDemoApi(
             : datasetId;
       const importedRows =
         sampleId === "compatibility_orders_csv"
-          ? 8
+          ? 80
           : sampleId === "compatibility_logistics_xlsx"
-            ? 36
+            ? dataType === "orders"
+              ? 80
+              : 480
             : buildOrders("promotion").length;
       return helpers.json({
         task: importTask(dataType, "analyzable", sampleId),

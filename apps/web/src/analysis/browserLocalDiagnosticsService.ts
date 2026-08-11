@@ -10,7 +10,7 @@ import type {
   DiagnosticSeverity,
 } from "../types/diagnostics";
 
-const RULE_VERSION = "browser-diagnostics-v1.0.0";
+const RULE_VERSION = "browser-diagnostics-v1.1.0";
 const SEVERITY_ORDER: Record<DiagnosticSeverity, number> = {
   critical: 4,
   high: 3,
@@ -212,6 +212,8 @@ async function analyze(
     });
   return {
     context: {
+      analysis_fingerprint: data.analysisFingerprint,
+      analysis_source: data.analysisSource,
       datasets: request.datasets,
       analyzed_at: new Date().toISOString(),
       order_count: orderCount,

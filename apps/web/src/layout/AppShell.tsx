@@ -145,7 +145,7 @@ export function AppShell({ children }: PropsWithChildren) {
           ) : null}
           {!isDesktop ? <Brand /> : <span />}
           <Space>
-            <Tag color="blue">v1.0.0</Tag>
+            <Tag color="blue">v1.1.0</Tag>
           </Space>
         </Header>
 
@@ -168,7 +168,7 @@ export function AppShell({ children }: PropsWithChildren) {
       <Drawer
         title={<Brand />}
         placement="left"
-        width="min(84vw, 320px)"
+        size="min(84vw, 320px)"
         open={!isDesktop && drawerOpen}
         onClose={() => {
           setDrawerOpen(false);

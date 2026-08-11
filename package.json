@@ -1,6 +1,6 @@
 {
   "name": "fulfilllens",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "private": true,
   "license": "MIT",
   "description": "FulfillLens 本地优先履约分析工具",
@@ -53,6 +53,7 @@
     "demo:cases": "python scripts/demo_cases.py",
     "demo:reports": "python scripts/demo_reports.py",
     "generate:cases": "python scripts/generate_cases.py",
+    "generate:compatibility-samples": "python scripts/generate_compatibility_samples.py",
     "smoke": "python scripts/smoke.py",
     "audit": "npm audit --audit-level=high && python -m pip_audit",
     "docs:check": "python scripts/check_release_docs.py",

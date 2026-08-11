@@ -170,11 +170,11 @@ def test_tracking_event_id_can_be_derived_but_other_required_fields_cannot() -> 
         == []
     )
 
-    mapping["订单"] = None
+    mapping["运单"] = None
     errors = validate_mapping(
         mapping,
         sources,
         get_contract(DataType.TRACKING_EVENTS),
-        ["订单"],
+        ["运单"],
     )
-    assert any("order_id" in error for error in errors)
+    assert any("shipment_id" in error for error in errors)

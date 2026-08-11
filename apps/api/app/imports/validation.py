@@ -78,6 +78,11 @@ ENGLISH_MONTHS = {
     )
 }
 NO_EXCEPTION_VALUES = {"", "0", "n", "正常", "无", "-", "常规"}
+NO_EXCEPTION_PATTERN = re.compile(
+    r"^(?:none|clear|stable|low|zero|normal|ok|no[_\s-]*exception)"
+    r"(?:[_-][a-z0-9]+)*$",
+    re.IGNORECASE,
+)
 KNOWN_EXCEPTION_CODES = {
     "WEATHER_DELAY",
     "CALL_FAIL",
@@ -331,7 +336,7 @@ def parse_text(value: object) -> str:
 
 def normalize_exception_code(value: object) -> tuple[str | None, bool]:
     raw = parse_text(value)
-    if raw.casefold() in NO_EXCEPTION_VALUES:
+    if raw.casefold() in NO_EXCEPTION_VALUES or NO_EXCEPTION_PATTERN.fullmatch(raw):
         return None, False
     if raw == "1":
         return "GENERIC_EXCEPTION", True
@@ -343,16 +348,20 @@ def normalize_exception_code(value: object) -> tuple[str | None, bool]:
 
 def generated_tracking_event_id(record: dict[str, Any], row_number: int) -> str | None:
     required = [
-        parse_text(record.get("order_id", "")),
         parse_text(record.get("shipment_id", "")),
         parse_text(record.get("event_time", "")),
         parse_text(record.get("raw_status", "")),
-        parse_text(record.get("carrier_id", "")),
     ]
     if any(not value for value in required):
         return None
     canonical = "\x1f".join(
-        [*required, parse_text(record.get("sequence_number", "")), str(row_number)]
+        [
+            *required,
+            parse_text(record.get("order_id", "")),
+            parse_text(record.get("carrier_id", "")),
+            parse_text(record.get("sequence_number", "")),
+            str(row_number),
+        ]
     )
     hash_value = 0x811C9DC5
     for byte in canonical.encode("utf-8"):

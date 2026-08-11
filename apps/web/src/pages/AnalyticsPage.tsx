@@ -140,7 +140,9 @@ export function AnalyticsPage() {
       announce = false,
     ) => {
       if (!selection.orders_dataset_id) {
-        setPersistentError("必须先确认并选择订单数据集。");
+        setPersistentError(
+          "请先导入订单、仓库作业或物流轨迹数据。只有物流轨迹也可以分析时效、状态与异常。 ",
+        );
         return;
       }
       const requestId = overviewRequest.current + 1;
@@ -458,26 +460,28 @@ export function AnalyticsPage() {
 
       <Card
         className="section-card dataset-selection-card"
-        title="本地数据集"
+        title="当前分析数据"
         extra={<DatabaseOutlined />}
       >
         <Flex vertical gap="middle">
-          <label className="import-field">
-            <Typography.Text strong>订单数据集 ID（必填）</Typography.Text>
-            <Input
-              aria-label="订单数据集 ID"
-              value={ordersId}
-              onChange={(event) => setOrdersId(event.target.value)}
-              placeholder="确认订单导入后自动填入"
-            />
-          </label>
+          <Typography.Paragraph>
+            系统默认只分析最近确认的当前文件，不会自动混入教学案例或兼容性示例。切换文件后会依据内容指纹重新计算。
+          </Typography.Paragraph>
           <Collapse
             items={[
               {
-                key: "events",
-                label: "关联仓库和物流事件（用于节点耗时）",
+                key: "technical-datasets",
+                label: "高级设置 / 技术详情（数据集编号）",
                 children: (
                   <div className="dataset-id-grid">
+                    <label className="import-field">
+                      <Typography.Text strong>订单数据集 ID</Typography.Text>
+                      <Input
+                        aria-label="订单数据集 ID"
+                        value={ordersId}
+                        onChange={(event) => setOrdersId(event.target.value)}
+                      />
+                    </label>
                     <label className="import-field">
                       <Typography.Text strong>
                         仓库事件数据集 ID
@@ -549,12 +553,31 @@ export function AnalyticsPage() {
         </Card>
       ) : overview === null ? (
         <Card className="section-card">
-          <Empty description="请先导入并确认订单数据，再读取真实分析总览。" />
+          <Empty description="请先导入并确认任一种业务数据，再读取当前数据能够支持的分析。" />
         </Card>
       ) : (
         <>
           <DashboardContextBar context={overview.context} />
-          <DashboardMetricCards metrics={overview.metrics} />
+          <Card className="section-card" title="当前可分析能力">
+            <Flex vertical gap="small">
+              {(overview.context.capabilities ?? []).map((capability) => (
+                <Flex key={capability.code} align="start" gap="small">
+                  <Tag color={capability.available ? "success" : "default"}>
+                    {capability.available ? "已支持" : "数据不足"}
+                  </Tag>
+                  <div>
+                    <Typography.Text strong>{capability.label}</Typography.Text>
+                    <br />
+                    <Typography.Text>{capability.reason}</Typography.Text>
+                  </div>
+                </Flex>
+              ))}
+            </Flex>
+          </Card>
+          <DashboardMetricCards
+            context={overview.context}
+            metrics={overview.metrics}
+          />
 
           {overview.context.order_count === 0 ? (
             <Alert

@@ -35,6 +35,10 @@ import { ApiClientError } from "../api/client";
 import { useNotifications } from "../components/notification-context";
 import { PageHeader } from "../components/PageHeader";
 import { isCloudflareDeploy } from "../config/runtime";
+import {
+  activateBrowserAnalysisSession,
+  type AnalysisSourceKind,
+} from "../analysis/browserAnalysisSession";
 import { MAX_IMPORT_BYTES, validateFileBasics } from "../imports/parser";
 import { getImportContract } from "../imports/contracts";
 import {
@@ -216,6 +220,8 @@ export function ImportPage() {
   const [sampleCatalogError, setSampleCatalogError] = useState<string | null>(
     null,
   );
+  const [analysisSourceKind, setAnalysisSourceKind] =
+    useState<AnalysisSourceKind>("user_import");
 
   useEffect(() => {
     let active = true;
@@ -469,6 +475,7 @@ export function ImportPage() {
       setPersistentError(errorMessage(error));
       return;
     }
+    setAnalysisSourceKind("user_import");
     setFile(selected);
     setTask(null);
     setParsed(null);
@@ -566,6 +573,7 @@ export function ImportPage() {
   async function handleSynthetic() {
     const response = await runAction(() => importApi.createSynthetic(dataType));
     if (response !== null) {
+      setAnalysisSourceKind("teaching_data");
       setFile(null);
       applyParsed(response);
       notifications.showSuccess(
@@ -594,6 +602,7 @@ export function ImportPage() {
       return { selected, uploaded };
     });
     if (response === null) return;
+    setAnalysisSourceKind("compatibility_sample");
     setDataType(sample.default_data_type);
     setFile(response.selected);
     setTask(response.uploaded.task);
@@ -663,20 +672,38 @@ export function ImportPage() {
   function persistConfirmed(response: ConfirmResponse) {
     setTask(response.task);
     setConfirmed(response);
-    window.localStorage.setItem(
-      response.dataset_id.startsWith("browser-local-")
-        ? `fulfilllens.browser.dataset.${response.task.data_type}`
-        : `fulfilllens.dataset.${response.task.data_type}`,
-      response.dataset_id,
-    );
+    activateBrowserAnalysisSession({
+      dataType: response.task.data_type,
+      datasetId: response.dataset_id,
+      fileName: response.task.file_name,
+      fingerprint:
+        response.analysis_fingerprint ?? `dataset-${response.dataset_id}`,
+      sourceKind: analysisSourceKind,
+    });
   }
 
   async function handleQuickAnalyze() {
-    if (task === null || blockingMappingCount > 0) return;
+    if (task === null) return;
+    const nextIgnored = [
+      ...new Set([...ignoredSourceColumns, ...safelyIgnorableColumns]),
+    ];
+    const nextMapping = {
+      ...mapping,
+      ...Object.fromEntries(
+        safelyIgnorableColumns.map((column) => [column, null]),
+      ),
+    };
+    const nextManual = [
+      ...new Set([...manualSourceColumns, ...recommendedMappingSources]),
+    ];
+    setMapping(nextMapping);
+    setIgnoredSourceColumns(nextIgnored);
+    setManualSourceColumns(nextManual);
+    setLastBulkIgnored([...safelyIgnorableColumns]);
     const result = await runAction(async () => {
       const checked = await importApi.validate(task.task_id, {
-        mapping,
-        ignored_source_columns: ignoredSourceColumns,
+        mapping: nextMapping,
+        ignored_source_columns: nextIgnored,
         default_timezone: timezone.trim() || null,
         project_status_mappings: projectStatusMappings,
         date_order: dateOrder ?? null,
@@ -691,12 +718,16 @@ export function ImportPage() {
     setValidationStale(false);
     if (result.imported === null) {
       setCurrent(5);
+      notifications.showError(
+        "还需处理少量关键问题",
+        "非必要字段已经整理完成；页面只保留会影响当前分析的阻断问题。",
+      );
       return;
     }
     persistConfirmed(result.imported);
     notifications.showSuccess(
       "已准备好分析",
-      `已导入 ${result.imported.imported_rows} 行；正在打开分析总览。`,
+      `已整理并导入 ${result.imported.imported_rows} 行；正在打开当前文件的独立分析会话。`,
     );
     window.location.assign("/analytics");
   }
@@ -1570,13 +1601,12 @@ export function ImportPage() {
                   type="primary"
                   loading={busy}
                   disabled={
-                    blockingMappingCount > 0 ||
-                    (parsed.date_order_inference?.ambiguous === true &&
-                      dateOrder === undefined)
+                    parsed.date_order_inference?.ambiguous === true &&
+                    dateOrder === undefined
                   }
                   onClick={() => void handleQuickAnalyze()}
                 >
-                  开始分析
+                  一键整理并分析
                 </Button>
               </Flex>
               {blockingMappingCount > 0 ? (

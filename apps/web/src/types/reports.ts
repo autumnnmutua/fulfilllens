@@ -50,6 +50,8 @@ export interface ReportRequest {
 }
 
 export interface ReportHeader {
+  analysis_fingerprint?: string;
+  analysis_source?: string;
   title: string;
   dataset_name: string;
   time_range_start: string | null;

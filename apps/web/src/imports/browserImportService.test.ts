@@ -131,10 +131,10 @@ describe("浏览器本地 CSV/XLSX 导入", () => {
     const parsed = await browserImportService.parse(uploaded.task.task_id, {
       sheet_name: "物流轨迹",
     });
-    expect(parsed.total_rows).toBe(36);
+    expect(parsed.total_rows).toBe(480);
     expect(parsed.task.selected_sheet).toBe("物流轨迹");
     expect(parsed.warnings.join(" ")).toMatch(/Excel 日期/);
-    expect(parsed.preview_rows[0]?.values.waybillNo).toBe("SHP-SYN-0001");
+    expect(parsed.preview_rows[0]?.values.waybillNo).toBe("SHP-SYN-00001");
     expect(
       findSafelyIgnorableColumns(
         parsed.suggestions,
@@ -154,9 +154,9 @@ describe("浏览器本地 CSV/XLSX 导入", () => {
       },
     );
     expect(validated.report.can_confirm).toBe(true);
-    expect(validated.report.valid_rows).toBe(36);
+    expect(validated.report.valid_rows).toBe(480);
     expect(validated.report.time_order_conflicts).toBe(0);
-  });
+  }, 15_000);
 
   it("支持 UTF-8 BOM、引号内逗号、CRLF、LF 和引号内换行", async () => {
     const content =
@@ -210,9 +210,16 @@ describe("浏览器本地 CSV/XLSX 导入", () => {
     });
     expect(
       parsed.suggestions
-        .filter((item) => !["d4", "e5"].includes(item.source_column))
+        .filter((item) => !["d4", "e5", "g7"].includes(item.source_column))
         .every((item) => item.suggested_field === null),
     ).toBe(true);
+    expect(
+      parsed.suggestions.find((item) => item.source_column === "g7"),
+    ).toMatchObject({
+      suggested_field: "location_code",
+      confidence_level: "medium",
+      requires_confirmation: true,
+    });
     const manual = {
       a1: "tracking_event_id",
       b2: "order_id",
@@ -234,6 +241,60 @@ describe("浏览器本地 CSV/XLSX 导入", () => {
     expect(validated.normalized_preview[0]?.event_code).toBe(
       "carrier_picked_up",
     );
+  });
+
+  it("陌生表头可由列值识别承运商与物流地点，并保留置信度边界", () => {
+    const columns = ["alpha", "beta"];
+    const rows = [
+      ["顺丰", "南京中转中心"],
+      ["中通", "上海配送站"],
+      ["顺丰", "南京中转中心"],
+      ["中通", "上海配送站"],
+      ["顺丰", "南京中转中心"],
+      ["中通", "上海配送站"],
+    ].map((values, index) => ({
+      row_number: index + 2,
+      values: Object.fromEntries(
+        columns.map((column, item) => [column, values[item]]),
+      ),
+    }));
+    const suggestions = suggestMappings(
+      columns,
+      getImportContract("tracking_events"),
+      rows,
+    );
+    expect(suggestions[0]).toMatchObject({
+      source_column: "alpha",
+      suggested_field: "carrier_id",
+      confidence_level: "high",
+    });
+    expect(suggestions[1]).toMatchObject({
+      source_column: "beta",
+      suggested_field: "location_code",
+      confidence_level: "medium",
+      requires_confirmation: true,
+    });
+  });
+
+  it.each([
+    ["物流单号", "shipment_id"],
+    ["运货凭据", "shipment_id"],
+    ["waybill", "shipment_id"],
+    ["trackingNo", "shipment_id"],
+    ["运单参考", "shipment_id"],
+    ["发生时刻", "event_time"],
+    ["节点时间", "event_time"],
+    ["eventTimestamp", "event_time"],
+    ["scan_date", "event_time"],
+    ["轨迹短语", "raw_status"],
+    ["物流动态", "raw_status"],
+    ["status_description", "raw_status"],
+  ])("字段命名变异 %s 仍识别为 %s", (source, target) => {
+    const suggestion = suggestMappings(
+      [source],
+      getImportContract("tracking_events"),
+    )[0];
+    expect(suggestion?.suggested_field).toBe(target);
   });
 
   it("缺失必填字段和未知状态分别按错误与 unmapped 报告", async () => {
@@ -311,17 +372,17 @@ describe("浏览器本地 CSV/XLSX 导入", () => {
       )?.status,
     ).toBe("ignored");
 
-    const orderSource = parsed.suggestions.find(
-      (suggestion) => suggestion.suggested_field === "order_id",
+    const shipmentSource = parsed.suggestions.find(
+      (suggestion) => suggestion.suggested_field === "shipment_id",
     )?.source_column;
-    expect(orderSource).toBe("订单号");
-    const withoutOrder = { ...mapping, [orderSource as string]: null };
+    expect(shipmentSource).toBe("快递单号");
+    const withoutShipment = { ...mapping, [shipmentSource as string]: null };
     const requiredIgnored = await browserImportService.validate(
       uploaded.task.task_id,
       {
         default_timezone: "Asia/Shanghai",
-        ignored_source_columns: ["客服备注", orderSource as string],
-        mapping: withoutOrder,
+        ignored_source_columns: ["客服备注", shipmentSource as string],
+        mapping: withoutShipment,
         project_status_mappings: {},
       },
     );
@@ -330,14 +391,14 @@ describe("浏览器本地 CSV/XLSX 导入", () => {
       requiredIgnored.report.issues.some(
         (issue) =>
           issue.code === "MISSING_REQUIRED_MAPPING" &&
-          issue.message.includes("order_id"),
+          issue.message.includes("shipment_id"),
       ),
     ).toBe(true);
     expect(
       requiredIgnored.report.field_resolutions.some(
         (resolution) =>
           resolution.status === "blocking" &&
-          resolution.target_field === "order_id",
+          resolution.target_field === "shipment_id",
       ),
     ).toBe(true);
   });
@@ -473,7 +534,8 @@ describe("浏览器本地 CSV/XLSX 导入", () => {
     const content =
       "业务交易键,跟单参考,发生时刻(原串),扫描结果,承运单位,异常标注,export_line,场站/网点,系统老码,客户备注\n" +
       "ORD-01,SHP-01,2026.07.02 06:35,运输中 | Linehaul,CAR-01,0,1,HUB-A,HUB_ARR,忽略我\n" +
-      "ORD-01,SHP-01,Tue Jul 07 2026 18:20:00 GMT+0800 (中国标准时间),妥投(POD),CAR-01,WEATHER_DELAY,2,HUB-B,POD_OK,忽略我\n";
+      "ORD-01,SHP-01,Tue Jul 07 2026 18:20:00 GMT+0800 (中国标准时间),妥投(POD),CAR-01,WEATHER_DELAY,2,HUB-B,POD_OK,忽略我\n" +
+      "ORD-02,SHP-02,2026-07-08T08:20:00+08:00,已揽收,CAR-02,clear-01,1,HUB-C,PICKUP_OK,忽略我\n";
     const uploaded = await browserImportService.upload(
       "tracking_events",
       csvFile(content, "arbitrary-export.csv"),
@@ -495,7 +557,7 @@ describe("浏览器本地 CSV/XLSX 导入", () => {
       project_status_mappings: {},
     });
     expect(first.report.can_confirm).toBe(true);
-    expect(first.normalized_preview).toHaveLength(2);
+    expect(first.normalized_preview).toHaveLength(3);
     expect(first.normalized_preview[0]?.tracking_event_id).toMatch(
       /^TRE-GEN-000002-[0-9A-F]{8}$/,
     );
@@ -508,6 +570,33 @@ describe("浏览器本地 CSV/XLSX 导入", () => {
     expect(first.normalized_preview[0]).not.toHaveProperty("客户备注");
     expect(first.normalized_preview[0]?.exception_code).toBeNull();
     expect(first.normalized_preview[1]?.exception_code).toBe("WEATHER_DELAY");
+    expect(first.normalized_preview[2]?.exception_code).toBeNull();
+  });
+
+  it("只有运单、时间和原始状态也可生成事件 ID 并进入轨迹分析", async () => {
+    const uploaded = await browserImportService.upload(
+      "tracking_events",
+      csvFile(
+        "运单号,轨迹时间,物流状态\nSHP-MIN-01,2026-08-01 08:00,已揽收\nSHP-MIN-01,2026-08-02 08:00,已签收\n",
+        "minimal-tracking.csv",
+      ),
+    );
+    const parsed = await browserImportService.parse(uploaded.task.task_id, {});
+    const validated = await browserImportService.validate(
+      uploaded.task.task_id,
+      {
+        default_timezone: "Asia/Shanghai",
+        mapping: mappingFrom(parsed.suggestions),
+        project_status_mappings: {},
+      },
+    );
+    expect(validated.report.can_confirm).toBe(true);
+    expect(validated.normalized_preview).toHaveLength(2);
+    expect(validated.normalized_preview[0]?.tracking_event_id).toMatch(
+      /^TRE-GEN-/,
+    );
+    expect(validated.normalized_preview[0]).not.toHaveProperty("order_id");
+    expect(validated.normalized_preview[0]).not.toHaveProperty("carrier_id");
   });
 
   it("无 AM/PM 的模糊斜杠日期要求一次文件级确认", () => {
@@ -563,9 +652,9 @@ describe("浏览器本地 CSV/XLSX 导入", () => {
     );
     const workbook = await inspectWorkbook(selected);
     expect(workbook.sheets).toHaveLength(3);
-    expect(parseWorkbookSheet(workbook, "订单数据").rows).toHaveLength(6);
-    expect(parseWorkbookSheet(workbook, "仓库事件").rows).toHaveLength(36);
-    expect(parseWorkbookSheet(workbook, "物流轨迹").rows).toHaveLength(36);
+    expect(parseWorkbookSheet(workbook, "订单数据").rows).toHaveLength(80);
+    expect(parseWorkbookSheet(workbook, "仓库事件").rows).toHaveLength(480);
+    expect(parseWorkbookSheet(workbook, "物流轨迹").rows).toHaveLength(480);
   });
 
   it("按 Excel 零填充显示格式保护数字型业务 ID 的前导零", () => {

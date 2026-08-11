@@ -1,8 +1,8 @@
 # FulfillLens 数据字典
 
 - 文档状态：Draft for implementation
-- 契约版本：data-contract-v1.0-draft
-- 更新日期：2026-07-29
+- 契约版本：data-contract-v1.1.0
+- 更新日期：2026-08-11
 
 ## 1. 数据契约原则
 
@@ -69,7 +69,7 @@
 
 - 一行代表某订单在仓库流程中的一次事件；
 - 主键：`event_id`；
-- 外键：`order_id` → `orders.order_id`；
+- 外键：`order_id` → `orders.order_id`；仓库作业事件仍要求订单编号，以保持仓内流程和订单粒度可对账；
 - 同一订单可有多条事件，按 `event_time` 排序。
 
 ### 4.2 字段
@@ -100,30 +100,30 @@
 
 - 一行代表某运单的一次物流轨迹事件；
 - 主键：`tracking_event_id`；源文件没有可信唯一事件 ID 时允许在导入校验阶段生成，并记录 `GENERATED_TRACKING_EVENT_ID` 信息；
-- 外键：`order_id` → `orders.order_id`；
+- 可选外键：`order_id` → `orders.order_id`；缺失时仍可按 `shipment_id` 做轨迹首末跨度、状态和时间线分析；
 - `shipment_id` 是本地可关联的运单标识，可为合成或脱敏值，不要求使用真实快递单号；
 - 一个订单可以有多个 `shipment_id`。
 
 ### 5.2 字段
 
-| 字段名              | 中文名称         | 类型             | 必填 | 合成示例                    | 敏感等级 | 校验规则                                   |
-| ------------------- | ---------------- | ---------------- | ---- | --------------------------- | -------- | ------------------------------------------ |
-| `tracking_event_id` | 轨迹事件标识     | string           | 是   | `TRE-SYN-000001`            | S2       | 1–128 字符；数据集内唯一；可由稳定规则生成 |
-| `order_id`          | 订单标识         | string           | 是   | `ORD-SYN-000001`            | S2       | 必须能关联订单表                           |
-| `shipment_id`       | 运单标识         | string           | 是   | `SHP-SYN-000001`            | S2       | 1–128 字符；公开示例不得使用真实快递单号   |
-| `event_time`        | 轨迹事件时间     | string/date-time | 是   | `2026-07-02T10:00:00+08:00` | S1       | 必须含时区；不得早于订单创建时间           |
-| `event_code`        | 标准物流事件代码 | enum/string      | 是   | `carrier_picked_up`         | S0       | 使用标准枚举；无法映射时为 `unmapped`      |
-| `raw_status`        | 原始物流状态     | string           | 是   | `快件已揽收`                | S2       | 1–256 字符；必须原样保留                   |
-| `carrier_id`        | 承运商标识       | string           | 是   | `CAR-SYN-01`                | S1       | 1–128 字符；同一运单原则上保持一致         |
-| `location_code`     | 节点位置代码     | string           | 否   | `HUB-SYN-QD-01`             | S2       | 1–128 字符；不得填详细地址或精确经纬度     |
-| `region_code`       | 区域代码         | string           | 否   | `CN-SD-QD`                  | S1       | 1–128 字符；使用规范区域代码               |
-| `exception_code`    | 异常代码         | string           | 否   | `WEATHER_DELAY`             | S1       | 1–64 字符；只记录规范代码，不写个人描述    |
-| `sequence_number`   | 源事件序号       | integer          | 否   | `12`                        | S1       | 大于等于 0；用于相同时间事件的稳定排序     |
+| 字段名              | 中文名称         | 类型             | 必填               | 合成示例                    | 敏感等级 | 校验规则                                       |
+| ------------------- | ---------------- | ---------------- | ------------------ | --------------------------- | -------- | ---------------------------------------------- |
+| `tracking_event_id` | 轨迹事件标识     | string           | 是                 | `TRE-SYN-000001`            | S2       | 1–128 字符；数据集内唯一；可由稳定规则生成     |
+| `order_id`          | 订单标识         | string           | 否，跨表关联依赖   | `ORD-SYN-000001`            | S2       | 缺失时仍可按运单分析，但不能生成订单级关联指标 |
+| `shipment_id`       | 运单标识         | string           | 是                 | `SHP-SYN-000001`            | S2       | 1–128 字符；公开示例不得使用真实快递单号       |
+| `event_time`        | 轨迹事件时间     | string/date-time | 是                 | `2026-07-02T10:00:00+08:00` | S1       | 必须含时区；不得早于订单创建时间               |
+| `event_code`        | 标准物流事件代码 | enum/string      | 是                 | `carrier_picked_up`         | S0       | 使用标准枚举；无法映射时为 `unmapped`          |
+| `raw_status`        | 原始物流状态     | string           | 是                 | `快件已揽收`                | S2       | 1–256 字符；必须原样保留                       |
+| `carrier_id`        | 承运商标识       | string           | 否，承运商维度依赖 | `CAR-SYN-01`                | S1       | 缺失时整体时效仍可计算，承运商对比不可用       |
+| `location_code`     | 节点位置代码     | string           | 否                 | `HUB-SYN-QD-01`             | S2       | 1–128 字符；不得填详细地址或精确经纬度         |
+| `region_code`       | 区域代码         | string           | 否                 | `CN-SD-QD`                  | S1       | 1–128 字符；使用规范区域代码                   |
+| `exception_code`    | 异常代码         | string           | 否                 | `WEATHER_DELAY`             | S1       | 1–64 字符；只记录规范代码，不写个人描述        |
+| `sequence_number`   | 源事件序号       | integer          | 否                 | `12`                        | S1       | 大于等于 0；用于相同时间事件的稳定排序         |
 
 ### 5.3 跨字段和跨行规则
 
 - 同一 `tracking_event_id` 冲突为阻断错误；
-- 自动生成 ID 使用规范化后的 `order_id`、`shipment_id`、`event_time`、`raw_status`、`carrier_id`、可选 `sequence_number` 和源行号；固定文件内容与行序可复现，重新排列源行会改变生成 ID；
+- 自动生成 ID 至少使用规范化后的 `shipment_id`、`event_time`、`raw_status`，并组合可选 `order_id`、`carrier_id`、`sequence_number` 和源行号；固定文件内容与行序可复现，重新排列源行会改变生成 ID；
 - 同一 `shipment_id` 出现多个 `carrier_id` 时产生冲突警告；
 - 相同时间按 `sequence_number` 排序；仍相同则保持稳定导入顺序并标记歧义；
 - `event_code=unmapped` 时不得丢弃 `raw_status`；

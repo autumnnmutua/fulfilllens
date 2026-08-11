@@ -1,8 +1,10 @@
 import {
+  fingerprintBrowserDataset,
   readBrowserDataset,
   type BrowserDataset,
 } from "../imports/browserDatasetStore";
 import { BROWSER_DERIVED_ORDERS_ID } from "./browserSelection";
+import { readBrowserAnalysisSession } from "./browserAnalysisSession";
 import type {
   DashboardFilters,
   DashboardOrderOptions,
@@ -21,8 +23,8 @@ import type {
   OrderMetricDetail,
 } from "../types/metrics";
 
-export const BROWSER_METRICS_VERSION = "browser-metrics-v1.0.0";
-const BROWSER_RULE_VERSION = "browser-analysis-rules-v1.0.0";
+export const BROWSER_METRICS_VERSION = "browser-metrics-v1.1.0";
+const BROWSER_RULE_VERSION = "browser-analysis-rules-v1.1.0";
 
 export interface EventRow {
   event_code: string;
@@ -44,6 +46,15 @@ export interface LocalAnalysisData {
   qualityWarningCount: number;
   statusNormalizations: BrowserDataset["qualityReport"]["status_normalizations"];
   orderDatasetPresent: boolean;
+  analysisFingerprint: string;
+  analysisSource:
+    "user_import" | "compatibility_sample" | "teaching_data" | "server_dataset";
+  linkage: {
+    linked_order_count: number;
+    linkage_rate: number | null;
+    orphan_event_count: number;
+    unlinked_order_count: number;
+  } | null;
 }
 
 function text(value: unknown, fallback = ""): string {
@@ -196,8 +207,11 @@ function eventAnomaly(event: EventRow): string[] {
   ) {
     codes.add(event.event_code);
   }
-  if (event.event_code === "unmapped") codes.add("unmapped_status");
   return [...codes];
+}
+
+function eventEntityId(event: EventRow): string {
+  return event.order_id || event.shipment_id;
 }
 
 function nodeDurations(events: EventRow[]): NodeDuration[] {
@@ -246,9 +260,10 @@ async function load(selection: DatasetSelection): Promise<LocalAnalysisData> {
   ];
   const eventsByOrder = new Map<string, EventRow[]>();
   events.forEach((event) => {
-    if (!event.order_id) return;
-    eventsByOrder.set(event.order_id, [
-      ...(eventsByOrder.get(event.order_id) ?? []),
+    const entityId = eventEntityId(event);
+    if (!entityId) return;
+    eventsByOrder.set(entityId, [
+      ...(eventsByOrder.get(entityId) ?? []),
       event,
     ]);
   });
@@ -334,7 +349,8 @@ async function load(selection: DatasetSelection): Promise<LocalAnalysisData> {
           ? text(
               (
                 trackingDataset?.rows.find(
-                  (item) => text(item.order_id) === orderId,
+                  (item) =>
+                    (text(item.order_id) || text(item.shipment_id)) === orderId,
                 ) ?? {}
               ).carrier_id,
               "未知",
@@ -361,6 +377,53 @@ async function load(selection: DatasetSelection): Promise<LocalAnalysisData> {
   const datasets = [ordersDataset, warehouseDataset, trackingDataset].filter(
     (item): item is BrowserDataset => item !== null,
   );
+  const orderKeys = new Set(
+    orderRows.map((row) => text(row.order_id)).filter(Boolean),
+  );
+  const eventKeys = new Set(
+    events.map((event) => event.order_id).filter(Boolean),
+  );
+  const linkedOrderCount = [...orderKeys].filter((key) =>
+    eventKeys.has(key),
+  ).length;
+  const orphanEventCount = events.filter(
+    (event) => Boolean(event.order_id) && !orderKeys.has(event.order_id),
+  ).length;
+  const linkage =
+    ordersDataset && events.length > 0
+      ? {
+          linked_order_count: linkedOrderCount,
+          linkage_rate: orderKeys.size
+            ? linkedOrderCount / orderKeys.size
+            : null,
+          orphan_event_count: orphanEventCount,
+          unlinked_order_count: Math.max(0, orderKeys.size - linkedOrderCount),
+        }
+      : null;
+  if (
+    linkage &&
+    orderKeys.size > 0 &&
+    eventKeys.size > 0 &&
+    linkedOrderCount === 0
+  ) {
+    throw new Error(
+      "订单数据与事件数据的关联率为 0，系统不会自动混合两个无关数据集。请检查订单编号映射或分别分析。",
+    );
+  }
+  const datasetFingerprints = await Promise.all(
+    datasets.map(async (dataset) => ({
+      data_type: dataset.dataType,
+      fingerprint:
+        dataset.fingerprint ??
+        (await fingerprintBrowserDataset(dataset.dataType, dataset.rows)),
+      file_name: dataset.fileName,
+    })),
+  );
+  const analysisFingerprint = await fingerprintBrowserDataset(
+    "orders",
+    datasetFingerprints,
+  );
+  const session = readBrowserAnalysisSession();
   return {
     datasets: selection,
     details,
@@ -374,6 +437,9 @@ async function load(selection: DatasetSelection): Promise<LocalAnalysisData> {
       (item) => item.qualityReport.status_normalizations,
     ),
     orderDatasetPresent: ordersDataset !== null,
+    analysisFingerprint,
+    analysisSource: session?.sourceKind ?? "user_import",
+    linkage,
   };
 }
 
@@ -381,7 +447,7 @@ function metricsFor(
   details: OrderMetricDetail[],
   orderDatasetPresent: boolean,
 ): MetricResult[] {
-  const eligible = details.filter(
+  const rateEligible = details.filter(
     (item) => !isExcludedStatus(item.order_status),
   );
   const rate = (
@@ -389,7 +455,7 @@ function metricsFor(
     label: string,
     key: "ot" | "in_full" | "otif",
   ): MetricResult => {
-    const values = eligible.filter((item) => item[key].value !== null);
+    const values = rateEligible.filter((item) => item[key].value !== null);
     const successes = values.filter((item) => item[key].value === true).length;
     return metric(
       code,
@@ -398,7 +464,7 @@ function metricsFor(
       values.length ? successes / values.length : null,
       values.length ? successes : null,
       values.length || null,
-      eligible.length,
+      rateEligible.length,
       values.length
         ? []
         : [
@@ -410,7 +476,8 @@ function metricsFor(
           ],
     );
   };
-  const durations = durationValues(eligible, orderDatasetPresent);
+  const durationEligible = orderDatasetPresent ? rateEligible : details;
+  const durations = durationValues(durationEligible, orderDatasetPresent);
   const durationMetric = (code: string, label: string, value: number | null) =>
     metric(
       code,
@@ -419,7 +486,7 @@ function metricsFor(
       value,
       value,
       durations.length || null,
-      eligible.length,
+      durationEligible.length,
       durations.length
         ? orderDatasetPresent
           ? []
@@ -448,7 +515,7 @@ function metricsFor(
           item.ordered_quantity !== null &&
           item.delivered_quantity !== null,
       ).length
-    : 0;
+    : details.filter((item) => item.node_durations.length > 0).length;
   return [
     metric(
       "total_order_count",
@@ -615,6 +682,89 @@ function groupedMetrics(
   }));
 }
 
+function capabilitiesFor(data: LocalAnalysisData, metrics: MetricResult[]) {
+  const metricAvailable = (code: string) =>
+    metrics.find((item) => item.code === code)?.value !== null;
+  const hasCarrier = data.details.some((item) => item.carrier_id !== "未知");
+  const hasLocation = data.events.some(
+    (item) => item.location_code && item.location_code !== "未知",
+  );
+  const hasRecognizedStatus = data.events.some(
+    (item) => item.event_code !== "unmapped",
+  );
+  const hasTrackingSpan = metricAvailable("fulfillment_duration_median_hours");
+  return [
+    {
+      available: hasTrackingSpan,
+      code: "lead_time",
+      label: data.orderDatasetPresent ? "订单履约时效" : "轨迹首末时效",
+      reason: hasTrackingSpan
+        ? "同一业务实体具有可排序的起止时间。"
+        : "至少需要同一运单或业务单的两个有效时间事件。",
+    },
+    {
+      available: hasTrackingSpan,
+      code: "percentiles",
+      label: "P50 / P90 与长尾",
+      reason: hasTrackingSpan
+        ? "当前具有可计算时效样本。"
+        : "需要可计算的轨迹或履约时长样本。",
+    },
+    {
+      available: hasRecognizedStatus,
+      code: "status",
+      label: "状态分布与时间线",
+      reason: hasRecognizedStatus
+        ? "已识别至少一种标准物流状态；未知状态仍保留原文。"
+        : "需要物流状态列；未知值不会被强行归类。",
+    },
+    {
+      available: hasCarrier,
+      code: "carrier",
+      label: "承运商表现对比",
+      reason: hasCarrier ? "已识别承运商字段。" : "需要承运商或物流公司字段。",
+    },
+    {
+      available: hasLocation,
+      code: "location",
+      label: "节点与地点分析",
+      reason: hasLocation
+        ? "已识别物流地点或节点字段。"
+        : "需要地点、网点或节点字段。",
+    },
+    {
+      available: metricAvailable("anomaly_order_rate"),
+      code: "anomaly",
+      label: "异常与长尾核查",
+      reason: "基于状态、异常码、时间间隔和未识别状态进行透明规则核查。",
+    },
+    {
+      available: metricAvailable("ot_rate"),
+      code: "ot",
+      label: "按时交付率（OT）",
+      reason: metricAvailable("ot_rate")
+        ? "具有承诺送达时间与实际交付时间。"
+        : "需要订单承诺送达时间与实际交付时间。",
+    },
+    {
+      available: metricAvailable("if_rate"),
+      code: "if",
+      label: "足量交付率（IF）",
+      reason: metricAvailable("if_rate")
+        ? "具有订购数量与实际交付数量。"
+        : "需要订购数量与实际交付数量。",
+    },
+    {
+      available: metricAvailable("otif_rate"),
+      code: "otif",
+      label: "按时足量交付率（OTIF）",
+      reason: metricAvailable("otif_rate")
+        ? "OT 与 IF 均可计算。"
+        : "需要同时满足 OT 与 IF 的数据要求。",
+    },
+  ];
+}
+
 export const browserLocalAnalyticsService = {
   async overview(
     selection: DatasetSelection,
@@ -624,8 +774,15 @@ export const browserLocalAnalyticsService = {
     const data = await load(selection);
     const filtered = filterDetails(data.details, filters);
     const metrics = metricsFor(filtered, data.orderDatasetPresent);
-    const dates = filtered
-      .map((item) => analysisDate(item)?.slice(0, 10))
+    const filteredIds = new Set(filtered.map((item) => item.order_id));
+    const dates = (
+      data.orderDatasetPresent
+        ? filtered.map((item) => analysisDate(item))
+        : data.events
+            .filter((event) => filteredIds.has(eventEntityId(event)))
+            .map((event) => event.event_time)
+    )
+      .map((value) => value?.slice(0, 10))
       .filter((value): value is string => Boolean(value))
       .sort();
     const dimensionKey = (detail: OrderMetricDetail) => detail[view.dimension];
@@ -664,6 +821,7 @@ export const browserLocalAnalyticsService = {
               "当前只有事件表：首末轨迹时效、节点耗时、状态与异常可以分析；OT、IF、OTIF 仍保持不可计算。",
           },
         ];
+    const capabilities = capabilitiesFor(data, metrics);
     return {
       context: {
         dataset_label: `浏览器本地数据：${data.sourceFiles.join(" + ") || "已导入文件"}`,
@@ -676,6 +834,10 @@ export const browserLocalAnalyticsService = {
         data_coverage: coverageMetric?.value ?? null,
         last_analyzed_at: new Date().toISOString(),
         warning_count: data.qualityWarningCount + warnings.length,
+        analysis_fingerprint: data.analysisFingerprint,
+        analysis_source: data.analysisSource,
+        capabilities,
+        linkage: data.linkage,
       },
       active_filters: filters,
       filter_options: {

@@ -416,7 +416,7 @@ export function DashboardOrderList({
               </section>
               <section>
                 <Typography.Title level={3}>指标判定</Typography.Title>
-                <Space direction="vertical">
+                <Space orientation="vertical">
                   {(
                     [
                       ["OT", detail.ot],
