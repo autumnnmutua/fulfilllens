@@ -5,6 +5,7 @@
 - version：`1.1.0`
 - branch：`main`
 - date：2026-08-11（Asia/Shanghai）
+- accepted application commit：`19e350bfeb66d4268a8b19c32c4c3bc3e021c3d7`
 - accepted commit：以最终 annotated tag `v1.1.0^{commit}` 为准
 - base release：`v1.0.0` 标签、GitHub Release 与历史不修改
 
@@ -89,7 +90,9 @@
 | `npm run test:browser`                                |         0 | 8 个路由 × 5 个视口，共 40 组 Chromium 可访问性、键盘、语义与横向溢出检查通过                                |
 | `npm run smoke`                                       |         0 | API、Web 代理、版本、主要 SPA 路由和两份兼容性示例下载通过                                                   |
 | `docker compose config/build/up --wait` + 宿主机探测  |         0 | Docker 29.6.2；API/Web 容器健康，宿主机 `/health` 与 `/api/version` 均返回 1.1.0，容器已停止并清理临时运行卷 |
-| Cloudflare / GitHub 外部门槛                          |    待执行 | Wrangler dry-run、正式部署、生产 A/B 浏览器复验、最终提交与 GitHub Actions 全绿后更新                        |
+| `wrangler deploy --dry-run`                           |         0 | 23 个静态资产、Worker 与 AI/ASSETS bindings 校验通过                                                         |
+| Cloudflare 正式部署与生产浏览器 A/B                   |         0 | Worker 1.1.0；19 个生产浏览器场景通过，两份 54×21 CSV 均零丢行、零阻断、零逐字段确认，原始文件上传请求为 0   |
+| GitHub Actions CI `31453650030`                       |         0 | 质量、测试、构建、Cloudflare 浏览器导入与 Docker 构建/烟雾测试两个任务全部通过                               |
 
 ## Security & Privacy
 
@@ -103,7 +106,10 @@
 
 - Worker：`fulfilllens`
 - production URL：<https://fulfilllens.esthertreu3724.workers.dev>
-- deployment / production smoke：最终部署后更新
+- deployment ID：`20794534-5427-4b64-82ab-3eb13129d7aa`
+- version ID：`34973221-e771-48fd-8537-2b87ff204ef2`
+- deployed at：2026-08-11 10:57:41（Asia/Shanghai）
+- production smoke：`/health`、`/api/version`、8 个 SPA 路由、两份兼容样例、Workers AI 固定合成探针和 19 个浏览器导入/A/B 场景全部通过；版本为 1.1.0，Workers AI 探针使用 71 tokens 且未发送业务数据。
 
 ## Release Assets
 
@@ -124,6 +130,6 @@
 
 ## Final Verdict
 
-**BLOCKED（等待剩余发布门槛）**
+**READY FOR v1.1.0**
 
-本地代码、A/B 浏览器正确性、全量 `release:check`、可访问性、smoke 与 Docker 门槛已通过；在 Cloudflare 正式部署与生产 A/B 复验、最终提交和 GitHub Actions 全绿前，不创建 `v1.1.0` 标签或 Release。
+本地与远端质量门槛、Docker、Cloudflare 正式部署、Workers AI 固定合成探针和生产 A/B 浏览器复验均已通过。最终验收证据提交再次通过 GitHub Actions 后，可创建 `v1.1.0` annotated tag 与正式 Release。
