@@ -6,7 +6,8 @@
 - branch：`main`
 - date：2026-08-13（Asia/Shanghai）
 - base release：`v1.1.1`
-- accepted commit：以最终 annotated tag `v1.1.2^{commit}` 为准
+- accepted runtime commit：`707a645c3c0614c9b63dc4cceb58904ffe3d7f2c`
+- accepted release commit：以最终 annotated tag `v1.1.2^{commit}` 为准；其相对 runtime commit 仅补充验收证据
 - compatibility：`v1.0.0`、`v1.1.0`、`v1.1.1` 的 tag、Release 与 Git 历史均不修改
 
 ## Scope
@@ -52,14 +53,16 @@
 | `npm.cmd run smoke`                                           |         0 | API/Web、1.1.2 版本、主要路由及兼容 CSV/XLSX 下载通过                                   |
 | `docker compose build/up --wait` + 宿主机探测                 |         0 | Docker 29.6.2；API/Web 健康，版本 1.1.2，设置页无旧入口，旧 API 为 404；专用卷已清理    |
 | `wrangler@4.120.0 deploy --dry-run`                           |         0 | 读取 23 个静态资产；唯一运行绑定为 `env.ASSETS`                                         |
-| GitHub Actions CI `31668965883`                               |         0 | 静态/测试/构建任务与独立 Docker/浏览器烟雾任务均通过                                    |
-| `npm.cmd run deploy:cloudflare`                               |         0 | 正式部署 Worker `fulfilllens`；Version ID `7dd4b3e8-a8f8-4d53-8b3c-e9b58a8b72bc`        |
+| GitHub Actions CI `31670543978`                               |         0 | 静态/测试/构建任务与独立 Docker/浏览器烟雾任务均通过                                    |
+| `npm.cmd run deploy:cloudflare`                               |         0 | 正式部署 Worker `fulfilllens`；Version ID `63f68bce-2684-4d75-821e-fe3b7f62816f`        |
 | 生产 `npm.cmd run test:browser-import`                        |         0 | 18 个自主导入/分析场景通过；原始上传请求 0                                              |
 | 生产 `npm.cmd run test:browser`                               |         0 | 8 路由 × 5 视口共 40 组通过，无 axe 违规或横向溢出                                      |
 
 首次审计在 Windows 中文用户路径上因 `pip-api` 错误按 UTF-8 解码本机输出而失败；设置 UTF-8 后又发现原命令错误包含全局 Jupyter 等非项目软件。现已使用 `scripts/audit_python.py` 固定 UTF-8，并只审计锁定的 `apps/api/requirements-dev.txt`；项目依赖结果为 0 已知漏洞，未忽略任何项目包。
 
 首次临时 Docker 项目探测使用了与 Compose 顶层兼容名称冲突的项目覆盖，且默认项目一度复用旧镜像。最终严格按 README 的 `docker compose build`、`up -d --wait` 从当前源码重建，确认 API 返回 1.1.2 后才计为通过。
+
+验收证据提交后的首轮 CI `31669594009` 在 Docker 的 360px 分析加载态发现两项真实无障碍缺陷：无语义 `div` 使用了 `aria-label`，以及加载遮罩下主按钮文字对比度只有 2.91:1。修复为 `role="status"` 的可播报加载区域，并采用遮罩后仍达到 4.70:1 的主色；相同 Docker 条件、本地 40 组审计及 CI `31670543978` 均已回归通过。
 
 ## Security & Privacy
 
@@ -74,9 +77,9 @@
 - Worker：`fulfilllens`
 - production URL：<https://fulfilllens.esthertreu3724.workers.dev>
 - pre-deploy validation：PASS，dry-run 只显示 `env.ASSETS`
-- accepted application commit：`e93ccd9e57405f79a5cc46db5663d0a6ec503480`
-- accepted production Version ID：`7dd4b3e8-a8f8-4d53-8b3c-e9b58a8b72bc`
-- deployed at：2026-08-13 13:08:46（Asia/Shanghai）
+- accepted runtime commit：`707a645c3c0614c9b63dc4cceb58904ffe3d7f2c`
+- accepted production Version ID：`63f68bce-2684-4d75-821e-fe3b7f62816f`
+- deployed at：2026-08-13 13:37:39（Asia/Shanghai）
 - bindings：仅 `env.ASSETS`，无外部生成式推理 binding
 - API smoke：`/health` 和 `/api/version` 返回 1.1.2；三套合成案例可读取；两个旧集成路径均返回 `ONLINE_DEMO_API_NOT_FOUND`/404
 - browser smoke：18 个生产导入/分析场景及 40 组全站审计通过；设置页无旧入口、无集成请求，原始上传请求为 0
