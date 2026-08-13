@@ -560,7 +560,12 @@ export function AnalyticsPage() {
       />
 
       {overviewBusy && overview === null ? (
-        <Card className="section-card" aria-label="正在加载分析总览">
+        <Card
+          className="section-card"
+          role="status"
+          aria-live="polite"
+          aria-label="正在加载分析总览"
+        >
           <Skeleton active paragraph={{ rows: 8 }} />
         </Card>
       ) : overview === null ? (

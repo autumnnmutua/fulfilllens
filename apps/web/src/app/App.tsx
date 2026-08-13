@@ -12,7 +12,9 @@ export function App() {
       locale={zhCN}
       theme={{
         token: {
-          colorPrimary: "#146c94",
+          // Keep primary button text readable even while Ant Design applies its
+          // translucent loading overlay (WCAG AA contrast remains above 4.5:1).
+          colorPrimary: "#003049",
           colorInfo: "#146c94",
           colorText: "#102a43",
           colorTextSecondary: "#334e68",
