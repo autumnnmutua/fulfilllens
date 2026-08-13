@@ -1,146 +1,110 @@
-# Cloudflare 部署与 Workers AI 可行性评估
+# Cloudflare 部署与运行边界
 
-- 更新日期：2026-08-10
-- 结论：在线版可用浏览器本地引擎导入并分析自主 CSV/XLSX，用独立 TypeScript Worker 提供公开合成分析；完整本地版不能原样迁移并继续依赖本机文件系统
-- 当前状态：已实现浏览器本地安全解析/转换/校验、指标/诊断/行动建议/报告，静态资源、公开确定性合成案例、订单级模拟接口和 Workers AI 原生绑定
+- 更新日期：2026-08-13
 - 在线地址：<https://fulfilllens.esthertreu3724.workers.dev>
-- 旧地址：`https://fulfilllens-cn.esthertreu3724.workers.dev` 在迁移验收期间保留为历史回退入口，不提前删除或覆盖
+- Worker：`fulfilllens`
+- 结论：自主 CSV/XLSX 在浏览器本地处理；Worker 托管 SPA 与公开合成案例 API，不接收自主文件或标准化行
 
-公开品牌和 Worker 项目名从 `fulfilllens-cn` 迁移为 `fulfilllens`。新项目复用同一构建、环境绑定、安全头和生产分支，不迁移用户原始文件，因为在线自主导入本来就只在浏览器本地处理。只有新地址完成 CSV/XLSX、字段映射、忽略、核心路由、Console/Network 与 AI binding 验收后，才评估旧地址跳转；本版本不冒险删除可工作的旧站。
-
-## 1. 结论
-
-FulfillLens 已具备“自主文件浏览器本地导入 + 公开合成数据云端分析”的 Cloudflare 在线版：
+## 1. 当前架构
 
 ```text
 React/Vite 静态资源（Workers Static Assets）
-        ├─ 自主 CSV/XLSX → 浏览器本地导入/指标/诊断/建议/报告
+        ├─ 自主 CSV/XLSX → 浏览器本地解析/映射/校验/指标/诊断/建议/报告
         └─ 同源 API
-           TypeScript Worker ── 确定性合成案例 → 指标/诊断/订单级模拟/报告
-                     └────────── 原生 AI binding → Workers AI 固定合成探针
+           TypeScript Worker ── 公开确定性合成案例 → 指标/诊断/模拟/报告
 ```
 
-自主文件不进入 Worker：浏览器负责文件安全检查、CSV/XLSX 解析、字段建议、状态标准化、Schema/质量校验、IndexedDB 保存以及确认后的指标、诊断、行动建议和报告。Worker 的原始上传路由返回 `BROWSER_LOCAL_IMPORT_REQUIRED`，旧的摘要白名单不再是合法自主文件的入口。公开合成指标使用 Type-7 分位数；What-if 先变换合成订单/节点副本再调用同一指标函数。浏览器自主数据当前不支持 What-if。运行期 Map 不宣传成持久存储。当前 FastAPI、DuckDB、SQLite 和临时目录仍面向本机持久文件；Cloudflare Python Workers、DuckDB/Python 二进制包、内存和 CPU 限制需要单独验证。“浏览器本地导入与分析 + 合成在线演示 + AI 原生绑定”已实现，“当前后端零修改部署”仍不可验收。
+运行时不声明外部生成式推理 binding，不提供模型状态或探针路由，也不需要模型凭据。指标、诊断、建议、模拟和报告均由仓库内确定性代码生成。
 
-## 1.1 当前在线演示契约
+公开品牌和 Worker 项目名已从历史名称 `fulfilllens-cn` 迁移为 `fulfilllens`。旧地址仍作为历史部署保留，不是当前文档或书签的首选。
 
-| 路径                                   | 行为                                                            |
-| -------------------------------------- | --------------------------------------------------------------- |
-| `/` 及前端路由                         | 返回 React SPA，并附 CSP、禁止嵌入、权限策略等安全响应头        |
-| `/health`、`/api/version`              | 返回 Worker 健康和 `cloudflare-online-demo` 版本契约            |
-| `/api/cases`、`/api/imports/synthetic` | 返回公开合成案例或预览                                          |
-| `/api/imports/samples`                 | 列出/下载公开合成兼容性样例                                     |
-| `/api/imports/upload`                  | 返回 `BROWSER_LOCAL_IMPORT_REQUIRED`；原始文件必须在浏览器处理  |
-| `/api/metrics/*`、`/api/dashboard/*`   | 对确定性合成订单计算指标、筛选、明细和安全 CSV                  |
-| `/api/diagnostics/*`                   | 对合成数据执行透明规则并返回事实、判断、谨慎原因和证据          |
-| `/api/simulations/*`                   | 在合成订单/节点副本上变换并复算；运行期自建方案不保证跨实例持久 |
-| `/api/reports/*`                       | 预览和小型合成报告；运行期任务不等同于持久云报告系统            |
-| 浏览器自主数据                         | IndexedDB 本地指标、诊断、双视图建议和报告；不调用原始上传路由  |
-| `/api/integrations/workers-ai/status`  | 只返回绑定状态、模型标识和数据策略，不返回凭据                  |
-| `/api/integrations/workers-ai/probe`   | 必须有显式确认请求头，只发送固定合成短句                        |
-| 未实现的其他 `/api/*`                  | 返回标准 404，不用合成结果冒充用户真实数据                      |
+## 2. 在线接口契约
 
-配置源是根目录 `wrangler.jsonc`，Worker 位于 `apps/cloudflare-worker/`。浏览器只调用同源接口；云端推理通过 `env.AI.run()`，不需要把 REST Token 或 Account ID 注入前端。
+| 路径                                   | 行为                                                           |
+| -------------------------------------- | -------------------------------------------------------------- |
+| `/` 及前端路由                         | 返回 React SPA，并附 CSP、禁止嵌入和权限策略等安全响应头       |
+| `/health`、`/api/version`              | 返回 Worker 健康和版本契约                                     |
+| `/api/cases`、`/api/imports/synthetic` | 返回公开合成案例或预览                                         |
+| `/api/imports/samples`                 | 列出或下载公开合成兼容性样例                                   |
+| `/api/imports/upload`                  | 返回 `BROWSER_LOCAL_IMPORT_REQUIRED`；原始文件必须在浏览器处理 |
+| `/api/metrics/*`、`/api/dashboard/*`   | 对公开合成订单计算指标、筛选、明细和安全 CSV                   |
+| `/api/diagnostics/*`                   | 对公开合成数据执行透明规则并返回事实、判断、谨慎原因和证据     |
+| `/api/simulations/*`                   | 在合成订单/节点副本上变换并复算；自建方案不保证跨实例持久      |
+| `/api/reports/*`                       | 预览和小型合成报告；运行期任务不是持久云报告系统               |
+| 浏览器自主数据                         | IndexedDB 本地指标、诊断、双视图建议和报告；不调用原始上传路由 |
+| 已移除的外部推理集成路由               | 返回标准 404，不保留兼容探针或隐藏调用                         |
+| 未实现的其他 `/api/*`                  | 返回标准 404，不用合成结果冒充用户真实数据                     |
 
-## 2. 组件可行性
+配置源是根目录 `wrangler.jsonc`，Worker 位于 `apps/cloudflare-worker/`。浏览器只调用同源公开接口。
 
-| 当前组件             | Cloudflare 结论         | 建议                                                                                                                                        |
-| -------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| React + Vite         | 已实现在线版            | Workers Static Assets 托管 SPA；`fflate`、DOM/XML 和 Web API 在浏览器执行 CSV/XLSX 本地导入                                                 |
-| 浏览器本地分析引擎   | 已实现                  | 原始文件不上传；确认后的规范化行、指标、诊断、建议和报告留在当前浏览器；不得宣传成跨设备云存储，当前不支持自主数据 What-if                  |
-| 合成分析适配层       | 已实现                  | TypeScript Worker 只分析内置合成案例；口径和模拟不变量有独立测试，不能替代真实数据后端                                                      |
-| FastAPI + Pydantic   | 有条件可行              | Python Workers 已支持但仍为 beta；先做最小迁移 PoC 和依赖清单验证                                                                           |
-| 本地 SQLite          | 不能直接持久            | 控制元数据迁到 D1；D1 提供 SQLite 语义但不是本机文件                                                                                        |
-| 本地 DuckDB          | 不能直接照搬            | 优先评估浏览器本地 DuckDB-Wasm，或 R2 分片 + Worker/D1 聚合；不要在请求内把大表全部载入 128 MB 内存                                         |
-| 上传临时目录         | 不能持久                | 小文件流式校验后写 R2；大文件使用直传/分片，任务状态写 D1                                                                                   |
-| Workers AI REST 探针 | 本地与云端可用          | 本地 FastAPI 使用进程环境；云端使用 `AI` binding；两者都只发送固定合成短句                                                                  |
-| 透明规则引擎         | 可迁移                  | 保持模型无关；先验证 Python Worker 运行时，再决定复用 Python 或移植纯规则内核                                                               |
-| 阶段 9 报告任务      | 演示可用/持久版不可照搬 | 在线小型合成报告可运行；`ThreadPoolExecutor` 与进程内任务/文件不会跨 Worker 请求可靠保留，真实云模式需 Queues/Workflows + D1 状态 + R2 成品 |
+## 3. 组件边界
+
+| 当前组件           | Cloudflare 结论         | 说明                                                                             |
+| ------------------ | ----------------------- | -------------------------------------------------------------------------------- |
+| React + Vite       | 已实现在线版            | Workers Static Assets 托管 SPA；CSV/XLSX 自主导入在浏览器执行                    |
+| 浏览器本地分析引擎 | 已实现                  | 原始文件不上传；确认后的规范化行、指标、诊断、建议和报告留在当前浏览器           |
+| 合成分析适配层     | 已实现                  | TypeScript Worker 只分析内置合成案例；不能替代真实数据后端                       |
+| FastAPI + Pydantic | 有条件可行              | Python Workers 仍需逐依赖 PoC；当前继续用于本地/Docker                           |
+| 本地 SQLite        | 不能直接持久            | 若未来需要云端控制元数据，应重新评估 D1 和身份/删除契约                          |
+| 本地 DuckDB        | 不能直接照搬            | 应先验证浏览器 DuckDB-Wasm 或 R2 分片方案，不在请求内无界载入大表                |
+| 上传临时目录       | 不用于在线自主导入      | 当前自主文件不进入 Worker；未来云上传必须另行设计流式校验、R2 生命周期和用户确认 |
+| 透明规则引擎       | 可复用/已部分移植       | 保持确定性；Python 与 TypeScript 契约由测试对账                                  |
+| 报告任务           | 演示可用/持久版不可照搬 | 在线小型合成报告可运行；真实云任务需持久队列、状态、成品存储、访问控制和取消语义 |
 
 官方依据：
 
 - [React + Vite on Workers](https://developers.cloudflare.com/workers/framework-guides/web-apps/react/)
 - [Workers Static Assets](https://developers.cloudflare.com/workers/static-assets/)
 - [Python Workers](https://developers.cloudflare.com/workers/languages/python/)
-- [Python Workers packages](https://developers.cloudflare.com/workers/languages/python/packages/)
-- [Python Worker 文件系统语义](https://developers.cloudflare.com/workers/languages/python/stdlib/)
 - [Workers 平台限制](https://developers.cloudflare.com/workers/platform/limits/)
 - [D1 限制](https://developers.cloudflare.com/d1/platform/limits/)
 - [R2 分片上传](https://developers.cloudflare.com/r2/objects/upload-objects/)
 
-## 3. Workers AI 能做什么
+## 4. 发布凭据
 
-适合的可选任务：
-
-- 用自然语言解释已经计算好的指标定义、分子分母和覆盖率；
-- 把透明规则结果改写为教学说明或报告草稿；
-- 给字段映射候选提供建议，但必须展示置信度并由用户确认；
-- 基于已脱敏、最小化的规则证据回答“下一步该核查什么”；
-- 在合成教学案例中作为问答助手。
-
-不能直接授权给模型的任务：
-
-- 计算或改写 OT/IF/OTIF、分位数、异常阈值和严重度；
-- 用模型输出代替规则证据或断言经营因果；
-- 默认上传姓名、手机号、地址、身份证、原始订单或整份工作簿；
-- 直接删除数据、确认导入、修改阈值、导出敏感明细或发起外部操作；
-- 把一次模型响应解释为“能自动完成网页所有任务”。
-
-AI 只允许作为可选解释层，不进入指标公式、诊断规则、严重度或聚合对账。
-
-Workers AI 支持 function calling；Cloudflare Agents 也提供 Browser 工具。但网页操作需要开发者定义白名单工具、输入 Schema、权限、审批、幂等、审计和失败恢复。模型本身不会在接入 API 后自动获得本网页的按钮和数据权限。
-
-- [Workers AI function calling](https://developers.cloudflare.com/workers-ai/features/function-calling/)
-- [Cloudflare Agents tools](https://developers.cloudflare.com/agents/concepts/tools/)
-- [Agents Browser tools](https://developers.cloudflare.com/agents/tools/browser/)
-
-## 4. 凭据与调用方式
-
-- 本机开发/连通探针：API Token 和 Account ID 只放 `apps/api/.env`，环境变量以 `FL_` 开头；`.env` 已忽略；
-- 部署后的 Worker：在 Wrangler/控制台声明 `AI` binding，通过 `env.AI.run()` 调用，不需要把 REST Token 注入浏览器；
-- 浏览器：只调用同源受控 API，不接收、打印或持久化 Cloudflare Token；
-- 任何已经出现在聊天、终端历史或其他非密钥管理位置的 Token 都应轮换；仓库扫描不能证明外部位置没有副本；
-- 当前固定探针只发送合成哨兵文本，不读取导入数据。未来的 AI 功能必须另设数据最小化与用户确认契约。
+- 本机部署使用 Wrangler OAuth，或在 CI 进程环境中提供最小权限的 `CLOUDFLARE_API_TOKEN` 和 `CLOUDFLARE_ACCOUNT_ID`；
+- 发布凭据只用于部署，不属于 FulfillLens 应用运行配置；
+- 浏览器不接收、打印或持久化 Cloudflare 发布凭据；
+- 不把真实凭据写入 `.env`、`wrangler.jsonc`、Issue、文档或测试；
+- 任何曾出现在聊天、终端历史或其他非密钥管理位置的凭据都应立即轮换。
 
 ## 5. 本地优先与云模式
 
-“部署在 Cloudflare”与“用户数据默认不离开设备”不是同一件事。当前提供三条清晰路径：
+当前提供三条清晰路径：
 
-- 本地模式：当前 FastAPI + DuckDB/SQLite，文件和分析留在用户设备；
-- 在线自主导入：文件、标准化行和质量报告留在当前浏览器；原始文件不请求 Worker，确认数据用 IndexedDB 保存并可由设置页删除，本地引擎继续生成指标、诊断、行动建议和报告；
-- 公开合成分析：Worker 只分析仓库内确定性合成案例，不读取浏览器自主数据。
+- 本地模式：FastAPI + DuckDB/SQLite，文件和分析留在用户设备；
+- 在线自主导入：文件、标准化行和质量报告留在当前浏览器，确认数据用 IndexedDB 保存并可在设置页删除；
+- 公开合成分析：Worker 只分析仓库内固定种子合成案例，不读取浏览器自主数据。
 
-若未来增加真实云模式，用户必须明确确认后才可上传数据，并展示存储位置、保留期、清理入口和 AI 是否被允许访问派生证据；届时不得继续使用“数据不离开浏览器”的文案。
+若未来增加真实云存储或第三方数据处理，必须另建 ADR，并在上传前展示存储位置、保留期、访问范围和清理入口；届时不得继续使用“数据不离开浏览器”的文案。
 
-## 6. 建议迁移顺序
+## 6. 当前限制
 
-1. 建立本地基线 Git 提交并推送，验证 GitHub Actions 质量与 Docker smoke；
-2. 部署当前在线版，验证 SPA、CSP、浏览器本地 CSV/XLSX、同源合成分析接口、AI binding 和回滚；
-3. 在需要云端业务数据前，先完成 D1/R2 的最小数据集元数据和合成小文件 PoC；
-4. 对 FastAPI/Pydantic、XLSX、DuckDB 逐依赖做 Python Workers 兼容测试；
-5. 选择“Python Worker 迁移”或“TypeScript Worker + 浏览器本地分析”，形成新 ADR；
-6. 用 AI binding 实现固定合成探针，验证限流、错误、用量和费用；
-7. 仅在隐私评审后增加自然语言解释，并保证规则/指标仍由确定性引擎生成；
-8. 进行 1 万/5 万订单、内存、CPU、失败恢复、删除和费用基线；
-9. 将报告进度、取消和下载迁到云端持久任务契约，验证 R2 生命周期与敏感成品删除；
-10. 先预览环境验收，再由用户明确授权生产部署。
+- 浏览器自主数据支持本地指标、诊断、行动建议和报告，但尚不支持 What-if 或跨设备同步；
+- FastAPI、DuckDB 和 SQLite 仍只在本地/Docker 运行；
+- 在线自建方案和合成报告任务不保证跨实例持久；
+- 完整云模式尚未实现账号、授权、长期存储、大文件异步任务、费用上限和删除 SLA；
+- `workers.dev` 地址没有自有域名 SLA。
 
-## 7. 当前限制与发布判定
-
-- 在线自主导入不上传原始文件，也不使用 D1/R2；确认后的规范化数据只存在浏览器 IndexedDB。完整云模式仍被真实数据保留、删除、身份和访问策略阻断；
-- 浏览器自有数据支持本地指标、诊断、行动建议和报告，但尚不支持 What-if，也不能宣传为持久、跨设备的完整 SaaS；
-- Python Workers/Containers 不是当前演示依赖，FastAPI、DuckDB 和 SQLite 仍只在本地/Docker 运行；
-- 在线自建方案和报告任务只处于 Worker 运行期，不保证跨实例持久；大文件异步、费用上限、身份与访问控制未实现，不能宣传成完整 SaaS；
-- 阶段 9 的进程内报告任务不能直接作为 Worker 云实现，完整云模式仍需 Queues/Workflows、D1/R2 与访问控制；
-- 仓库使用 MIT 许可证；Cloudflare 和 GitHub 的真实发布状态必须以实际 CLI/API 验证为准。
-
-## 8. 部署、验证与回滚
+## 7. 构建、验证、部署与回滚
 
 ```powershell
 npm.cmd ci
 npm.cmd run build:cloudflare
 npm.cmd run test:cloudflare
+npx.cmd --yes wrangler@4.120.0 deploy --dry-run
 npm.cmd run deploy:cloudflare
 ```
 
-部署进程可使用 Wrangler 本机 OAuth，或在 CI 进程环境中提供 `CLOUDFLARE_API_TOKEN` 与 `CLOUDFLARE_ACCOUNT_ID`；不得把真实值写入仓库。验收至少请求 `/`、`/health`、`/api/version`、兼容样例目录与静态文件，并用真实 Chrome 完成非标准 CSV、多工作表 XLSX 的浏览器本地七步导入，继续检查指标不可计算保护、诊断、专业行动方案、管理层简报和报告，断言网络中没有 `/api/imports/upload` 原始请求；另外检查公开合成案例、指标、诊断、模拟、报告和 AI 状态接口，并以显式确认头调用一次固定合成探针。回滚使用 Wrangler 的部署版本历史；回滚前后都要重新执行浏览器和 API 冒烟。已经出现在聊天或终端历史的 API Token 应立即轮换。
+部署前后至少验证：
+
+1. `/`、`/health`、`/api/version` 和主要 SPA 路由；
+2. 兼容性样例目录与静态文件；
+3. 公开合成案例的指标、诊断、模拟和报告；
+4. 真实 Chromium 中的自主 CSV 与多工作表 XLSX 浏览器本地导入；
+5. 指标不可计算保护、诊断、专业行动方案、管理层简报和报告；
+6. 网络中没有 `/api/imports/upload` 原始文件请求；
+7. 已移除的外部推理集成路径返回标准 404；
+8. Wrangler 部署输出只包含预期的静态资源绑定，不包含外部推理 binding。
+
+回滚使用 Wrangler 的部署版本历史。回滚前后都要重新执行浏览器与 API 冒烟；不要先删除当前稳定版本再测试新版本。

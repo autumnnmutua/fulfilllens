@@ -40,13 +40,6 @@ describe("设置页本地数据清理", () => {
             environment: "test",
             contract_versions: {},
           });
-        if (path === "/api/integrations/workers-ai/status")
-          return json({
-            enabled: false,
-            configured: false,
-            model: "@cf/test/model",
-            external_data_policy: "不发送业务数据",
-          });
         if (path === "/api/datasets" && options?.method !== "DELETE")
           return json({
             total: 1,
@@ -80,6 +73,7 @@ describe("设置页本地数据清理", () => {
     const user = userEvent.setup();
     render(<App />);
     await screen.findByText(/订单表 · 120 行/);
+    expect(screen.queryByText(/Workers AI/i)).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "清理此数据集" }));
     expect(screen.getByText("确认不可逆清理")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "确认清理" }));

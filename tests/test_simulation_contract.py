@@ -40,7 +40,7 @@ def test_simulation_architecture_and_adr_keep_core_ai_free() -> None:
 
     assert "apps/api/app/simulation/" in architecture
     assert "/api/simulations" in architecture
-    assert "核心模拟不调用 Workers AI" in adr
+    assert "核心模拟不调用外部生成式模型" in adr
     assert "workers_ai" not in engine.lower()
 
 

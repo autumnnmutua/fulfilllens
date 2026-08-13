@@ -3,7 +3,6 @@ import re
 import unittest
 from pathlib import Path
 
-from app.core.config import Settings
 from app.metrics.models import DEFINITION_VERSION
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -215,9 +214,26 @@ class ContractConsistencyTests(unittest.TestCase):
                     hits.append(str(path.relative_to(ROOT)))
         self.assertEqual([], hits)
 
-    def test_workers_ai_default_model_matches_documentation(self) -> None:
-        workers_ai = read_text(DOCS / "WORKERS_AI.md")
-        self.assertIn(Settings().workers_ai_model, workers_ai)
+    def test_runtime_contains_no_external_ai_integration(self) -> None:
+        checked_files = (
+            ROOT / "wrangler.jsonc",
+            ROOT / "apps" / "cloudflare-worker" / "src" / "index.ts",
+            ROOT / "apps" / "api" / "app" / "main.py",
+            ROOT / "apps" / "api" / "app" / "core" / "config.py",
+            ROOT / "apps" / "web" / "src" / "pages" / "SettingsPage.tsx",
+        )
+        prohibited = (
+            '"ai":',
+            "env.AI",
+            "AI.run",
+            "workers-ai",
+            "workers_ai",
+            "cloudflare_api_token",
+        )
+        for path in checked_files:
+            content = read_text(path).lower()
+            for marker in prohibited:
+                self.assertNotIn(marker.lower(), content, f"{marker} remains in {path}")
 
 
 if __name__ == "__main__":

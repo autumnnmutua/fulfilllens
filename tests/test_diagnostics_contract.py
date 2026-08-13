@@ -35,10 +35,11 @@ def test_tracking_transition_rules_only_use_taxonomy_codes() -> None:
     assert all(start in codes and end in codes for start, end in ALLOWED_TRACKING_TRANSITIONS)
 
 
-def test_cloudflare_document_keeps_ai_out_of_deterministic_diagnostics() -> None:
+def test_cloudflare_runtime_has_no_external_inference_path() -> None:
     cloudflare = (ROOT / "docs" / "CLOUDFLARE_DEPLOYMENT.md").read_text(encoding="utf-8")
     architecture = (ROOT / "docs" / "ARCHITECTURE.md").read_text(encoding="utf-8")
 
-    assert "AI binding" in cloudflare
-    assert "不进入指标公式、诊断规则" in cloudflare
+    assert "不声明外部生成式推理 binding" in cloudflare
+    assert "外部生成式推理 binding" in architecture
+    assert "/api/integrations/workers-ai" not in cloudflare
     assert "ADR 0008" in architecture

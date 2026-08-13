@@ -6,7 +6,6 @@ from app.api.routes.dashboard import router as dashboard_router
 from app.api.routes.datasets import router as datasets_router
 from app.api.routes.diagnostics import router as diagnostics_router
 from app.api.routes.imports import router as imports_router
-from app.api.routes.integrations import router as integrations_router
 from app.api.routes.metrics import router as metrics_router
 from app.api.routes.reports import router as reports_router
 from app.api.routes.simulations import router as simulations_router
@@ -48,7 +47,6 @@ def create_app() -> FastAPI:
             "Accept",
             "Content-Type",
             "X-Request-ID",
-            "X-FulfillLens-External-Call",
         ],
         expose_headers=["X-Request-ID"],
     )
@@ -63,7 +61,6 @@ def create_app() -> FastAPI:
     app.include_router(diagnostics_router)
     app.include_router(simulations_router)
     app.include_router(reports_router)
-    app.include_router(integrations_router)
     return app
 
 

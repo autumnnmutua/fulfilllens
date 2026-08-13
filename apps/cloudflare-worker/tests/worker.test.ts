@@ -4,16 +4,6 @@ import worker, { type Env } from "../src/index";
 
 function createEnv(): Env {
   return {
-    AI: {
-      run: vi.fn().mockResolvedValue({
-        response: "FULFILLLENS_WORKERS_AI_OK",
-        usage: {
-          prompt_tokens: 12,
-          completion_tokens: 6,
-          total_tokens: 18,
-        },
-      }),
-    },
     ASSETS: {
       fetch: vi.fn().mockResolvedValue(
         new Response("<html></html>", {
@@ -55,7 +45,7 @@ describe("Cloudflare Worker", () => {
 
     await expect(health.json()).resolves.toMatchObject({
       status: "ok",
-      version: "1.1.1",
+      version: "1.1.2",
     });
     await expect(version.json()).resolves.toMatchObject({
       environment: "cloudflare-online-demo",
@@ -63,36 +53,30 @@ describe("Cloudflare Worker", () => {
     });
   });
 
-  it("requires explicit confirmation before calling Workers AI", async () => {
+  it("does not expose removed external AI integration routes", async () => {
     const env = createEnv();
-    const response = await worker.fetch(
-      new Request("https://example.test/api/integrations/workers-ai/probe", {
-        method: "POST",
-      }),
-      env,
-    );
+    const [status, probe] = await Promise.all([
+      worker.fetch(
+        new Request("https://example.test/api/integrations/workers-ai/status"),
+        env,
+      ),
+      worker.fetch(
+        new Request("https://example.test/api/integrations/workers-ai/probe", {
+          method: "POST",
+          headers: { "X-FulfillLens-External-Call": "confirm" },
+        }),
+        env,
+      ),
+    ]);
 
-    expect(response.status).toBe(403);
-    expect(env.AI.run).not.toHaveBeenCalled();
-  });
-
-  it("uses the native AI binding for the fixed synthetic probe", async () => {
-    const env = createEnv();
-    const response = await worker.fetch(
-      new Request("https://example.test/api/integrations/workers-ai/probe", {
-        method: "POST",
-        headers: { "X-FulfillLens-External-Call": "confirm" },
-      }),
-      env,
-    );
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
-      reachable: true,
-      sentinel_matched: true,
-      usage: { total_tokens: 18 },
+    expect(status.status).toBe(404);
+    expect(probe.status).toBe(404);
+    await expect(status.json()).resolves.toMatchObject({
+      error: { code: "ONLINE_DEMO_API_NOT_FOUND" },
     });
-    expect(env.AI.run).toHaveBeenCalledTimes(1);
+    await expect(probe.json()).resolves.toMatchObject({
+      error: { code: "ONLINE_DEMO_API_NOT_FOUND" },
+    });
   });
 
   it("serves an online synthetic dashboard instead of a preview-only error", async () => {

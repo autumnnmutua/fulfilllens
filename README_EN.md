@@ -6,7 +6,7 @@ FulfillLens is a local-first, open-source fulfillment analytics tool for logisti
 
 The project is designed to make every percentage, anomaly, and scenario traceable to fields, formulas, thresholds, samples, and order-level evidence instead of generating a merely plausible story.
 
-> Current stable version: `1.1.1`. Users do not need to rename CSV/XLSX columns to FulfillLens templates first. Keep Auto-detect (recommended), upload the file, and choose “Organize and analyze”: the engine combines headers, value profiles, column relationships, and the data contract to apply high-confidence mappings, generate safe internal IDs, retain unknown statuses, and ignore non-analytical columns. Only key ambiguities that could change business meaning require one confirmation. The Cloudflare edition performs custom-file parsing and analysis in the browser without uploading raw files or normalized rows to the Worker. See [Project status](#project-status-and-known-limitations).
+> Current stable version: `1.1.2`. Users do not need to rename CSV/XLSX columns to FulfillLens templates first. Keep Auto-detect (recommended), upload the file, and choose “Organize and analyze”: the engine combines headers, value profiles, column relationships, and the data contract to apply high-confidence mappings, generate safe internal IDs, retain unknown statuses, and ignore non-analytical columns. Only key ambiguities that could change business meaning require one confirmation. The Cloudflare edition performs custom-file parsing and analysis in the browser without uploading raw files or normalized rows to the Worker. See [Project status](#project-status-and-known-limitations).
 
 ## Why FulfillLens
 
@@ -197,7 +197,7 @@ During the brand migration, the legacy `fulfilllens-cn.esthertreu3724.workers.de
 
 The online edition loads public deterministic synthetic cases and supports metrics, dashboards, transparent diagnostics, order-level What-if recalculation, reports, and action recommendations. Its custom-file path performs extension/MIME/signature checks, CSV/XLSX parsing, field suggestions, status normalization, Schema validation, and quality checks in the browser. After confirmation, the browser-local engine calculates supported metrics, diagnostics, deterministic recommendation facts, and reports. Raw files and normalized rows are not sent to Cloudflare; confirmed normalized datasets remain only in this browser's IndexedDB and can be deleted in Settings. The Worker upload endpoint rejects raw bodies to protect older clients from accidental uploads.
 
-The current Cloudflare custom-file path does not yet run What-if simulation for browser-owned datasets; use the local or Docker edition for that workflow. User-created online scenarios for public cases remain runtime-only. `wrangler.jsonc` binds Workers AI as `AI`; AI is optional presentation assistance, receives no raw imported rows by default, and never calculates core KPIs or rule triggers. The Account ID and API token never enter browser assets or the repository.
+The current Cloudflare custom-file path does not yet run What-if simulation for browser-owned datasets; use the local or Docker edition for that workflow. User-created online scenarios for public cases remain runtime-only. The runtime has no external generative-inference binding, probe route, or model credential. Cloudflare deployment credentials are used only by the deployment process and never enter browser assets or the repository.
 
 ```powershell
 npm.cmd run build:cloudflare
@@ -278,7 +278,7 @@ See [Architecture](docs/ARCHITECTURE.md) and [ADRs](docs/adr/README.md). The Clo
 
 ## Project status and known limitations
 
-Stages 0–12, the v1.0.0 stable release, the v1.1.0 beginner-import work, and the v1.1.1 data-contract fixes are complete. The current version lets bundled CSV/XLSX files re-enter analysis directly, fixes empty and inconsistent duration distributions, and separately reports raw rows, valid rows, events, unique shipments, unique business orders, and analyzed entities. User files are not automatically mixed with demos or compatibility samples; switching files recomputes dashboards, diagnostics, recommendations, and reports. Current evidence includes:
+Stages 0–12, the v1.0.0 stable release, the v1.1.0 beginner-import work, the v1.1.1 data-contract fixes, and the v1.1.2 removal of external generative inference are complete. The current version lets bundled CSV/XLSX files re-enter analysis directly, fixes empty and inconsistent duration distributions, and separately reports raw rows, valid rows, events, unique shipments, unique business orders, and analyzed entities. User files are not automatically mixed with demos or compatibility samples; switching files recomputes dashboards, diagnostics, recommendations, and reports. Current evidence includes:
 
 - 108 frontend, 14 Cloudflare Worker, and 235 backend/contract tests;
 - 10,000/50,000-order performance benchmarks;
@@ -304,7 +304,7 @@ Reports and benchmarks are evidence for a specific revision, dataset, and machin
 - Stage 11: bilingual open-source docs, license, governance templates, and RC assets;
 - Stage 12: clean-environment acceptance and the v1.0 release decision.
 
-See the [Roadmap](docs/ROADMAP.md), [final acceptance record](docs/RELEASE_ACCEPTANCE.md), [compatibility validation report](docs/COMPATIBILITY_VALIDATION.md), [v1.0.0 release notes](docs/releases/v1.0.0.md), [v1.1.0 release notes](docs/releases/v1.1.0.md), and [v1.1.1 release notes](docs/releases/v1.1.1.md).
+See the [Roadmap](docs/ROADMAP.md), [final acceptance record](docs/RELEASE_ACCEPTANCE.md), [compatibility validation report](docs/COMPATIBILITY_VALIDATION.md), [v1.0.0 release notes](docs/releases/v1.0.0.md), [v1.1.0 release notes](docs/releases/v1.1.0.md), [v1.1.1 release notes](docs/releases/v1.1.1.md), and [v1.1.2 release notes](docs/releases/v1.1.2.md).
 
 ## Privacy, security, and disclaimer
 
@@ -312,7 +312,7 @@ See the [Roadmap](docs/ROADMAP.md), [final acceptance record](docs/RELEASE_ACCEP
 - names, phone numbers, detailed addresses, and identity numbers are risk indicators and are not written to logs;
 - reports exclude sensitive fields by default, and order identifiers require a second confirmation;
 - Cloudflare custom imports keep raw files in browser memory and store confirmed normalized datasets only in this browser's IndexedDB;
-- Workers AI is disabled by default, does not read imported data, and does not calculate metrics or rules;
+- The runtime has no external generative-inference API; metrics, diagnostics, recommendations, and reports use deterministic project logic;
 - real secrets belong only in ignored local `.env` files; credentials exposed in chat or logs must be rotated;
 - users must validate field meaning, timezone, quantity unit, promise definition, coverage, and rule thresholds.
 

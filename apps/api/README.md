@@ -36,8 +36,6 @@ FastAPI 本地 API。阶段 9 提供系统、导入、可复算履约指标、�
 - `POST /api/reports/jobs`
 - `GET/DELETE /api/reports/jobs/{job_id}`
 - `GET /api/reports/jobs/{job_id}/download`
-- `GET /api/integrations/workers-ai/status`
-- `POST /api/integrations/workers-ai/probe`
 
 在仓库根目录创建并激活虚拟环境后运行：
 
@@ -55,6 +53,6 @@ python -m uvicorn app.main:app --app-dir apps/api --reload --host 127.0.0.1 --po
 
 模拟器只变换订单/事件副本并重新调用指标引擎；方案元数据进入 SQLite，原始标准表保持只读。参数、公式、重采样和误用边界见 [`docs/SIMULATION.md`](../../docs/SIMULATION.md)。
 
-Workers AI 默认关闭，只允许固定合成连接探针，不接收订单数据或自由提示词。配置、显式确认请求头和令牌轮换要求见 [`docs/WORKERS_AI.md`](../../docs/WORKERS_AI.md)。
+API 不集成外部生成式推理接口。指标、诊断、建议和报告均使用项目内确定性实现；Cloudflare 发布凭据不属于应用运行配置。
 
 报告 API 使用同一筛选集合复用指标、诊断和模拟，默认掩码订单/事件标识。Markdown、自包含 HTML、五类 CSV、进度/取消、PDF 准入条件和示例报告见 [`docs/REPORTING.md`](../../docs/REPORTING.md)。

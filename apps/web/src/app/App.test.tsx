@@ -29,7 +29,7 @@ describe("FulfillLens 应用壳", () => {
             jsonResponse({
               status: "ok",
               service: "fulfilllens-api",
-              version: "1.1.1",
+              version: "1.1.2",
             }),
           );
         }
@@ -38,7 +38,7 @@ describe("FulfillLens 应用壳", () => {
           return Promise.resolve(
             jsonResponse({
               app_name: "FulfillLens",
-              app_version: "1.1.1",
+              app_version: "1.1.2",
               api_version: "v1",
               environment: "test",
               contract_versions: {
@@ -49,19 +49,6 @@ describe("FulfillLens 应用壳", () => {
                 simulation: "simulation-v1.0.0",
                 cases: "teaching-cases-v1.0.0",
               },
-            }),
-          );
-        }
-
-        if (url.endsWith("/api/integrations/workers-ai/status")) {
-          return Promise.resolve(
-            jsonResponse({
-              provider: "cloudflare_workers_ai",
-              enabled: false,
-              configured: false,
-              model: "@cf/meta/llama-3.1-8b-instruct-fast",
-              external_data_policy:
-                "仅允许显式合成探针；不会自动发送导入数据或个人信息。",
             }),
           );
         }
@@ -166,7 +153,7 @@ describe("FulfillLens 应用壳", () => {
     expect(screen.queryByText("开发中")).not.toBeInTheDocument();
   });
 
-  it("设置页只展示脱敏 Workers AI 状态，不提供浏览器密钥输入", async () => {
+  it("设置页只管理本地数据，不展示外部 AI 配置", async () => {
     window.history.pushState({}, "", "/settings");
 
     render(<App />);
@@ -176,12 +163,8 @@ describe("FulfillLens 应用壳", () => {
         name: "设置",
       }),
     ).toBeVisible();
-    expect(
-      screen.getByText("默认关闭", { selector: ".ant-tag" }),
-    ).toBeVisible();
-    expect(
-      screen.getByRole("button", { name: "执行合成连接探针" }),
-    ).toBeDisabled();
+    expect(screen.getByText(/管理本地数据集/)).toBeVisible();
+    expect(screen.queryByText(/Workers AI/i)).not.toBeInTheDocument();
     expect(
       screen.queryByRole("textbox", { name: /token|密钥/i }),
     ).not.toBeInTheDocument();

@@ -104,18 +104,6 @@ OT 依赖承诺和实际交付时间，IF 依赖订购和交付数量，OTIF 同
 - HTML/Markdown 是主路径，PDF 当前未开放；
 - 导出 CSV 前缀会被安全转义，这是防电子表格公式执行的预期行为。
 
-## Workers AI 探针失败
-
-默认关闭不影响其他功能。若明确启用：
-
-1. 确认 Account ID 为 32 位十六进制；
-2. Token 与账户匹配且状态 active；
-3. Token 具有 Workers AI 所需最小权限；
-4. 使用 `POST /api/integrations/workers-ai/probe` 并附 `X-FulfillLens-External-Call: confirm`；
-5. 不要把凭据写入浏览器、Issue、README 或测试。
-
-任何曾出现在聊天或日志中的 Token 都应轮换。
-
 ## 清理本地数据
 
 优先使用设置页。API 运行时，可在 PowerShell 列出并逐个删除：

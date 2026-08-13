@@ -29,7 +29,6 @@
 - [阶段 10 质量与发布门禁](QA_STAGE10.md)
 - [依赖许可证审查](DEPENDENCY_LICENSES.md)
 - [Cloudflare 部署可行性](CLOUDFLARE_DEPLOYMENT.md)
-- [Workers AI 可选连接](WORKERS_AI.md)
 
 ## 发布资料
 

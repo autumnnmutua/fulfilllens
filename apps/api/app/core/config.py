@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit
 
-from pydantic import Field, SecretStr, field_validator, model_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 API_ROOT = Path(__file__).resolve().parents[2]
@@ -16,7 +16,7 @@ DEFAULT_CORS_ORIGINS = [
 
 class Settings(BaseSettings):
     app_name: str = "FulfillLens"
-    app_version: str = "1.1.1"
+    app_version: str = "1.1.2"
     api_version: str = "v1"
     environment: Literal["development", "test", "production"] = "development"
     host: str = "127.0.0.1"
@@ -25,11 +25,6 @@ class Settings(BaseSettings):
     import_root: Path = PROJECT_ROOT / "data" / "local" / "imports"
     analytics_database: Path = PROJECT_ROOT / "data" / "local" / "analytics.duckdb"
     control_database: Path = PROJECT_ROOT / "data" / "local" / "control.sqlite3"
-    workers_ai_enabled: bool = False
-    cloudflare_account_id: str | None = None
-    cloudflare_api_token: SecretStr | None = None
-    workers_ai_model: str = "@cf/meta/llama-3.1-8b-instruct-fast"
-    workers_ai_timeout_seconds: float = Field(default=20.0, ge=1.0, le=60.0)
     max_upload_bytes: int = Field(default=10 * 1024 * 1024, ge=1024)
     max_xlsx_uncompressed_bytes: int = Field(default=50 * 1024 * 1024, ge=1024)
     max_xlsx_entries: int = Field(default=512, ge=16, le=10_000)
@@ -77,48 +72,6 @@ class Settings(BaseSettings):
     def resolve_local_path(cls, value: Path) -> Path:
         path = value if value.is_absolute() else PROJECT_ROOT / value
         return path.resolve()
-
-    @field_validator("cloudflare_account_id", mode="before")
-    @classmethod
-    def normalize_optional_account_id(cls, value: object) -> object:
-        if isinstance(value, str):
-            return value.strip() or None
-        return value
-
-    @field_validator("cloudflare_api_token", mode="before")
-    @classmethod
-    def normalize_optional_api_token(cls, value: object) -> object:
-        if isinstance(value, str):
-            return value.strip() or None
-        return value
-
-    @field_validator("cloudflare_account_id")
-    @classmethod
-    def validate_cloudflare_account_id(cls, value: str | None) -> str | None:
-        if value is not None and (
-            len(value) != 32
-            or any(character not in "0123456789abcdefABCDEF" for character in value)
-        ):
-            raise ValueError("Cloudflare Account ID 必须是 32 位十六进制字符串")
-        return value.lower() if value is not None else None
-
-    @field_validator("workers_ai_model")
-    @classmethod
-    def validate_workers_ai_model(cls, value: str) -> str:
-        allowed = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@/._-")
-        if not value.startswith("@cf/") or any(character not in allowed for character in value):
-            raise ValueError("Workers AI 模型必须是安全的 @cf/ 模型标识")
-        return value
-
-    @model_validator(mode="after")
-    def validate_workers_ai_configuration(self) -> "Settings":
-        has_account = self.cloudflare_account_id is not None
-        has_token = self.cloudflare_api_token is not None
-        if has_account != has_token:
-            raise ValueError("Cloudflare Account ID 与 API Token 必须同时配置")
-        if self.workers_ai_enabled and not has_account:
-            raise ValueError("启用 Workers AI 前必须配置 Account ID 与 API Token")
-        return self
 
 
 @lru_cache(maxsize=1)

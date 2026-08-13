@@ -8,7 +8,7 @@ def test_health_smoke(client: TestClient) -> None:
     assert response.json() == {
         "status": "ok",
         "service": "fulfilllens-api",
-        "version": "1.1.1",
+        "version": "1.1.2",
     }
     assert response.headers["X-Request-ID"]
 
@@ -19,7 +19,7 @@ def test_version_exposes_contract_versions(client: TestClient) -> None:
     assert response.status_code == 200
     assert response.json() == {
         "app_name": "FulfillLens",
-        "app_version": "1.1.1",
+        "app_version": "1.1.2",
         "api_version": "v1",
         "environment": "test",
         "contract_versions": {
@@ -60,7 +60,7 @@ def test_cors_allows_only_configured_development_origin(
         headers={
             "Origin": "http://localhost:5173",
             "Access-Control-Request-Method": "POST",
-            "Access-Control-Request-Headers": "X-FulfillLens-External-Call",
+            "Access-Control-Request-Headers": "Content-Type",
         },
     )
     denied = client.options(
@@ -73,8 +73,18 @@ def test_cors_allows_only_configured_development_origin(
 
     assert allowed.status_code == 200
     assert allowed.headers["access-control-allow-origin"] == "http://localhost:5173"
-    assert "X-FulfillLens-External-Call" in allowed.headers["access-control-allow-headers"]
+    assert "Content-Type" in allowed.headers["access-control-allow-headers"]
     assert "access-control-allow-origin" not in denied.headers
+
+
+def test_removed_external_ai_routes_return_standard_not_found(client: TestClient) -> None:
+    status = client.get("/api/integrations/workers-ai/status")
+    probe = client.post("/api/integrations/workers-ai/probe")
+
+    assert status.status_code == 404
+    assert probe.status_code == 404
+    assert status.json()["error"]["code"] == "NOT_FOUND"
+    assert probe.json()["error"]["code"] == "NOT_FOUND"
 
 
 def test_openapi_documents_success_and_standard_error_contracts(

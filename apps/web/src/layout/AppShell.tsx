@@ -145,7 +145,7 @@ export function AppShell({ children }: PropsWithChildren) {
           ) : null}
           {!isDesktop ? <Brand /> : <span />}
           <Space>
-            <Tag color="blue">v1.1.1</Tag>
+            <Tag color="blue">v1.1.2</Tag>
           </Space>
         </Header>
 
@@ -157,7 +157,7 @@ export function AppShell({ children }: PropsWithChildren) {
                 type="info"
                 showIcon
                 message="Cloudflare 在线版：合成演示与浏览器本地分析"
-                description="同源 Worker 提供合成案例；自主 CSV/XLSX 的解析、标准化、指标、诊断、行动建议和报告在当前浏览器完成，原始文件和标准化行不发送给 Worker。Workers AI 只在你确认后发送固定连接探针。"
+                description="同源 Worker 提供合成案例；自主 CSV/XLSX 的解析、标准化、指标、诊断、行动建议和报告在当前浏览器完成，原始文件和标准化行不发送给 Worker 或第三方服务。"
               />
             ) : null}
             {children}
