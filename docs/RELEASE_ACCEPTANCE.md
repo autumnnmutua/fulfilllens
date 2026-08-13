@@ -52,6 +52,10 @@
 | `npm.cmd run smoke`                                           |         0 | API/Web、1.1.2 版本、主要路由及兼容 CSV/XLSX 下载通过                                   |
 | `docker compose build/up --wait` + 宿主机探测                 |         0 | Docker 29.6.2；API/Web 健康，版本 1.1.2，设置页无旧入口，旧 API 为 404；专用卷已清理    |
 | `wrangler@4.120.0 deploy --dry-run`                           |         0 | 读取 23 个静态资产；唯一运行绑定为 `env.ASSETS`                                         |
+| GitHub Actions CI `31668965883`                               |         0 | 静态/测试/构建任务与独立 Docker/浏览器烟雾任务均通过                                    |
+| `npm.cmd run deploy:cloudflare`                               |         0 | 正式部署 Worker `fulfilllens`；Version ID `7dd4b3e8-a8f8-4d53-8b3c-e9b58a8b72bc`        |
+| 生产 `npm.cmd run test:browser-import`                        |         0 | 18 个自主导入/分析场景通过；原始上传请求 0                                              |
+| 生产 `npm.cmd run test:browser`                               |         0 | 8 路由 × 5 视口共 40 组通过，无 axe 违规或横向溢出                                      |
 
 首次审计在 Windows 中文用户路径上因 `pip-api` 错误按 UTF-8 解码本机输出而失败；设置 UTF-8 后又发现原命令错误包含全局 Jupyter 等非项目软件。现已使用 `scripts/audit_python.py` 固定 UTF-8，并只审计锁定的 `apps/api/requirements-dev.txt`；项目依赖结果为 0 已知漏洞，未忽略任何项目包。
 
@@ -70,8 +74,12 @@
 - Worker：`fulfilllens`
 - production URL：<https://fulfilllens.esthertreu3724.workers.dev>
 - pre-deploy validation：PASS，dry-run 只显示 `env.ASSETS`
-- production deploy/version：待候选提交与 CI 通过后记录
-- production smoke：待部署后执行
+- accepted application commit：`e93ccd9e57405f79a5cc46db5663d0a6ec503480`
+- accepted production Version ID：`7dd4b3e8-a8f8-4d53-8b3c-e9b58a8b72bc`
+- deployed at：2026-08-13 13:08:46（Asia/Shanghai）
+- bindings：仅 `env.ASSETS`，无外部生成式推理 binding
+- API smoke：`/health` 和 `/api/version` 返回 1.1.2；三套合成案例可读取；两个旧集成路径均返回 `ONLINE_DEMO_API_NOT_FOUND`/404
+- browser smoke：18 个生产导入/分析场景及 40 组全站审计通过；设置页无旧入口、无集成请求，原始上传请求为 0
 
 ## Release Assets
 
@@ -92,6 +100,6 @@
 
 ## Final Verdict
 
-**LOCAL RELEASE GATE PASSED；PRODUCTION DEPLOYMENT PENDING**
+**READY FOR v1.1.2**
 
-本地代码、浏览器、Docker、依赖、安全、文档与 Wrangler dry-run 门槛均已通过。只有 Cloudflare 正式部署、生产浏览器复验和 GitHub Actions 通过后，才把结论更新为 `READY FOR v1.1.2` 并创建正式 tag/Release。
+本地代码、浏览器、Docker、依赖、安全、文档、Wrangler dry-run、Cloudflare 正式部署、生产浏览器复验和 GitHub Actions 均已通过。验收证据提交再次通过 CI 后，可从同一运行时代码创建 `v1.1.2` annotated tag 与正式 Release。
