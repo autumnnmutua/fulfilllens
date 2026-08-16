@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import {
   activateBrowserAnalysisSession,
+  BROWSER_ANALYSIS_SESSION_KEY,
   browserSessionSelection,
   readBrowserAnalysisSession,
 } from "./browserAnalysisSession";
@@ -83,5 +84,24 @@ describe("分析会话隔离", () => {
     expect(initialAnalysisDataset("tracking_events")).toBe(
       "browser-local-legacy-user-tracking",
     );
+  });
+
+  it("损坏的旧会话不会因非字符串数据集编号使分析页崩溃", () => {
+    window.localStorage.setItem(
+      BROWSER_ANALYSIS_SESSION_KEY,
+      JSON.stringify({
+        activeDataType: "tracking_events",
+        activatedAt: "2026-08-16T00:00:00.000Z",
+        datasetIds: { tracking_events: 42 },
+        fileNames: { tracking_events: "legacy.csv" },
+        fingerprint: "sha256-legacy",
+        sessionId: "legacy-session",
+        sourceKind: "user_import",
+        version: 1,
+      }),
+    );
+
+    expect(readBrowserAnalysisSession()).toBeNull();
+    expect(() => initialAnalysisDataset("tracking_events")).not.toThrow();
   });
 });

@@ -45,7 +45,7 @@ describe("Cloudflare Worker", () => {
 
     await expect(health.json()).resolves.toMatchObject({
       status: "ok",
-      version: "1.1.2",
+      version: "1.1.3",
     });
     await expect(version.json()).resolves.toMatchObject({
       environment: "cloudflare-online-demo",

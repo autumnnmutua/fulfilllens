@@ -1,6 +1,6 @@
 import { handleOnlineDemoApi } from "./online-demo";
 
-const APP_VERSION = "1.1.2";
+const APP_VERSION = "1.1.3";
 const API_VERSION = "v1";
 
 interface AssetsBinding {

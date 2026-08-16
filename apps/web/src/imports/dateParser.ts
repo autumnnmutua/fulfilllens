@@ -204,7 +204,20 @@ function normalizedExplicitOffset(text: string): ParsedImportDate | null {
   const matched = normalized.match(
     /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/i,
   );
-  if (!matched || !Number.isFinite(Date.parse(normalized))) invalidDate();
+  if (!matched) invalidDate();
+  const parts: DateParts = {
+    day: Number(matched[3]),
+    hour: Number(matched[4]),
+    minute: Number(matched[5]),
+    month: Number(matched[2]),
+    second: Number(matched[6] ?? 0),
+    year: Number(matched[1]),
+  };
+  // Date.parse normalizes impossible ISO dates such as February 30 into the
+  // following month. Validate the source wall-clock components first so an
+  // explicit offset never turns bad source data into an apparently valid KPI.
+  if (!validParts(parts) || !Number.isFinite(Date.parse(normalized)))
+    invalidDate();
   const offset = matched[7]?.toUpperCase() === "Z" ? "+00:00" : matched[7];
   return {
     iso: `${matched[1]}-${matched[2]}-${matched[3]}T${matched[4]}:${matched[5]}:${matched[6] ?? "00"}${offset}`,

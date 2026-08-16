@@ -745,11 +745,14 @@ describe("浏览器本地 CSV/XLSX 导入", () => {
     });
   });
 
-  it("无效日期不会被静默纠正", () => {
-    expect(() => parseImportDateValue("2026-02-31", "Asia/Shanghai")).toThrow(
-      /无法可靠解析/,
-    );
-  });
+  it.each(["2026-02-31", "2026-02-30T10:00:00+08:00", "2026-04-31T10:00:00Z"])(
+    "无效日期 %s 不会被 JavaScript 静默滚入下个月",
+    (source) => {
+      expect(() => parseImportDateValue(source, "Asia/Shanghai")).toThrow(
+        /无法可靠解析/,
+      );
+    },
+  );
 
   it("解析多工作表时不忽略其他工作表，只有用户选择后读取数据", async () => {
     const selected = fixture(

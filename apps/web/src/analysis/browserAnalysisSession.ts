@@ -27,21 +27,50 @@ function storage(): Storage | null {
   return typeof window === "undefined" ? null : window.localStorage;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function isDataTypeStringRecord(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  return DATA_TYPES.every((dataType) => {
+    const item = value[dataType];
+    return item === undefined || (typeof item === "string" && item.length > 0);
+  });
+}
+
+function isAnalysisSession(value: unknown): value is BrowserAnalysisSession {
+  if (!isRecord(value)) return false;
+  return (
+    value.version === 1 &&
+    typeof value.sessionId === "string" &&
+    value.sessionId.length > 0 &&
+    typeof value.fingerprint === "string" &&
+    value.fingerprint.length > 0 &&
+    typeof value.activatedAt === "string" &&
+    DATA_TYPES.includes(value.activeDataType as DataType) &&
+    isDataTypeStringRecord(value.datasetIds) &&
+    (value.fileNames === undefined ||
+      isDataTypeStringRecord(value.fileNames)) &&
+    ["user_import", "compatibility_sample", "teaching_data"].includes(
+      String(value.sourceKind),
+    )
+  );
+}
+
 export function readBrowserAnalysisSession(): BrowserAnalysisSession | null {
-  const raw = storage()?.getItem(SESSION_KEY);
+  const local = storage();
+  const raw = local?.getItem(SESSION_KEY);
   if (!raw) return null;
   try {
-    const value = JSON.parse(raw) as BrowserAnalysisSession;
-    if (
-      value.version !== 1 ||
-      !value.sessionId ||
-      !value.fingerprint ||
-      !DATA_TYPES.includes(value.activeDataType)
-    ) {
+    const value: unknown = JSON.parse(raw);
+    if (!isAnalysisSession(value)) {
+      local?.removeItem(SESSION_KEY);
       return null;
     }
     return value;
   } catch {
+    local?.removeItem(SESSION_KEY);
     return null;
   }
 }
