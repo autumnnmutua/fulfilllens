@@ -6,7 +6,7 @@
 - branch：`main`
 - date：2026-08-26（Asia/Shanghai）
 - rollback baseline：`v1.1.3` / commit `71d4dbe4fc440942176ad61845b424e8841fceec`
-- accepted runtime commit：待运行时代码提交后补充
+- accepted runtime commit：`62089dc2809b7d07a5906355e415d688dc3a8a65`
 - accepted release commit：以最终 annotated tag `v1.1.4^{commit}` 为准；相对 runtime commit 只允许补充验收证据
 - compatibility：`v1.0.0` 至 `v1.1.3` 的 tag、Release 与 Git 历史均不修改
 
@@ -44,7 +44,11 @@
 | 本地 Chromium 页面审计                  |         0 | 8 路由 × 5 视口共 40 组通过                                                           |
 | `npm.cmd run smoke`                     |         0 | API/Web、版本、代理、兼容样例与主要路由通过                                           |
 | `docker compose config --quiet`         |         0 | Compose 配置有效                                                                      |
-| Docker 构建与运行 smoke                 |    未执行 | Docker Desktop 引擎未运行；没有启动系统服务，也没有接触现有 `fulfilllens-cn` 数据卷   |
+| GitHub Actions run `32932992396`        |         0 | 质量 job 与独立 Docker 构建/启动/健康/浏览器/只读资产 smoke 全部通过                  |
+| 生产 `test:browser-import`              |         0 | Cloudflare 上 18 个 CSV/XLSX、映射、分析、持久化场景通过；原始上传请求 0              |
+| 生产 Chromium 页面审计                  |         0 | 8 路由 × 5 视口共 40 组通过，无 axe 违规、横向溢出或未命名交互控件                    |
+
+首次 CI run `32932069423` 暴露了浏览器 E2E 在重复访问同一路由时复用旧页面状态的问题；修复为每次导航使用独立运行标识并检查导航响应后，定向浏览器测试、本地全量门槛及上述独立 CI 均重新通过。
 
 ## Security and Privacy
 
@@ -59,10 +63,10 @@
 - Worker：`fulfilllens`
 - production URL：<https://fulfilllens.esthertreu3724.workers.dev>
 - rollback Version ID：`8717da49-5280-4dd2-a94a-0864a20d5736`（v1.1.3）
-- accepted production Version ID：待正式部署后补充
-- deployed at：待正式部署后补充
-- bindings：预期仅 `env.ASSETS`，以 Wrangler 正式输出为准
-- production smoke：待正式部署后补充
+- accepted production Version ID：`4d8e5eda-c452-4067-9348-c41a76343c00`
+- deployed at：2026-08-26 13:16:42（Asia/Shanghai）
+- bindings：仅 `env.ASSETS`
+- production smoke：`/health`、`/api/version`、8 个 SPA 路由、18 个浏览器导入场景与 40 组页面审计全部通过；`/api/version` 返回 `1.1.4`
 
 ## Release Assets
 
@@ -78,11 +82,11 @@
 4. Ant Design 仍有弃用提示，且主依赖分块较大；属于后续兼容与性能改进项，不影响本补丁数据正确性。
 5. 自动映射不能保证覆盖所有企业私有字段；会改变业务含义的关键歧义仍需要一次确认。
 6. 未识别状态保留为 `unmapped` 并降低状态覆盖率，不会被猜成正常状态。
-7. 本机 Docker 引擎未运行，因此本轮本地 Docker 运行态 smoke 尚未完成；GitHub Actions 的独立 Docker job 必须通过才能发布。
+7. 本机 Docker 引擎未运行；独立 GitHub Actions Docker job 已完成构建、启动、健康、浏览器与只读资产 smoke，未使用或删除本机既有数据卷。
 8. `workers.dev` 地址没有自有域名 SLA、多租户身份或长期云存储承诺。
 
 ## Final Verdict
 
-**PENDING v1.1.4 RELEASE GATE**
+**READY FOR v1.1.4**
 
-本地静态、单元、集成、浏览器与运行态检查已通过。正式发布仍需完成版本化代码提交、GitHub Actions（含 Docker）、Wrangler dry-run/正式部署、生产浏览器复验和最终验收证据提交。
+本地静态、单元、集成、浏览器与运行态检查、GitHub Actions（含独立 Docker）、Wrangler 正式部署和生产浏览器复验均已通过。最终验收证据提交相对 accepted runtime commit 仅修改本文档；该提交再次通过 CI 后可创建 annotated tag 与正式 GitHub Release。
