@@ -30,10 +30,12 @@ const manualCsvPaths = [
   process.env.FL_MANUAL_CSV_2,
 ].filter(Boolean);
 const runNonce = Date.now().toString(36);
+let navigationSequence = 0;
 
 function route(pathname) {
   const target = new URL(pathname, baseUrl);
-  target.searchParams.set("_fl_e2e", runNonce);
+  navigationSequence += 1;
+  target.searchParams.set("_fl_e2e", `${runNonce}-${navigationSequence}`);
   return target.toString();
 }
 const executablePath =
@@ -255,9 +257,25 @@ async function openMapping(
   sheetName,
   expectedDataType = "物流轨迹数据",
 ) {
-  await page.goto(route("/import"), { waitUntil: "networkidle" });
+  const response = await page.goto(route("/import"), {
+    waitUntil: "networkidle",
+  });
+  if (!response?.ok()) {
+    throw new Error(
+      `Import route returned ${response?.status() ?? "no response"}`,
+    );
+  }
   await assertPublicBrand(page);
-  await page.getByText("自动识别（推荐）", { exact: true }).waitFor();
+  try {
+    await page.getByText("自动识别（推荐）", { exact: true }).waitFor();
+  } catch (error) {
+    throw new Error(
+      `Import wizard did not reset to data-type selection at ${page.url()}. Visible text:\n${(
+        await page.locator("body").innerText()
+      ).slice(-3000)}`,
+      { cause: error },
+    );
+  }
   await chooseCustomFile(page, filePath);
   await parseSelectedFile(page, sheetName);
   await page
