@@ -27,6 +27,7 @@ REQUIRED_FILES = (
     "docs/releases/v1.1.1.md",
     "docs/releases/v1.1.2.md",
     "docs/releases/v1.1.3.md",
+    "docs/releases/v1.1.4.md",
     ".github/ISSUE_TEMPLATE/bug.yml",
     ".github/ISSUE_TEMPLATE/feature.yml",
     ".github/ISSUE_TEMPLATE/data-mapping.yml",

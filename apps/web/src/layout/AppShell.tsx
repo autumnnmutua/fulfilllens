@@ -145,7 +145,7 @@ export function AppShell({ children }: PropsWithChildren) {
           ) : null}
           {!isDesktop ? <Brand /> : <span />}
           <Space>
-            <Tag color="blue">v1.1.3</Tag>
+            <Tag color="blue">v1.1.4</Tag>
           </Space>
         </Header>
 

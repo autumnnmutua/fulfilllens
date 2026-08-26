@@ -83,12 +83,53 @@ function transactionRequest<T>(
           resolve(null);
           return;
         }
-        const transaction = database.transaction(STORE_NAME, mode);
-        const request = run(transaction.objectStore(STORE_NAME));
+        let settled = false;
+        let result: T | null = null;
+        const fail = (error: unknown) => {
+          if (settled) return;
+          settled = true;
+          database.close();
+          const message =
+            error &&
+            typeof error === "object" &&
+            "message" in error &&
+            typeof error.message === "string"
+              ? error.message
+              : "浏览器数据存储操作失败。";
+          reject(error instanceof Error ? error : new Error(message));
+        };
+        let transaction: IDBTransaction;
+        let request: IDBRequest<T>;
+        try {
+          transaction = database.transaction(STORE_NAME, mode);
+          request = run(transaction.objectStore(STORE_NAME));
+        } catch (error) {
+          fail(error);
+          return;
+        }
         request.onerror = () =>
-          reject(request.error ?? new Error("浏览器数据存储操作失败。"));
-        request.onsuccess = () => resolve(request.result);
-        transaction.oncomplete = () => database.close();
+          fail(request.error ?? new Error("浏览器数据存储操作失败。"));
+        request.onsuccess = () => {
+          result = request.result;
+        };
+        transaction.onerror = () =>
+          fail(
+            transaction.error ??
+              request.error ??
+              new Error("浏览器数据存储事务失败。"),
+          );
+        transaction.onabort = () =>
+          fail(
+            transaction.error ??
+              request.error ??
+              new Error("浏览器数据存储事务已中止。"),
+          );
+        transaction.oncomplete = () => {
+          if (settled) return;
+          settled = true;
+          database.close();
+          resolve(result);
+        };
       }),
   );
 }
@@ -96,8 +137,8 @@ function transactionRequest<T>(
 export async function saveBrowserDataset(
   dataset: BrowserDataset,
 ): Promise<void> {
-  memoryDatasets.set(dataset.datasetId, dataset);
   await transactionRequest("readwrite", (store) => store.put(dataset));
+  memoryDatasets.set(dataset.datasetId, dataset);
 }
 
 export async function readBrowserDataset(
@@ -114,8 +155,8 @@ export async function readBrowserDataset(
 }
 
 export async function deleteBrowserDataset(datasetId: string): Promise<void> {
-  memoryDatasets.delete(datasetId);
   await transactionRequest("readwrite", (store) => store.delete(datasetId));
+  memoryDatasets.delete(datasetId);
 }
 
 export async function listBrowserDatasets(): Promise<BrowserDataset[]> {

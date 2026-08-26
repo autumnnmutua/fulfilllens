@@ -177,6 +177,20 @@ function invalidDate(): never {
   );
 }
 
+function validUtcOffset(hoursText: string, minutesText: string): boolean {
+  const hours = Number(hoursText);
+  const minutes = Number(minutesText);
+  return (
+    Number.isInteger(hours) &&
+    Number.isInteger(minutes) &&
+    hours >= 0 &&
+    hours <= 14 &&
+    minutes >= 0 &&
+    minutes <= 59 &&
+    (hours < 14 || minutes === 0)
+  );
+}
+
 function normalizedExplicitOffset(text: string): ParsedImportDate | null {
   const gmt = text.match(
     /^(?:[A-Za-z]{3}\s+)?([A-Za-z]{3})\s+(\d{1,2})\s+(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s+GMT([+-])(\d{2})(\d{2})(?:\s+\([^)]*\))?$/i,
@@ -192,7 +206,8 @@ function normalizedExplicitOffset(text: string): ParsedImportDate | null {
       second: Number(gmt[6] ?? 0),
       year: Number(gmt[3]),
     };
-    if (!validParts(parts)) invalidDate();
+    if (!validParts(parts) || !validUtcOffset(gmt[8] ?? "", gmt[9] ?? ""))
+      invalidDate();
     return {
       iso: `${parts.year}-${pad(parts.month)}-${pad(parts.day)}T${pad(parts.hour)}:${pad(parts.minute)}:${pad(parts.second)}${gmt[7]}${gmt[8]}:${gmt[9]}`,
       precision: gmt[6] ? "second" : "minute",
@@ -213,10 +228,17 @@ function normalizedExplicitOffset(text: string): ParsedImportDate | null {
     second: Number(matched[6] ?? 0),
     year: Number(matched[1]),
   };
+  const offsetMatch = matched[7]?.match(/^([+-])(\d{2}):(\d{2})$/);
   // Date.parse normalizes impossible ISO dates such as February 30 into the
   // following month. Validate the source wall-clock components first so an
   // explicit offset never turns bad source data into an apparently valid KPI.
-  if (!validParts(parts) || !Number.isFinite(Date.parse(normalized)))
+  if (
+    !validParts(parts) ||
+    (matched[7]?.toUpperCase() !== "Z" &&
+      (!offsetMatch ||
+        !validUtcOffset(offsetMatch[2] ?? "", offsetMatch[3] ?? ""))) ||
+    !Number.isFinite(Date.parse(normalized))
+  )
     invalidDate();
   const offset = matched[7]?.toUpperCase() === "Z" ? "+00:00" : matched[7];
   return {
